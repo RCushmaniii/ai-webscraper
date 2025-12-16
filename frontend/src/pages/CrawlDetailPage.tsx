@@ -1,0 +1,407 @@
+import React, { useState, useEffect } from 'react';
+import { useParams, Link } from 'react-router-dom';
+import { apiService, Crawl, Page, Link as CrawlLink, Issue } from '../services/api';
+
+const CrawlDetailPage: React.FC = () => {
+  const { id } = useParams<{ id: string }>();
+  const [crawl, setCrawl] = useState<Crawl | null>(null);
+  const [pages, setPages] = useState<Page[]>([]);
+  const [links, setLinks] = useState<CrawlLink[]>([]);
+  const [issues, setIssues] = useState<Issue[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState('pages');
+  const [pageLoading, setPageLoading] = useState(false);
+
+  useEffect(() => {
+    if (!id) return;
+    
+    const fetchCrawlData = async () => {
+      try {
+        setLoading(true);
+        
+        // Fetch crawl details
+        const crawlData = await apiService.getCrawl(id);
+        setCrawl(crawlData);
+ 
+        // Always fetch page inventory (v1 core dataset)
+        try {
+          const pagesData = await apiService.getCrawlPages(id);
+          setPages(pagesData);
+        } catch (err) {
+          console.error('Error fetching pages:', err);
+        }
+        
+      } catch (err) {
+        console.error('Error fetching crawl:', err);
+        setError('Failed to load crawl data. Please try again later.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCrawlData();
+  }, [id]);
+
+  const fetchTabData = async (tab: string) => {
+    if (!id) return;
+    
+    setPageLoading(true);
+    
+    try {
+      switch (tab) {
+        case 'pages':
+          if (pages.length === 0) {
+            const pagesData = await apiService.getCrawlPages(id);
+            setPages(pagesData);
+          }
+          break;
+        case 'links':
+          if (links.length === 0) {
+            const linksData = await apiService.getCrawlLinks(id);
+            setLinks(linksData);
+          }
+          break;
+        case 'issues':
+          if (issues.length === 0) {
+            const issuesData = await apiService.getCrawlIssues(id);
+            setIssues(issuesData);
+          }
+          break;
+        default:
+          break;
+      }
+    } catch (err) {
+      console.error(`Error fetching ${tab}:`, err);
+      setError(`Failed to load ${tab} data. Please try again later.`);
+    } finally {
+      setPageLoading(false);
+    }
+  };
+
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    fetchTabData(tab);
+  };
+
+  const getStatusBadgeClass = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return 'bg-green-100 text-green-800';
+      case 'in_progress':
+        return 'bg-blue-100 text-blue-800';
+      case 'queued':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'failed':
+        return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleString();
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-lg font-medium text-gray-500">Loading crawl data...</div>
+      </div>
+    );
+  }
+
+  if (error || !crawl) {
+    return (
+      <div className="container px-4 py-8 mx-auto">
+        <div className="p-4 mb-6 text-sm text-red-700 bg-red-100 rounded-md" role="alert">
+          {error || 'Crawl not found'}
+        </div>
+        <Link to="/crawls" className="text-indigo-600 hover:text-indigo-800">
+          &larr; Back to Crawls
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="container px-4 py-8 mx-auto">
+      <div className="mb-6">
+        <Link to="/crawls" className="text-indigo-600 hover:text-indigo-800">
+          &larr; Back to Crawls
+        </Link>
+      </div>
+
+      <div className="mb-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-3xl font-bold text-gray-900">{crawl.name}</h1>
+          <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusBadgeClass(crawl.status)}`}>
+            {crawl.status}
+          </span>
+        </div>
+        <p className="mt-2 text-gray-600">
+          <span className="font-medium">URL:</span> {crawl.url}
+        </p>
+        <div className="grid grid-cols-1 gap-4 mt-4 sm:grid-cols-2 md:grid-cols-4">
+          <div className="p-3 bg-gray-50 rounded-md">
+            <span className="text-sm text-gray-500">Created</span>
+            <p className="text-gray-800">{formatDate(crawl.created_at)}</p>
+          </div>
+          <div className="p-3 bg-gray-50 rounded-md">
+            <span className="text-sm text-gray-500">Max Depth</span>
+            <p className="text-gray-800">{crawl.max_depth}</p>
+          </div>
+          <div className="p-3 bg-gray-50 rounded-md">
+            <span className="text-sm text-gray-500">Max Pages</span>
+            <p className="text-gray-800">{crawl.max_pages}</p>
+          </div>
+          <div className="p-3 bg-gray-50 rounded-md">
+            <span className="text-sm text-gray-500">JavaScript Rendering</span>
+            <p className="text-gray-800">{crawl.js_rendering ? 'Enabled' : 'Disabled'}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="mb-6 border-b border-gray-200">
+        <nav className="flex -mb-px space-x-8">
+          <button
+            onClick={() => handleTabChange('pages')}
+            className={`py-4 text-sm font-medium border-b-2 ${
+              activeTab === 'pages'
+                ? 'border-indigo-500 text-indigo-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            Pages
+          </button>
+          <button
+            onClick={() => handleTabChange('links')}
+            className={`py-4 text-sm font-medium border-b-2 ${
+              activeTab === 'links'
+                ? 'border-indigo-500 text-indigo-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            Links
+          </button>
+          <button
+            onClick={() => handleTabChange('issues')}
+            className={`py-4 text-sm font-medium border-b-2 ${
+              activeTab === 'issues'
+                ? 'border-indigo-500 text-indigo-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            Issues
+          </button>
+        </nav>
+      </div>
+
+      {/* Tab Content */}
+      <div className="bg-white rounded-lg shadow">
+        {pageLoading ? (
+          <div className="flex items-center justify-center h-64">
+            <div className="text-lg font-medium text-gray-500">Loading data...</div>
+          </div>
+        ) : (
+          <>
+            {/* Pages Tab */}
+            {activeTab === 'pages' && (
+              <div className="p-6">
+                <h2 className="mb-4 text-xl font-semibold text-gray-800">Crawled Pages</h2>
+                
+                {pages.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
+                            Title
+                          </th>
+                          <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
+                            URL
+                          </th>
+                          <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
+                            Status
+                          </th>
+                          <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
+                            Depth
+                          </th>
+                          <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
+                            Load Time
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {pages.map((page) => (
+                          <tr key={page.id} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm text-gray-900">{page.title || 'No title'}</div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="text-sm text-gray-500 truncate max-w-xs" title={page.url}>
+                                {page.url}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                page.status_code >= 200 && page.status_code < 300
+                                  ? 'bg-green-100 text-green-800'
+                                  : page.status_code >= 300 && page.status_code < 400
+                                  ? 'bg-yellow-100 text-yellow-800'
+                                  : 'bg-red-100 text-red-800'
+                              }`}>
+                                {page.status_code}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm text-gray-500">{page.crawl_depth}</div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm text-gray-500">{page.load_time_ms}ms</div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="p-4 text-sm text-gray-700 bg-gray-100 rounded-md">
+                    <p>No pages found for this crawl.</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Links Tab */}
+            {activeTab === 'links' && (
+              <div className="p-6">
+                <h2 className="mb-4 text-xl font-semibold text-gray-800">Links</h2>
+                
+                {links.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
+                            Source
+                          </th>
+                          <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
+                            Target
+                          </th>
+                          <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
+                            Anchor Text
+                          </th>
+                          <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
+                            Type
+                          </th>
+                          <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
+                            Status
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {links.map((link) => (
+                          <tr key={link.id} className="hover:bg-gray-50">
+                            <td className="px-6 py-4">
+                              <div className="text-sm text-gray-500 truncate max-w-xs" title={link.source_url}>
+                                {link.source_url}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="text-sm text-gray-500 truncate max-w-xs" title={link.target_url}>
+                                {link.target_url}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="text-sm text-gray-900 truncate max-w-xs" title={link.anchor_text}>
+                                {link.anchor_text || 'No text'}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                link.is_internal
+                                  ? 'bg-blue-100 text-blue-800'
+                                  : 'bg-purple-100 text-purple-800'
+                              }`}>
+                                {link.is_internal ? 'Internal' : 'External'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              {link.is_broken ? (
+                                <span className="inline-flex px-2 py-1 text-xs font-semibold text-red-800 bg-red-100 rounded-full">
+                                  Broken {link.status_code ? `(${link.status_code})` : ''}
+                                </span>
+                              ) : (
+                                <span className="inline-flex px-2 py-1 text-xs font-semibold text-green-800 bg-green-100 rounded-full">
+                                  OK {link.status_code ? `(${link.status_code})` : ''}
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="p-4 text-sm text-gray-700 bg-gray-100 rounded-md">
+                    <p>No links found for this crawl.</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Issues Tab */}
+            {activeTab === 'issues' && (
+              <div className="p-6">
+                <h2 className="mb-4 text-xl font-semibold text-gray-800">Issues</h2>
+                
+                {issues.length > 0 ? (
+                  <div className="space-y-4">
+                    {issues.map((issue) => (
+                      <div 
+                        key={issue.id} 
+                        className={`p-4 rounded-md ${
+                          issue.severity === 'high' 
+                            ? 'bg-red-50 border-l-4 border-red-500' 
+                            : issue.severity === 'medium'
+                            ? 'bg-yellow-50 border-l-4 border-yellow-500'
+                            : 'bg-blue-50 border-l-4 border-blue-500'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-lg font-medium text-gray-900">{issue.issue_type}</h3>
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                            issue.severity === 'high' 
+                              ? 'bg-red-100 text-red-800' 
+                              : issue.severity === 'medium'
+                              ? 'bg-yellow-100 text-yellow-800'
+                              : 'bg-blue-100 text-blue-800'
+                          }`}>
+                            {issue.severity}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-sm text-gray-600">{issue.description}</p>
+                        <p className="mt-2 text-sm text-gray-500">
+                          <span className="font-medium">URL:</span> {issue.url}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-4 text-sm text-gray-700 bg-gray-100 rounded-md">
+                    <p>No issues found for this crawl.</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default CrawlDetailPage;
