@@ -7,7 +7,7 @@ load_dotenv()
 
 class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
-    PROJECT_NAME: str = "AAA Web Scraper API"
+    PROJECT_NAME: str = "AI Web Scraper API"
 
     ENABLE_BATCH_CRAWLS: bool = os.getenv("ENABLE_BATCH_CRAWLS", "false").strip().lower() in {
         "1",
@@ -49,6 +49,7 @@ class Settings(BaseSettings):
     BACKEND_CORS_ORIGINS: list[str] = [
         "http://localhost:3000",  # React frontend (default)
         "http://localhost:3001",  # React frontend (alternative port)
+        "http://localhost:3002",  # React frontend (alternative port)
         "http://localhost:8000",  # Backend for development
         "https://yourdomain.com",  # Production domain
     ]

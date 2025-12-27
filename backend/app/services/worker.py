@@ -4,17 +4,47 @@ from celery import Celery
 from typing import Dict, Any, List
 from uuid import UUID, uuid4
 from datetime import datetime
+import ssl
 
 from app.core.config import settings
 from app.models.models import Crawl, CrawlCreate
 from app.services.crawler import Crawler
 from app.db.supabase import supabase_client
 
-# Configure Celery
+# Configure Celery with SSL support for Upstash Redis
+broker_use_ssl = {
+    'ssl_cert_reqs': ssl.CERT_NONE
+}
+
 celery_app = Celery(
     "worker",
     broker=settings.CELERY_BROKER_URL,
     backend=settings.CELERY_RESULT_BACKEND
+)
+
+# Configure SSL and connection settings for broker and backend
+celery_app.conf.update(
+    broker_use_ssl=broker_use_ssl,
+    redis_backend_use_ssl=broker_use_ssl,
+    broker_connection_retry_on_startup=True,
+    broker_connection_retry=True,
+    broker_connection_max_retries=10,
+    broker_pool_limit=1,
+    broker_heartbeat=None,
+    broker_connection_timeout=30,
+    result_backend_transport_options={
+        'master_name': 'mymaster',
+        'socket_keepalive': True,
+        'socket_keepalive_options': {
+            1: 1,  # TCP_KEEPIDLE
+            2: 1,  # TCP_KEEPINTVL
+            3: 5,  # TCP_KEEPCNT
+        },
+        'health_check_interval': 30,
+    },
+    task_acks_late=True,
+    task_reject_on_worker_lost=True,
+    worker_prefetch_multiplier=1,
 )
 
 # Configure logging

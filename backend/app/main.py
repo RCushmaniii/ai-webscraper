@@ -3,9 +3,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import time
 import logging
+import asyncio
+from contextlib import asynccontextmanager
 
 from app.api.api import api_router
 from app.core.config import settings
+from app.services.crawl_monitor import check_and_fix_stale_crawls
 
 # Configure logging
 logging.basicConfig(
@@ -14,10 +17,48 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Create FastAPI app
+# Background task for monitoring stale crawls
+async def monitor_stale_crawls():
+    """Background task that runs every 10 minutes to check for stale crawls"""
+    while True:
+        try:
+            logger.info("Running stale crawl check...")
+            check_and_fix_stale_crawls()
+            logger.info("Stale crawl check completed")
+        except Exception as e:
+            logger.error(f"Error in stale crawl monitor: {e}")
+        
+        # Wait 10 minutes before next check
+        await asyncio.sleep(600)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan context manager for startup and shutdown events"""
+    # Startup: Run initial check and start background task
+    logger.info("Starting up... Running initial stale crawl check")
+    try:
+        check_and_fix_stale_crawls()
+    except Exception as e:
+        logger.error(f"Error in initial stale crawl check: {e}")
+    
+    # Start background monitoring task
+    task = asyncio.create_task(monitor_stale_crawls())
+    logger.info("Started background stale crawl monitoring (runs every 10 minutes)")
+    
+    yield
+    
+    # Shutdown: Cancel background task
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        logger.info("Background monitoring task cancelled")
+
+# Create FastAPI app with lifespan
 app = FastAPI(
     title=settings.PROJECT_NAME,
-    openapi_url=f"{settings.API_V1_STR}/openapi.json"
+    openapi_url=f"{settings.API_V1_STR}/openapi.json",
+    lifespan=lifespan
 )
 
 # Configure CORS
@@ -74,7 +115,10 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy"}
+    return {
+        "status": "healthy",
+        "monitoring": "stale_crawl_check_active"
+    }
 
 if __name__ == "__main__":
     import uvicorn

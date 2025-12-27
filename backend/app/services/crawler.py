@@ -10,7 +10,7 @@ from urllib.parse import urljoin, urlparse
 
 from playwright.async_api import async_playwright
 
-from app.models.models import Crawl, Page, SEOMetadata, CrawlProgress, Link
+from app.models.models import Crawl, Page, SEOMetadata, CrawlProgress, Link, Issue
 from uuid import uuid4
 from app.db.supabase import supabase_client
 from app.core.config import settings
@@ -645,7 +645,7 @@ class Crawler:
                 'og:image': seo_data.get('og_image')
             },
             twitter_tags={},  # Will enhance later
-            json_ld=seo_data.get('schema_markup', []),
+            json_ld=seo_data.get('schema_markup', {}) if isinstance(seo_data.get('schema_markup'), dict) else {},
             image_alt_missing_count=technical_data.get('images_without_alt', 0),
             internal_links=technical_data.get('internal_links', 0),
             external_links=technical_data.get('external_links', 0)

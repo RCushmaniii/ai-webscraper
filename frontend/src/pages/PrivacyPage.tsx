@@ -12,7 +12,7 @@ const PrivacyPage: React.FC = () => {
         
         <h2 className="mt-8 mb-4 text-2xl font-semibold">1. Introduction</h2>
         <p>
-          AAA WebScraper ("we", "our", or "us") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our web scraping and site auditing platform.
+          AI WebScraper ("we", "our", or "us") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our web scraping and site auditing platform.
         </p>
         
         <h2 className="mt-8 mb-4 text-2xl font-semibold">2. Information We Collect</h2>
@@ -53,7 +53,7 @@ const PrivacyPage: React.FC = () => {
           If you have any questions about this Privacy Policy, please contact us at:
         </p>
         <p className="font-medium">
-          privacy@aaawebscraper.com
+          privacy@aiwebscraper.com
         </p>
       </div>
     </div>

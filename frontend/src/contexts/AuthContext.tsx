@@ -54,18 +54,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Check if user is admin
   const checkUserRole = async (userId: string) => {
     try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('is_admin')
-        .eq('id', userId)
-        .single();
-
-      if (error) {
-        console.error('Error fetching user role:', error);
+      // Use backend API instead of direct Supabase query to avoid RLS issues
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/users/me`, {
+        headers: {
+          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        console.error('Error fetching user role:', response.statusText);
         setIsAdmin(false);
         return;
       }
-
+      
+      const data = await response.json();
       setIsAdmin(data?.is_admin || false);
     } catch (error) {
       console.error('Error checking user role:', error);

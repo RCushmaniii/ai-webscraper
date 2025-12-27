@@ -78,7 +78,13 @@ const UsersPage: React.FC = () => {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString();
+    return new Date(dateString).toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   };
 
   return (
@@ -87,7 +93,7 @@ const UsersPage: React.FC = () => {
         <h1 className="text-3xl font-bold text-gray-900">User Management</h1>
         <button
           onClick={() => setShowCreateForm(!showCreateForm)}
-          className="px-4 py-2 text-white bg-indigo-600 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          className="px-4 py-2 text-white bg-secondary-500 rounded-md hover:bg-secondary-hover focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-secondary-500"
         >
           {showCreateForm ? 'Cancel' : 'New User'}
         </button>
@@ -115,7 +121,7 @@ const UsersPage: React.FC = () => {
                   required
                   value={formData.email}
                   onChange={handleInputChange}
-                  className="block w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                  className="block w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-secondary-500 focus:border-secondary-500"
                 />
               </div>
 
@@ -130,7 +136,7 @@ const UsersPage: React.FC = () => {
                   required
                   value={formData.password}
                   onChange={handleInputChange}
-                  className="block w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                  className="block w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-secondary-500 focus:border-secondary-500"
                 />
               </div>
 
@@ -145,7 +151,7 @@ const UsersPage: React.FC = () => {
                   required
                   value={formData.full_name}
                   onChange={handleInputChange}
-                  className="block w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                  className="block w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-secondary-500 focus:border-secondary-500"
                 />
               </div>
 
@@ -156,7 +162,7 @@ const UsersPage: React.FC = () => {
                   id="is_admin"
                   checked={formData.is_admin}
                   onChange={handleInputChange}
-                  className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                  className="w-4 h-4 text-secondary-500 border-gray-300 rounded focus:ring-secondary-500"
                 />
                 <label htmlFor="is_admin" className="block ml-2 text-sm text-gray-700">
                   Admin User
@@ -168,7 +174,7 @@ const UsersPage: React.FC = () => {
               <button
                 type="submit"
                 disabled={formSubmitting}
-                className="inline-flex justify-center px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+                className="inline-flex justify-center px-4 py-2 text-sm font-medium text-white bg-secondary-500 border border-transparent rounded-md shadow-sm hover:bg-secondary-hover focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-secondary-500 disabled:opacity-50"
               >
                 {formSubmitting ? 'Creating...' : 'Create User'}
               </button>
@@ -249,7 +255,7 @@ const UsersPage: React.FC = () => {
           <p className="text-gray-500">No users found. Create your first user to get started.</p>
           <button
             onClick={() => setShowCreateForm(true)}
-            className="px-4 py-2 mt-4 text-white bg-indigo-600 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            className="px-4 py-2 mt-4 text-white bg-secondary-500 rounded-md hover:bg-secondary-hover focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-secondary-500"
           >
             Create First User
           </button>

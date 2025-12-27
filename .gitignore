@@ -29,3 +29,7 @@ build
 backend/storage
 
 supabase/.temp
+
+# Windows system files
+nul
+*.log

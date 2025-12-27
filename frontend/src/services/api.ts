@@ -29,7 +29,7 @@ export interface Crawl {
   user_id: string;
   url: string;
   name: string;
-  status: 'queued' | 'in_progress' | 'completed' | 'failed';
+  status: 'pending' | 'queued' | 'running' | 'in_progress' | 'completed' | 'failed' | 'cancelled';
   max_depth: number;
   max_pages: number;
   respect_robots_txt: boolean;
@@ -188,12 +188,22 @@ class ApiService {
     const response = await this.api.delete(`/crawls/${id}`);
     return response.data;
   }
+
+  async markCrawlFailed(id: string): Promise<{ message: string; crawl_id: string }> {
+    const response = await this.api.post(`/crawls/${id}/mark-failed`);
+    return response.data;
+  }
   
   async getCrawlPages(id: string, params?: { skip?: number; limit?: number }): Promise<Page[]> {
     const response = await this.api.get(`/crawls/${id}/pages`, { params });
     return response.data;
   }
-  
+
+  async getPageDetail(crawlId: string, pageId: string): Promise<any> {
+    const response = await this.api.get(`/crawls/${crawlId}/pages/${pageId}`);
+    return response.data;
+  }
+
   async getCrawlLinks(id: string, params?: { 
     skip?: number; 
     limit?: number;

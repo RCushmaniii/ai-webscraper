@@ -22,6 +22,12 @@ class SupabaseClient:
         try:
             self.url = settings.SUPABASE_URL
             self.key = settings.SUPABASE_KEY
+
+            if not self.url or not self.key:
+                raise ValueError(
+                    "Missing Supabase credentials. Set SUPABASE_URL and SUPABASE_SECRET_KEY (or SUPABASE_KEY) in backend/.env."
+                )
+
             self.client = create_client(self.url, self.key)
             self.auth_url = f"{self.url}/auth/v1"
             self.supabase_key = self.key

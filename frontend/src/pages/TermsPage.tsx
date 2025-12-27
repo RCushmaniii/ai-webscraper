@@ -12,12 +12,12 @@ const TermsPage: React.FC = () => {
         
         <h2 className="mt-8 mb-4 text-2xl font-semibold">1. Acceptance of Terms</h2>
         <p>
-          By accessing or using the AAA WebScraper platform, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use our services.
+          By accessing or using the AI WebScraper platform, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use our services.
         </p>
         
         <h2 className="mt-8 mb-4 text-2xl font-semibold">2. Description of Service</h2>
         <p>
-          AAA WebScraper provides web scraping and site auditing services for authorized users. Our platform allows users to crawl websites, analyze content, and generate reports within the limits of our service parameters.
+          AI WebScraper provides web scraping and site auditing services for authorized users. Our platform allows users to crawl websites, analyze content, and generate reports within the limits of our service parameters.
         </p>
         
         <h2 className="mt-8 mb-4 text-2xl font-semibold">3. User Responsibilities</h2>
@@ -35,12 +35,12 @@ const TermsPage: React.FC = () => {
         
         <h2 className="mt-8 mb-4 text-2xl font-semibold">4. Limitation of Liability</h2>
         <p>
-          AAA WebScraper is provided "as is" without warranties of any kind. We are not responsible for any damages resulting from your use of our service, including but not limited to direct, indirect, incidental, punitive, and consequential damages.
+          AI WebScraper is provided "as is" without warranties of any kind. We are not responsible for any damages resulting from your use of our service, including but not limited to direct, indirect, incidental, punitive, and consequential damages.
         </p>
         
         <h2 className="mt-8 mb-4 text-2xl font-semibold">5. Intellectual Property</h2>
         <p>
-          All content, features, and functionality of the AAA WebScraper platform are owned by us and are protected by copyright, trademark, and other intellectual property laws. You may not reproduce, distribute, modify, or create derivative works of our platform without explicit permission.
+          All content, features, and functionality of the AI WebScraper platform are owned by us and are protected by copyright, trademark, and other intellectual property laws. You may not reproduce, distribute, modify, or create derivative works of our platform without explicit permission.
         </p>
         
         <h2 className="mt-8 mb-4 text-2xl font-semibold">6. Termination</h2>
@@ -58,7 +58,7 @@ const TermsPage: React.FC = () => {
           If you have any questions about these Terms of Service, please contact us at:
         </p>
         <p className="font-medium">
-          legal@aaawebscraper.com
+          legal@aiwebscraper.com
         </p>
       </div>
     </div>

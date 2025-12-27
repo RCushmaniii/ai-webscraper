@@ -30,23 +30,36 @@ async def create_crawl(
     try:
         # Create crawl record in database
         now = datetime.now()
-        crawl_data = crawl.model_dump()
+        raw_data = crawl.model_dump()
+
+        # Map model fields to ACTUAL database column names (based on existing schema)
+        crawl_data = {
+            "id": str(crawl_id),
+            "user_id": str(current_user.id),
+            "url": raw_data["url"],  # Direct mapping
+            "max_depth": raw_data.get("max_depth", 2),
+            "max_pages": raw_data.get("max_pages", 100),
+            "respect_robots_txt": raw_data.get("respect_robots_txt", True),
+            "follow_external_links": raw_data.get("follow_external_links", False),
+            "js_rendering": raw_data.get("js_rendering", False),
+            "rate_limit": raw_data.get("rate_limit", 2),
+            "user_agent": raw_data.get("user_agent") or "AI WebScraper Bot",
+            "concurrency": 5,
+            "status": "queued",
+            "created_at": now.isoformat(),
+            "updated_at": now.isoformat(),
+        }
 
         # If no name is provided, use the hostname from the URL
-        if not crawl_data.get("name"):
+        if raw_data.get("name"):
+            crawl_data["name"] = raw_data["name"]
+        else:
             try:
-                parsed_url = urlparse(crawl_data["url"])
-                crawl_data["name"] = parsed_url.hostname
+                parsed_url = urlparse(raw_data["url"])
+                crawl_data["name"] = parsed_url.hostname or "Untitled Crawl"
             except Exception:
                 crawl_data["name"] = "Untitled Crawl"
 
-        crawl_data.update({
-            "id": str(crawl_id),
-            "user_id": str(current_user.id),
-            "status": "queued",
-            "created_at": now.isoformat(),
-            "updated_at": now.isoformat()
-        })
         logger.debug(f"Inserting crawl data: {crawl_data}")
 
         # Insert into Supabase
@@ -127,6 +140,46 @@ async def get_crawl(
     except Exception as e:
         logger.error(f"Error getting crawl: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get crawl: {str(e)}")
+
+@router.post("/{crawl_id}/mark-failed", response_model=Dict[str, Any])
+async def mark_crawl_failed(
+    crawl_id: UUID,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Manually mark a stuck crawl as failed.
+    """
+    try:
+        # Check if crawl exists and belongs to user
+        response = supabase_client.table("crawls").select("*").eq("id", str(crawl_id)).eq("user_id", str(current_user.id)).execute()
+        
+        if not response.data:
+            raise HTTPException(status_code=404, detail="Crawl not found")
+        
+        crawl = response.data[0]
+        
+        # Only allow marking non-terminal states as failed
+        if crawl['status'] in ['completed', 'failed', 'cancelled']:
+            raise HTTPException(status_code=400, detail=f"Cannot mark {crawl['status']} crawl as failed")
+        
+        # Update to failed status
+        from datetime import datetime, timezone
+        update_response = supabase_client.table("crawls").update({
+            'status': 'failed',
+            'error': 'Manually marked as failed by user',
+            'updated_at': datetime.now(timezone.utc).isoformat()
+        }).eq("id", str(crawl_id)).execute()
+        
+        if hasattr(update_response, "error") and update_response.error is not None:
+            raise HTTPException(status_code=500, detail="Failed to update crawl status")
+        
+        return {"message": "Crawl marked as failed", "crawl_id": str(crawl_id)}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error marking crawl as failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to mark crawl as failed: {str(e)}")
 
 @router.delete("/{crawl_id}", response_model=Dict[str, Any])
 async def delete_crawl(
@@ -233,6 +286,44 @@ async def list_crawl_pages(
     except Exception as e:
         logger.error(f"Error listing pages: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to list pages: {str(e)}")
+
+@router.get("/{crawl_id}/pages/{page_id}", response_model=Dict[str, Any])
+async def get_page_detail(
+    crawl_id: UUID,
+    page_id: UUID,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get detailed information for a specific page including full content.
+    """
+    try:
+        # First check if the crawl exists and belongs to the user
+        crawl_response = supabase_client.table("crawls").select("*").eq("id", str(crawl_id)).eq("user_id", str(current_user.id)).execute()
+        
+        if hasattr(crawl_response, "error") and crawl_response.error is not None:
+            logger.error(f"Error checking crawl: {crawl_response.error}")
+            raise HTTPException(status_code=500, detail="Failed to check crawl")
+        
+        if not crawl_response.data:
+            raise HTTPException(status_code=404, detail="Crawl not found")
+        
+        # Get the specific page
+        response = supabase_client.table("pages").select("*").eq("id", str(page_id)).eq("crawl_id", str(crawl_id)).single().execute()
+        
+        if hasattr(response, "error") and response.error is not None:
+            logger.error(f"Error getting page: {response.error}")
+            raise HTTPException(status_code=500, detail="Failed to get page")
+        
+        if not response.data:
+            raise HTTPException(status_code=404, detail="Page not found")
+        
+        return response.data
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting page detail: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get page: {str(e)}")
 
 @router.get("/{crawl_id}/links", response_model=List[Dict[str, Any]])
 async def list_crawl_links(

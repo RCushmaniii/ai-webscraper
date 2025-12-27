@@ -1,24 +1,30 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { apiService, Crawl, CrawlCreate } from '../services/api';
+import { toast } from 'sonner';
+import { Plus, Loader2, Trash2, Eye, Globe, Settings2, RefreshCw } from 'lucide-react';
+import { apiService, Crawl } from '../services/api';
+import ConfirmationModal from '../components/ConfirmationModal';
 
 const CrawlsPage: React.FC = () => {
   const [crawls, setCrawls] = useState<Crawl[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [formData, setFormData] = useState<CrawlCreate>({
-    url: '',
-    name: '',
-    max_depth: 2,
-    max_pages: 100,
-    respect_robots_txt: true,
-    follow_external_links: false,
-    js_rendering: false,
-    rate_limit: 1,
-    user_agent: 'AAA Web Scraper Bot'
+  const [selectedCrawls, setSelectedCrawls] = useState<Set<string>>(new Set());
+  const [bulkActionLoading, setBulkActionLoading] = useState(false);
+
+  // Confirmation modal state
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    variant?: 'danger' | 'warning' | 'info';
+    confirmText?: string;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
   });
-  const [formSubmitting, setFormSubmitting] = useState(false);
 
   useEffect(() => {
     fetchCrawls();
@@ -31,389 +37,381 @@ const CrawlsPage: React.FC = () => {
       setCrawls(data);
     } catch (err) {
       console.error('Error fetching crawls:', err);
-      setError('Failed to load crawls. Please try again later.');
+      toast.error('Failed to load crawls. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value, type } = e.target as HTMLInputElement;
-    
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' 
-        ? (e.target as HTMLInputElement).checked 
-        : type === 'number' 
-          ? Number(value) 
-          : value
-    }));
+  const handleDelete = async (id: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete Crawl',
+      message: 'Are you sure you want to delete this crawl? This action cannot be undone.',
+      confirmText: 'Delete',
+      variant: 'danger',
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        try {
+          await apiService.deleteCrawl(id);
+          setCrawls(crawls.filter(crawl => crawl.id !== id));
+          setSelectedCrawls(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(id);
+            return newSet;
+          });
+          toast.success('Crawl deleted successfully');
+        } catch (err) {
+          console.error('Error deleting crawl:', err);
+          toast.error('Failed to delete crawl');
+        }
+      },
+    });
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setFormSubmitting(true);
-    setError(null);
-
-    try {
-      await apiService.createCrawl(formData);
-      setShowCreateForm(false);
-      setFormData({
-        url: '',
-        name: '',
-        max_depth: 2,
-        max_pages: 100,
-        respect_robots_txt: true,
-        follow_external_links: false,
-        js_rendering: false,
-        rate_limit: 1,
-        user_agent: 'AAA Web Scraper Bot'
-      });
-      fetchCrawls();
-    } catch (err) {
-      console.error('Error creating crawl:', err);
-      setError('Failed to create crawl. Please check your inputs and try again.');
-    } finally {
-      setFormSubmitting(false);
+  const handleSelectAll = () => {
+    if (selectedCrawls.size === crawls.length) {
+      setSelectedCrawls(new Set());
+    } else {
+      setSelectedCrawls(new Set(crawls.map(c => c.id)));
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this crawl? This action cannot be undone.')) {
+  const handleSelectCrawl = (id: string) => {
+    setSelectedCrawls(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedCrawls.size === 0) {
+      toast.info('No crawls selected');
       return;
     }
 
-    try {
-      await apiService.deleteCrawl(id);
-      setCrawls(crawls.filter(crawl => crawl.id !== id));
-    } catch (err) {
-      console.error('Error deleting crawl:', err);
-      setError('Failed to delete crawl. Please try again later.');
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete Multiple Crawls',
+      message: `Are you sure you want to delete ${selectedCrawls.size} selected crawl(s)? This action cannot be undone.`,
+      confirmText: `Delete ${selectedCrawls.size} Crawls`,
+      variant: 'danger',
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        setBulkActionLoading(true);
+        const deletePromises = Array.from(selectedCrawls).map(id => apiService.deleteCrawl(id));
+
+        try {
+          await Promise.all(deletePromises);
+          setCrawls(crawls.filter(crawl => !selectedCrawls.has(crawl.id)));
+          setSelectedCrawls(new Set());
+          toast.success(`Deleted ${deletePromises.length} crawl(s) successfully`);
+        } catch (err) {
+          console.error('Error deleting crawls:', err);
+          toast.error('Failed to delete some crawls');
+        } finally {
+          setBulkActionLoading(false);
+        }
+      },
+    });
+  };
+
+  const handleBulkRerun = async () => {
+    if (selectedCrawls.size === 0) {
+      toast.info('No crawls selected');
+      return;
     }
+
+    setConfirmModal({
+      isOpen: true,
+      title: 'Re-run Multiple Crawls',
+      message: `Are you sure you want to re-run ${selectedCrawls.size} selected crawl(s)? This will create new crawl jobs with the same settings.`,
+      confirmText: `Re-run ${selectedCrawls.size} Crawls`,
+      variant: 'info',
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        setBulkActionLoading(true);
+        const selectedCrawlData = crawls.filter(c => selectedCrawls.has(c.id));
+        const createPromises = selectedCrawlData.map(crawl =>
+          apiService.createCrawl({
+            url: crawl.url,
+            name: `${crawl.name} (Re-run)`,
+            max_depth: crawl.max_depth,
+            max_pages: crawl.max_pages,
+            respect_robots_txt: crawl.respect_robots_txt,
+            follow_external_links: crawl.follow_external_links,
+            js_rendering: crawl.js_rendering,
+            rate_limit: crawl.rate_limit,
+            user_agent: crawl.user_agent
+          })
+        );
+
+        try {
+          await Promise.all(createPromises);
+          setSelectedCrawls(new Set());
+          toast.success(`Re-running ${createPromises.length} crawl(s)`);
+          fetchCrawls();
+        } catch (err) {
+          console.error('Error re-running crawls:', err);
+          toast.error('Failed to re-run some crawls');
+        } finally {
+          setBulkActionLoading(false);
+        }
+      },
+    });
   };
 
   const handleDeleteFailedCrawls = async () => {
     const failedCrawls = crawls.filter(crawl => crawl.status === 'failed');
-    
+
     if (failedCrawls.length === 0) {
-      setError('No failed crawls to delete.');
+      toast.info('No failed crawls to delete');
       return;
     }
 
-    if (!window.confirm(`Are you sure you want to delete ${failedCrawls.length} failed crawl(s)? This action cannot be undone.`)) {
-      return;
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete Failed Crawls',
+      message: `Are you sure you want to delete ${failedCrawls.length} failed crawl(s)? This action cannot be undone.`,
+      confirmText: `Delete ${failedCrawls.length} Failed Crawls`,
+      variant: 'danger',
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        const deletePromises = failedCrawls.map(crawl => apiService.deleteCrawl(crawl.id));
 
-    try {
-      setFormSubmitting(true);
-      
-      // Delete failed crawls one by one to identify which one fails
-      const results = [];
-      for (const crawl of failedCrawls) {
-        try {
-          await apiService.deleteCrawl(crawl.id);
-          results.push({ id: crawl.id, success: true });
-        } catch (err) {
-          console.error(`Error deleting crawl ${crawl.id}:`, err);
-          results.push({ id: crawl.id, success: false, error: err });
-        }
-      }
-      
-      // Update local state - remove successfully deleted crawls
-      const successfullyDeleted = results.filter(r => r.success).map(r => r.id);
-      setCrawls(crawls.filter(crawl => !successfullyDeleted.includes(crawl.id)));
-      
-      const failedCount = results.filter(r => !r.success).length;
-      if (failedCount > 0) {
-        setError(`Failed to delete ${failedCount} crawl(s). Check console for details.`);
-      }
-      
-    } catch (err) {
-      console.error('Error deleting failed crawls:', err);
-      setError('Failed to delete failed crawls. Please try again later.');
-    } finally {
-      setFormSubmitting(false);
-    }
+        toast.promise(Promise.all(deletePromises), {
+          loading: 'Deleting failed crawls...',
+          success: () => {
+            setCrawls(crawls.filter(crawl => crawl.status !== 'failed'));
+            return `Deleted ${failedCrawls.length} failed crawl(s)`;
+          },
+          error: 'Failed to delete some crawls',
+        });
+      },
+    });
   };
 
-  const getStatusBadgeClass = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return 'bg-green-100 text-green-800';
-      case 'in_progress':
-        return 'bg-blue-100 text-blue-800';
-      case 'queued':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'failed':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
+  const getStatusBadge = (status: string) => {
+    const styles = {
+      completed: 'bg-success-100 text-success-600 border-success-200',
+      in_progress: 'bg-secondary-100 text-secondary-600 border-secondary-200',
+      queued: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+      failed: 'bg-error-100 text-error-600 border-error-200',
+    };
+
+    return (
+      <span className={`inline-flex items-center px-3 py-1 rounded-lg text-xs font-medium border ${styles[status as keyof typeof styles] || 'bg-primary-100 text-primary-600 border-primary-200'}`}>
+        {status.replace('_', ' ')}
+      </span>
+    );
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString();
+    return new Date(dateString).toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   };
 
+  const failedCount = crawls.filter(crawl => crawl.status === 'failed').length;
+  const hasCrawls = crawls.length > 0;
+
   return (
-    <div className="container px-4 py-8 mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Website Crawls</h1>
-        <div className="flex space-x-3">
-          {crawls.filter(crawl => crawl.status === 'failed').length > 0 && (
-            <button
-              onClick={handleDeleteFailedCrawls}
-              disabled={formSubmitting}
-              className="px-4 py-2 text-white bg-red-600 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
-            >
-              {formSubmitting ? 'Deleting...' : `Delete ${crawls.filter(crawl => crawl.status === 'failed').length} Failed`}
-            </button>
+    <div className="max-w-7xl mx-auto" style={{ padding: '4rem 2rem' }}>
+      {/* Header */}
+      <div className="mb-12">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-semibold text-neutral-charcoal">Crawls</h1>
+            <p className="mt-2 text-base text-neutral-steel leading-comfortable">
+              Manage and monitor your website crawl operations
+            </p>
+          </div>
+          {hasCrawls && (
+            <div className="flex items-center gap-3">
+              {selectedCrawls.size > 0 && (
+                <>
+                  <button
+                    onClick={handleBulkRerun}
+                    disabled={bulkActionLoading}
+                    className="inline-flex items-center gap-2 px-6 py-3 text-sm font-medium text-secondary-600 bg-secondary-50 hover:bg-secondary-100 border border-secondary-200 rounded-lg shadow-soft transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    Re-run {selectedCrawls.size}
+                  </button>
+                  <button
+                    onClick={handleBulkDelete}
+                    disabled={bulkActionLoading}
+                    className="inline-flex items-center gap-2 px-6 py-3 text-sm font-medium text-error-600 bg-error-50 hover:bg-error-100 border border-error-200 rounded-lg shadow-soft transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Delete {selectedCrawls.size}
+                  </button>
+                </>
+              )}
+              {failedCount > 0 && selectedCrawls.size === 0 && (
+                <button
+                  onClick={handleDeleteFailedCrawls}
+                  className="inline-flex items-center gap-2 px-6 py-3 text-sm font-medium text-error-600 bg-error-50 hover:bg-error-100 border border-error-200 rounded-lg shadow-soft transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete {failedCount} Failed
+                </button>
+              )}
+              <Link
+                to="/crawls/new"
+                className="inline-flex items-center gap-2 px-6 py-3 text-sm font-medium text-white bg-secondary-500 hover:bg-secondary-hover rounded-lg shadow-soft transition-colors"
+              >
+                <Plus className="w-5 h-5" />
+                New Crawl
+              </Link>
+            </div>
           )}
-          <button
-            onClick={() => setShowCreateForm(!showCreateForm)}
-            className="px-4 py-2 text-white bg-indigo-600 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-          >
-            {showCreateForm ? 'Cancel' : 'New Crawl'}
-          </button>
         </div>
       </div>
 
-      {error && (
-        <div className="p-4 mb-6 text-sm text-red-700 bg-red-100 rounded-md" role="alert">
-          {error}
-        </div>
-      )}
-
-      {showCreateForm && (
-        <div className="p-6 mb-6 bg-white rounded-lg shadow">
-          <h2 className="mb-4 text-xl font-semibold text-gray-800">Create New Crawl</h2>
-          <form onSubmit={handleSubmit}>
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-              <div>
-                <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-                  Crawl Name
-                </label>
-                <input
-                  type="text"
-                  name="name"
-                  id="name"
-                  required
-                  value={formData.name}
-                  onChange={handleInputChange}
-                  className="block w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="start_url" className="block text-sm font-medium text-gray-700">
-                  Start URL
-                </label>
-                <input
-                  type="url"
-                  name="url"
-                  id="url"
-                  required
-                  value={formData.url}
-                  onChange={handleInputChange}
-                  placeholder="https://example.com"
-                  className="block w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="max_depth" className="block text-sm font-medium text-gray-700">
-                  Max Depth
-                </label>
-                <input
-                  type="number"
-                  name="max_depth"
-                  id="max_depth"
-                  min="1"
-                  max="10"
-                  required
-                  value={formData.max_depth}
-                  onChange={handleInputChange}
-                  className="block w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="max_pages" className="block text-sm font-medium text-gray-700">
-                  Max Pages
-                </label>
-                <input
-                  type="number"
-                  name="max_pages"
-                  id="max_pages"
-                  min="1"
-                  max="1000"
-                  required
-                  value={formData.max_pages}
-                  onChange={handleInputChange}
-                  className="block w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="rate_limit" className="block text-sm font-medium text-gray-700">
-                  Rate Limit (requests per second)
-                </label>
-                <input
-                  type="number"
-                  name="rate_limit"
-                  id="rate_limit"
-                  min="0.1"
-                  max="10"
-                  step="0.1"
-                  required
-                  value={formData.rate_limit}
-                  onChange={handleInputChange}
-                  className="block w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="user_agent" className="block text-sm font-medium text-gray-700">
-                  User Agent
-                </label>
-                <input
-                  type="text"
-                  name="user_agent"
-                  id="user_agent"
-                  value={formData.user_agent || ''}
-                  onChange={handleInputChange}
-                  className="block w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                />
-              </div>
-
-              <div className="flex items-center mt-4">
-                <input
-                  type="checkbox"
-                  name="respect_robots_txt"
-                  id="respect_robots_txt"
-                  checked={formData.respect_robots_txt}
-                  onChange={handleInputChange}
-                  className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                />
-                <label htmlFor="respect_robots_txt" className="block ml-2 text-sm text-gray-700">
-                  Respect robots.txt
-                </label>
-              </div>
-
-              <div className="flex items-center mt-4">
-                <input
-                  type="checkbox"
-                  name="follow_external_links"
-                  id="follow_external_links"
-                  checked={formData.follow_external_links}
-                  onChange={handleInputChange}
-                  className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                />
-                <label htmlFor="follow_external_links" className="block ml-2 text-sm text-gray-700">
-                  Follow external links
-                </label>
-              </div>
-
-              <div className="flex items-center mt-4">
-                <input
-                  type="checkbox"
-                  name="js_rendering"
-                  id="js_rendering"
-                  checked={formData.js_rendering}
-                  onChange={handleInputChange}
-                  className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                />
-                <label htmlFor="js_rendering" className="block ml-2 text-sm text-gray-700">
-                  Enable JavaScript rendering
-                </label>
-              </div>
-            </div>
-
-            <div className="mt-6">
-              <button
-                type="submit"
-                disabled={formSubmitting}
-                className="inline-flex justify-center px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
-              >
-                {formSubmitting ? 'Creating...' : 'Create Crawl'}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
+      {/* Loading State */}
       {loading ? (
-        <div className="flex items-center justify-center h-64">
-          <div className="text-lg font-medium text-gray-500">Loading crawls...</div>
+        <div className="flex flex-col items-center justify-center py-24">
+          <Loader2 className="w-10 h-10 text-secondary-500 animate-spin mb-4" />
+          <p className="text-sm text-neutral-steel">Loading crawls...</p>
         </div>
-      ) : crawls.length > 0 ? (
-        <div className="overflow-hidden bg-white shadow sm:rounded-md">
-          <ul className="divide-y divide-gray-200">
-            {crawls.map((crawl) => (
-              <li key={crawl.id}>
-                <div className="px-4 py-4 sm:px-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <p className="text-lg font-medium text-indigo-600 truncate">
-                        <Link to={`/crawls/${crawl.id}`}>{crawl.name}</Link>
-                      </p>
-                      <span className={`ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeClass(crawl.status)}`}>
-                        {crawl.status}
-                      </span>
-                    </div>
-                    <div className="flex">
-                      <Link
-                        to={`/crawls/${crawl.id}`}
-                        className="inline-flex items-center px-3 py-1 text-sm font-medium text-indigo-600 bg-indigo-100 rounded-md hover:bg-indigo-200"
-                      >
-                        View
-                      </Link>
-                      <button
-                        onClick={() => handleDelete(crawl.id)}
-                        className="inline-flex items-center px-3 py-1 ml-2 text-sm font-medium text-red-600 bg-red-100 rounded-md hover:bg-red-200"
-                      >
-                        Delete
-                      </button>
+      ) : hasCrawls ? (
+        /* Crawls List - Plush cards */
+        <div className="space-y-4">
+          {/* Select All Bar */}
+          {crawls.length > 0 && (
+            <div className="bg-primary-50 rounded-lg border border-primary-200 px-6 py-3 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  checked={selectedCrawls.size === crawls.length && crawls.length > 0}
+                  onChange={handleSelectAll}
+                  className="w-4 h-4 text-secondary-500 border-primary-300 rounded focus:ring-secondary-500 cursor-pointer"
+                />
+                <span className="text-sm font-medium text-neutral-charcoal">
+                  {selectedCrawls.size === crawls.length && crawls.length > 0
+                    ? `All ${crawls.length} crawls selected`
+                    : selectedCrawls.size > 0
+                    ? `${selectedCrawls.size} of ${crawls.length} selected`
+                    : `Select all ${crawls.length} crawls`}
+                </span>
+              </div>
+              {selectedCrawls.size > 0 && (
+                <button
+                  onClick={() => setSelectedCrawls(new Set())}
+                  className="text-sm text-secondary-600 hover:text-secondary-700 font-medium"
+                >
+                  Clear selection
+                </button>
+              )}
+            </div>
+          )}
+
+          {crawls.map((crawl) => (
+            <div
+              key={crawl.id}
+              className="bg-white rounded-lg border border-primary-100 hover:border-secondary-200 hover:shadow-soft transition-all overflow-hidden"
+            >
+              <div style={{ padding: '2rem' }}>
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start gap-4">
+                    <input
+                      type="checkbox"
+                      checked={selectedCrawls.has(crawl.id)}
+                      onChange={() => handleSelectCrawl(crawl.id)}
+                      className="mt-1 w-4 h-4 text-secondary-500 border-primary-300 rounded focus:ring-secondary-500 cursor-pointer"
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-3 mb-3">
+                        <Link
+                          to={`/crawls/${crawl.id}`}
+                          className="text-xl font-semibold text-neutral-charcoal hover:text-secondary-500 transition-colors"
+                        >
+                          {crawl.name}
+                        </Link>
+                        {getStatusBadge(crawl.status)}
+                      </div>
+                      <div className="space-y-2">
+                        <p className="flex items-center gap-2 text-sm text-neutral-steel">
+                          <Globe className="w-4 h-4" />
+                          {crawl.url.length > 60 ? `${crawl.url.substring(0, 60)}...` : crawl.url}
+                        </p>
+                        <p className="flex items-center gap-2 text-sm text-neutral-steel">
+                          <Settings2 className="w-4 h-4" />
+                          Depth: {crawl.max_depth} • Max Pages: {crawl.max_pages}
+                        </p>
+                        <p className="text-xs text-neutral-steel/70 mt-3">
+                          Created {formatDate(crawl.created_at)}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                  <div className="mt-2 sm:flex sm:justify-between">
-                    <div className="sm:flex">
-                      <p className="flex items-center text-sm text-gray-500">
-                        <svg className="flex-shrink-0 mr-1.5 h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M12.586 4.586a2 2 0 112.828 2.828l-3 3a2 2 0 01-2.828 0 1 1 0 00-1.414 1.414 4 4 0 005.656 0l3-3a4 4 0 00-5.656-5.656l-1.5 1.5a1 1 0 101.414 1.414l1.5-1.5zm-5 5a2 2 0 012.828 0 1 1 0 101.414-1.414 4 4 0 00-5.656 0l-3 3a4 4 0 105.656 5.656l1.5-1.5a1 1 0 10-1.414-1.414l-1.5 1.5a2 2 0 11-2.828-2.828l3-3z" clipRule="evenodd" />
-                        </svg>
-                        {crawl.url.length > 40 ? `${crawl.url.substring(0, 40)}...` : crawl.url}
-                      </p>
-                      <p className="flex items-center mt-2 text-sm text-gray-500 sm:mt-0 sm:ml-6">
-                        <svg className="flex-shrink-0 mr-1.5 h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                          <path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z" />
-                        </svg>
-                        Depth: {crawl.max_depth}, Max Pages: {crawl.max_pages}
-                      </p>
-                    </div>
-                    <div className="flex items-center mt-2 text-sm text-gray-500 sm:mt-0">
-                      <svg className="flex-shrink-0 mr-1.5 h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
-                      </svg>
-                      <span>Created: {formatDate(crawl.created_at)}</span>
-                    </div>
+
+                  <div className="flex items-center gap-3 ml-6">
+                    <Link
+                      to={`/crawls/${crawl.id}`}
+                      className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-secondary-600 bg-secondary-50 hover:bg-secondary-100 rounded-lg transition-colors"
+                    >
+                      <Eye className="w-4 h-4" />
+                      View
+                    </Link>
+                    <button
+                      onClick={() => handleDelete(crawl.id)}
+                      className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-error-600 bg-error-50 hover:bg-error-100 rounded-lg transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Delete
+                    </button>
                   </div>
                 </div>
-              </li>
-            ))}
-          </ul>
+              </div>
+            </div>
+          ))}
         </div>
       ) : (
-        <div className="p-6 text-center bg-white rounded-lg shadow">
-          <p className="text-gray-500">No crawls found. Create your first crawl to get started.</p>
-          <button
-            onClick={() => setShowCreateForm(true)}
-            className="px-4 py-2 mt-4 text-white bg-indigo-600 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-          >
-            Create First Crawl
-          </button>
+        /* Empty State - Plush centered hero panel */
+        <div className="bg-white rounded-lg shadow-soft-lg border border-primary-100" style={{ padding: '4rem 3rem' }}>
+          <div className="text-center max-w-lg mx-auto">
+            <div className="w-20 h-20 bg-primary-50 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Globe className="w-10 h-10 text-primary-300" />
+            </div>
+            <h3 className="text-2xl font-semibold text-neutral-charcoal mb-3">
+              No crawls found
+            </h3>
+            <p className="text-base text-neutral-steel mb-8 leading-comfortable">
+              Start your first site analysis to begin crawling and inspecting web pages
+            </p>
+            <Link
+              to="/crawls/new"
+              className="inline-flex items-center gap-2 px-8 py-4 text-base font-medium text-white bg-secondary-500 hover:bg-secondary-hover rounded-lg shadow-soft transition-colors"
+            >
+              <Plus className="w-5 h-5" />
+              Create First Crawl
+            </Link>
+          </div>
         </div>
       )}
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        confirmText={confirmModal.confirmText}
+        variant={confirmModal.variant}
+      />
     </div>
   );
 };

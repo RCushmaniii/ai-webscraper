@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import { apiService, Crawl, Page, Link as CrawlLink, Issue } from '../services/api';
 
 const CrawlDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [crawl, setCrawl] = useState<Crawl | null>(null);
   const [pages, setPages] = useState<Page[]>([]);
   const [links, setLinks] = useState<CrawlLink[]>([]);
@@ -12,6 +14,19 @@ const CrawlDetailPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('pages');
   const [pageLoading, setPageLoading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [markingFailed, setMarkingFailed] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  const fetchCrawl = async () => {
+    if (!id) return;
+    try {
+      const crawlData = await apiService.getCrawl(id);
+      setCrawl(crawlData);
+    } catch (err) {
+      console.error('Error fetching crawl:', err);
+    }
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -84,6 +99,51 @@ const CrawlDetailPage: React.FC = () => {
     fetchTabData(tab);
   };
 
+  const handleDelete = async () => {
+    if (!id) return;
+    
+    setDeleting(true);
+    try {
+      await apiService.deleteCrawl(id);
+      navigate('/crawls');
+    } catch (err) {
+      console.error('Error deleting crawl:', err);
+      setError('Failed to delete crawl. Please try again.');
+      setDeleting(false);
+      setShowDeleteConfirm(false);
+    }
+  };
+
+  const handleMarkFailed = async () => {
+    if (!window.confirm('Mark this crawl as failed? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      setMarkingFailed(true);
+      await apiService.markCrawlFailed(id!);
+      toast.success('Crawl marked as failed');
+      fetchCrawl();
+    } catch (err) {
+      console.error('Error marking crawl as failed:', err);
+      toast.error('Failed to mark crawl as failed');
+    } finally {
+      setMarkingFailed(false);
+    }
+  };
+
+  const isStuckCrawl = () => {
+    if (!crawl) return false;
+    if (!['running', 'queued', 'pending'].includes(crawl.status)) return false;
+    
+    const createdAt = new Date(crawl.created_at);
+    const now = new Date();
+    const minutesElapsed = (now.getTime() - createdAt.getTime()) / (1000 * 60);
+    
+    // Consider stuck if running for more than 30 minutes
+    return minutesElapsed > 30;
+  };
+
   const getStatusBadgeClass = (status: string) => {
     switch (status) {
       case 'completed':
@@ -117,7 +177,7 @@ const CrawlDetailPage: React.FC = () => {
         <div className="p-4 mb-6 text-sm text-red-700 bg-red-100 rounded-md" role="alert">
           {error || 'Crawl not found'}
         </div>
-        <Link to="/crawls" className="text-indigo-600 hover:text-indigo-800">
+        <Link to="/crawls" className="text-secondary-500 hover:text-secondary-600">
           &larr; Back to Crawls
         </Link>
       </div>
@@ -127,7 +187,7 @@ const CrawlDetailPage: React.FC = () => {
   return (
     <div className="container px-4 py-8 mx-auto">
       <div className="mb-6">
-        <Link to="/crawls" className="text-indigo-600 hover:text-indigo-800">
+        <Link to="/crawls" className="text-secondary-500 hover:text-secondary-600">
           &larr; Back to Crawls
         </Link>
       </div>
@@ -135,9 +195,27 @@ const CrawlDetailPage: React.FC = () => {
       <div className="mb-6">
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold text-gray-900">{crawl.name}</h1>
-          <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusBadgeClass(crawl.status)}`}>
-            {crawl.status}
-          </span>
+          <div className="flex items-center gap-3">
+            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusBadgeClass(crawl.status)}`}>
+              {crawl.status}
+            </span>
+            {isStuckCrawl() && (
+              <button
+                onClick={handleMarkFailed}
+                disabled={markingFailed}
+                className="px-4 py-2 text-sm font-medium text-white bg-orange-600 rounded-md hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {markingFailed ? 'Marking...' : 'Mark as Failed'}
+              </button>
+            )}
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              disabled={deleting}
+              className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {deleting ? 'Deleting...' : 'Delete Crawl'}
+            </button>
+          </div>
         </div>
         <p className="mt-2 text-gray-600">
           <span className="font-medium">URL:</span> {crawl.url}
@@ -169,7 +247,7 @@ const CrawlDetailPage: React.FC = () => {
             onClick={() => handleTabChange('pages')}
             className={`py-4 text-sm font-medium border-b-2 ${
               activeTab === 'pages'
-                ? 'border-indigo-500 text-indigo-600'
+                ? 'border-secondary-500 text-secondary-500'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
           >
@@ -179,7 +257,7 @@ const CrawlDetailPage: React.FC = () => {
             onClick={() => handleTabChange('links')}
             className={`py-4 text-sm font-medium border-b-2 ${
               activeTab === 'links'
-                ? 'border-indigo-500 text-indigo-600'
+                ? 'border-secondary-500 text-secondary-500'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
           >
@@ -189,7 +267,7 @@ const CrawlDetailPage: React.FC = () => {
             onClick={() => handleTabChange('issues')}
             className={`py-4 text-sm font-medium border-b-2 ${
               activeTab === 'issues'
-                ? 'border-indigo-500 text-indigo-600'
+                ? 'border-secondary-500 text-secondary-500'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
           >
@@ -226,23 +304,29 @@ const CrawlDetailPage: React.FC = () => {
                             Status
                           </th>
                           <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
-                            Depth
+                            Load Time (ms)
                           </th>
                           <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
-                            Load Time
+                            Actions
                           </th>
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
                         {pages.map((page) => (
                           <tr key={page.id} className="hover:bg-gray-50">
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm text-gray-900">{page.title || 'No title'}</div>
+                            <td className="px-6 py-4">
+                              <div className="text-sm font-medium text-gray-900">{page.title || 'No title'}</div>
                             </td>
                             <td className="px-6 py-4">
-                              <div className="text-sm text-gray-500 truncate max-w-xs" title={page.url}>
+                              <a 
+                                href={page.url} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="text-sm text-secondary-600 hover:text-secondary-700 underline truncate max-w-xs block" 
+                                title={page.url}
+                              >
                                 {page.url}
-                              </div>
+                              </a>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
@@ -256,10 +340,15 @@ const CrawlDetailPage: React.FC = () => {
                               </span>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm text-gray-500">{page.crawl_depth}</div>
+                              <div className="text-sm text-gray-500">{page.load_time_ms || 'N/A'}</div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm text-gray-500">{page.load_time_ms}ms</div>
+                              <Link
+                                to={`/crawls/${id}/pages/${page.id}`}
+                                className="text-sm font-medium text-secondary-600 hover:text-secondary-700"
+                              >
+                                View Content
+                              </Link>
                             </td>
                           </tr>
                         ))}
@@ -400,6 +489,46 @@ const CrawlDetailPage: React.FC = () => {
           </>
         )}
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div className="p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Delete Crawl</h3>
+              <p className="text-gray-600 mb-4">
+                Are you sure you want to delete this crawl? This will permanently remove the crawl and all associated data including:
+              </p>
+              <ul className="list-disc list-inside text-sm text-gray-600 mb-6 space-y-1">
+                <li>All crawled pages ({pages.length} page{pages.length !== 1 ? 's' : ''})</li>
+                <li>All links</li>
+                <li>All SEO metadata</li>
+                <li>All issues</li>
+                <li>All stored files</li>
+              </ul>
+              <p className="text-red-600 font-medium text-sm mb-6">
+                This action cannot be undone.
+              </p>
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  disabled={deleting}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-secondary-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {deleting ? 'Deleting...' : 'Delete Permanently'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,5 +1,5 @@
 {
-  "name": "aaa-webscraper-frontend",
+  "name": "ai-webscraper-frontend",
   "version": "0.1.0",
   "private": true,
   "dependencies": {
@@ -22,6 +22,7 @@
     "react-query": "^3.39.3",
     "react-router-dom": "^6.18.0",
     "react-scripts": "5.0.1",
+    "sonner": "^2.0.7",
     "tailwind-merge": "^3.3.1",
     "tailwindcss-animate": "^1.0.7",
     "typescript": "^4.9.5",
