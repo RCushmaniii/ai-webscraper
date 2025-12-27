@@ -496,54 +496,79 @@ class Crawler:
             elif not is_internal and self.crawl.follow_external and new_depth <= self.crawl.external_depth:
                 should_follow = True
             
-            # Create link record
-            link_obj = Link(
-                crawl_id=self.crawl.id,
-                source_page_id=source_page_id,
-                url=absolute_url,
-                link_type="internal" if is_internal else "external",
-                anchor_text=link.text.strip(),
-                is_broken=False
-            )
-            
+            # Create link record matching database schema
+            link_data = {
+                "id": str(uuid4()),
+                "crawl_id": str(self.crawl.id),
+                "source_page_id": str(source_page_id),
+                "target_url": absolute_url,
+                "is_internal": is_internal,
+                "depth": new_depth,
+                "status_code": None,
+                "error": None,
+                "latency_ms": None,
+                "anchor_text": link.text.strip()[:500] if link.text else None,  # Limit length
+                "is_nofollow": link.get('rel') and 'nofollow' in link.get('rel', []),
+                "created_at": datetime.now().isoformat(),
+                "updated_at": datetime.now().isoformat()
+            }
+
             # Check link status (async)
             if should_follow:
                 # Add to queue for crawling
                 self.url_queue.append((absolute_url, new_depth, source_url))
+                # Save link without status check
+                await self._save_link(link_data)
             else:
-                # Just check status without crawling
-                await self._check_link_status(link_obj)
+                # Check status and save with status info
+                await self._check_and_save_link(link_data)
     
-    async def _check_link_status(self, link: Link) -> None:
-        """Check the status of a link without fully crawling it."""
+    async def _save_link(self, link_data: Dict) -> None:
+        """Save a link to the database."""
+        try:
+            result = supabase_client.table("links").insert(link_data).execute()
+            if hasattr(result, "error") and result.error:
+                logger.error(f"Error saving link: {result.error}")
+            else:
+                logger.debug(f"Saved link {link_data['target_url'][:100]}")
+        except Exception as e:
+            logger.error(f"Error saving link: {e}")
+
+    async def _check_and_save_link(self, link_data: Dict) -> None:
+        """Check link status and save to database."""
         try:
             await self.rate_limiter.wait()
             start_time = time.time()
-            
+
             # Try HEAD request first
-            response = await self.client.head(
-                link.url, 
-                follow_redirects=True,
-                timeout=10.0
-            )
-            
-            link.status_code = response.status_code
-            
-            # If HEAD fails, try GET
-            if response.status_code >= 400:
-                # Try GET request
-                response = await self.client.get(
-                    link.url,
+            try:
+                response = await self.client.head(
+                    link_data['target_url'],
                     follow_redirects=True,
                     timeout=10.0
                 )
-                
-                link.status_code = response.status_code
-            
+                link_data['status_code'] = response.status_code
+                link_data['latency_ms'] = int((time.time() - start_time) * 1000)
+            except Exception:
+                # If HEAD fails, try GET
+                try:
+                    response = await self.client.get(
+                        link_data['target_url'],
+                        follow_redirects=True,
+                        timeout=10.0
+                    )
+                    link_data['status_code'] = response.status_code
+                    link_data['latency_ms'] = int((time.time() - start_time) * 1000)
+                except Exception as e:
+                    link_data['status_code'] = 0
+                    link_data['error'] = str(e)[:500]  # Limit error length
+                    link_data['latency_ms'] = int((time.time() - start_time) * 1000)
+
+            # Save the link with status info
+            await self._save_link(link_data)
+
         except Exception as e:
-            link.status_code = 0  # Error
-            link.error_message = str(e)
-            link.is_broken = True
+            logger.error(f"Error checking and saving link: {e}")
     def _normalize_url(self, url: str) -> str:
         """Normalize URL to avoid duplicates."""
         parsed = urlparse(url)
@@ -828,13 +853,15 @@ class Crawler:
                 'id': str(uuid4()),
                 'crawl_id': str(self.crawl.id),
                 'page_id': page_id,
-                'issue_type': 'SEO',
+                'type': 'SEO',
                 'severity': 'high' if 'Missing' in issue else 'medium',
-                'description': issue,
-                'url': extracted_data.get('url', ''),
-                'created_at': datetime.now().isoformat()
+                'message': issue,
+                'pointer': None,
+                'context': extracted_data.get('url', ''),
+                'created_at': datetime.now().isoformat(),
+                'updated_at': datetime.now().isoformat()
             })
-        
+
         # Meta description issues
         meta_issues = self._analyze_meta_description_issues(extracted_data['seo'])
         for issue in meta_issues:
@@ -842,13 +869,15 @@ class Crawler:
                 'id': str(uuid4()),
                 'crawl_id': str(self.crawl.id),
                 'page_id': page_id,
-                'issue_type': 'SEO',
+                'type': 'SEO',
                 'severity': 'high' if 'Missing' in issue else 'medium',
-                'description': issue,
-                'url': extracted_data.get('url', ''),
-                'created_at': datetime.now().isoformat()
+                'message': issue,
+                'pointer': None,
+                'context': extracted_data.get('url', ''),
+                'created_at': datetime.now().isoformat(),
+                'updated_at': datetime.now().isoformat()
             })
-        
+
         # Heading issues
         heading_issues = self._analyze_heading_issues(extracted_data['content']['headings'])
         for issue in heading_issues:
@@ -856,13 +885,15 @@ class Crawler:
                 'id': str(uuid4()),
                 'crawl_id': str(self.crawl.id),
                 'page_id': page_id,
-                'issue_type': 'SEO',
+                'type': 'SEO',
                 'severity': 'high' if 'Missing H1' in issue else 'medium',
-                'description': issue,
-                'url': extracted_data.get('url', ''),
-                'created_at': datetime.now().isoformat()
+                'message': issue,
+                'pointer': None,
+                'context': extracted_data.get('url', ''),
+                'created_at': datetime.now().isoformat(),
+                'updated_at': datetime.now().isoformat()
             })
-        
+
         # Technical issues
         technical_issues = self._identify_technical_issues(extracted_data['technical'])
         for issue in technical_issues:
@@ -870,11 +901,13 @@ class Crawler:
                 'id': str(uuid4()),
                 'crawl_id': str(self.crawl.id),
                 'page_id': page_id,
-                'issue_type': 'Technical',
+                'type': 'Technical',
                 'severity': 'low' if 'Large page size' in issue else 'medium',
-                'description': issue,
-                'url': extracted_data.get('url', ''),
-                'created_at': datetime.now().isoformat()
+                'message': issue,
+                'pointer': None,
+                'context': extracted_data.get('url', ''),
+                'created_at': datetime.now().isoformat(),
+                'updated_at': datetime.now().isoformat()
             })
         
         return issues

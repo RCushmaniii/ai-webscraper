@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { RefreshCw } from 'lucide-react';
 import { apiService, Crawl, Page, Link as CrawlLink, Issue } from '../services/api';
+import ConfirmationModal from '../components/ConfirmationModal';
 
 const CrawlDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -15,8 +17,9 @@ const CrawlDetailPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState('pages');
   const [pageLoading, setPageLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [markingFailed, setMarkingFailed] = useState(false);
+  const [rerunning, setRerunning] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showRerunConfirm, setShowRerunConfirm] = useState(false);
 
   const fetchCrawl = async () => {
     if (!id) return;
@@ -101,7 +104,7 @@ const CrawlDetailPage: React.FC = () => {
 
   const handleDelete = async () => {
     if (!id) return;
-    
+
     setDeleting(true);
     try {
       await apiService.deleteCrawl(id);
@@ -114,34 +117,32 @@ const CrawlDetailPage: React.FC = () => {
     }
   };
 
-  const handleMarkFailed = async () => {
-    if (!window.confirm('Mark this crawl as failed? This action cannot be undone.')) {
-      return;
-    }
+  const handleRerun = async () => {
+    if (!crawl) return;
+
+    setShowRerunConfirm(false);
+    setRerunning(true);
 
     try {
-      setMarkingFailed(true);
-      await apiService.markCrawlFailed(id!);
-      toast.success('Crawl marked as failed');
-      fetchCrawl();
+      await apiService.createCrawl({
+        url: crawl.url,
+        name: `${crawl.name} (Re-run)`,
+        max_depth: crawl.max_depth,
+        max_pages: crawl.max_pages,
+        respect_robots_txt: crawl.respect_robots_txt,
+        follow_external_links: crawl.follow_external_links,
+        js_rendering: crawl.js_rendering,
+        rate_limit: crawl.rate_limit,
+        user_agent: crawl.user_agent
+      });
+      toast.success('Crawl re-run initiated successfully');
+      navigate('/crawls');
     } catch (err) {
-      console.error('Error marking crawl as failed:', err);
-      toast.error('Failed to mark crawl as failed');
+      console.error('Error re-running crawl:', err);
+      toast.error('Failed to re-run crawl');
     } finally {
-      setMarkingFailed(false);
+      setRerunning(false);
     }
-  };
-
-  const isStuckCrawl = () => {
-    if (!crawl) return false;
-    if (!['running', 'queued', 'pending'].includes(crawl.status)) return false;
-    
-    const createdAt = new Date(crawl.created_at);
-    const now = new Date();
-    const minutesElapsed = (now.getTime() - createdAt.getTime()) / (1000 * 60);
-    
-    // Consider stuck if running for more than 30 minutes
-    return minutesElapsed > 30;
   };
 
   const getStatusBadgeClass = (status: string) => {
@@ -199,15 +200,14 @@ const CrawlDetailPage: React.FC = () => {
             <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusBadgeClass(crawl.status)}`}>
               {crawl.status}
             </span>
-            {isStuckCrawl() && (
-              <button
-                onClick={handleMarkFailed}
-                disabled={markingFailed}
-                className="px-4 py-2 text-sm font-medium text-white bg-orange-600 rounded-md hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {markingFailed ? 'Marking...' : 'Mark as Failed'}
-              </button>
-            )}
+            <button
+              onClick={() => setShowRerunConfirm(true)}
+              disabled={rerunning}
+              className="px-4 py-2 text-sm font-medium text-white bg-secondary-600 rounded-md hover:bg-secondary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-secondary-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              <RefreshCw className="w-4 h-4" />
+              {rerunning ? 'Re-running...' : 'Re-run'}
+            </button>
             <button
               onClick={() => setShowDeleteConfirm(true)}
               disabled={deleting}
@@ -529,6 +529,18 @@ const CrawlDetailPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Re-run Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showRerunConfirm}
+        onClose={() => setShowRerunConfirm(false)}
+        onConfirm={handleRerun}
+        title="Re-run Crawl"
+        message={`Are you sure you want to re-run this crawl? This will create a new crawl job with the same settings: "${crawl.name}".`}
+        confirmText="Re-run Crawl"
+        variant="info"
+        isLoading={rerunning}
+      />
     </div>
   );
 };
