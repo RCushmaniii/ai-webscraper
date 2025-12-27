@@ -18,23 +18,29 @@ echo Press any key to continue or Ctrl+C to cancel...
 pause >nul
 
 echo.
-echo [1/4] Finding available ports...
+echo [1/5] Cleaning up existing processes...
+call :KillProcessOnPortRange 3000 3010
+call :KillProcessOnPortRange 8000 8010
+echo Cleanup complete.
+
+echo.
+echo [2/5] Finding available ports...
 call :FindAvailablePort 3000 3010 FRONTEND_PORT
 call :FindAvailablePort 8000 8010 BACKEND_PORT
 echo Using ports: Frontend=%FRONTEND_PORT%, Backend=%BACKEND_PORT%
 
 echo.
-echo [2/4] Updating environment files...
+echo [3/5] Updating environment files...
 powershell -Command "(Get-Content 'frontend\.env') -replace 'REACT_APP_API_URL=http://localhost:8000/api/v1', 'REACT_APP_API_URL=http://localhost:%BACKEND_PORT%/api/v1' | Set-Content 'frontend\.env'"
 powershell -Command "(Get-Content 'backend\.env') -replace 'API_PORT=8000', 'API_PORT=%BACKEND_PORT%' | Set-Content 'backend\.env'"
 echo Environment files updated.
 
 echo.
-echo [3/4] Redis Configuration...
+echo [4/5] Redis Configuration...
 echo Using Upstash Redis (cloud) - no local Redis needed.
 
 echo.
-echo [4/4] Starting services...
+echo [5/5] Starting services...
 echo Starting FastAPI backend on port %BACKEND_PORT%...
 cd backend
 if not exist venv (
@@ -95,4 +101,20 @@ for /l %%i in (%START_PORT%, 1, %END_PORT%) do (
 )
 :break
 endlocal & set "%RESULT_VAR%=%RETURN_VALUE%"
+goto :eof
+
+:KillProcessOnPortRange
+setlocal
+set START_PORT=%1
+set END_PORT=%2
+
+for /l %%p in (%START_PORT%, 1, %END_PORT%) do (
+    for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":%%p " ^| findstr "LISTENING"') do (
+        if not "%%a"=="" (
+            echo Killing process on port %%p (PID: %%a)...
+            taskkill /F /PID %%a >nul 2>&1
+        )
+    )
+)
+endlocal
 goto :eof
