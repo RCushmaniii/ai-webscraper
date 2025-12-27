@@ -206,9 +206,10 @@ class Crawler:
             final_url = str(response.url)
             status_code = response.status_code
             content_type = response.headers.get("content-type", "")
-            
+
             # Check if we need to use Playwright for JavaScript rendering
-            if self._needs_js_rendering(response):
+            # Use JS rendering if explicitly enabled OR if auto-detection determines it's needed
+            if self.crawl.js_rendering or self._needs_js_rendering(response):
                 method = "js"
                 html_content, render_time = await self._render_with_playwright(url)
             else:
