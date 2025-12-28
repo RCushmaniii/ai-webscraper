@@ -230,12 +230,13 @@ class Crawler:
             extractor = SmartContentExtractor(html_content, url)
             extracted_data = extractor.extract_all_data()
             
-            # Extract basic text for backwards compatibility
+            # Extract full text content
             soup = BeautifulSoup(html_content, 'lxml')
-            text_excerpt = extracted_data['content']['text'][:1000] if extracted_data['content']['text'] else self._extract_text_excerpt(soup)
+            full_content = extracted_data['content']['text'] if extracted_data['content']['text'] else self._extract_text_excerpt(soup)
+            text_excerpt = full_content[:1000] if full_content else ""  # Keep excerpt for listings
             word_count = extracted_data['content']['word_count']
-            
-            # Create page record
+
+            # Create page record with full content
             page = Page(
                 crawl_id=self.crawl.id,
                 url=url,
@@ -246,6 +247,7 @@ class Crawler:
                 content_hash=content_hash,
                 html_storage_path=html_storage_path,
                 text_excerpt=text_excerpt,
+                full_content=full_content,  # Store complete content (not truncated)
                 word_count=word_count,
                 content_type=content_type,
                 page_size_bytes=len(html_content)
@@ -260,7 +262,9 @@ class Crawler:
             # Extract links
             if status_code == 200:
                 await self._extract_and_process_links(soup, url, depth, page.id)
-            
+                # Extract and save images
+                await self._extract_and_save_images(soup, url, page.id)
+
             # Increment pages crawled
             self.pages_crawled += 1
             
@@ -569,6 +573,74 @@ class Crawler:
 
         except Exception as e:
             logger.error(f"Error checking and saving link: {e}")
+
+    async def _extract_and_save_images(
+        self,
+        soup: BeautifulSoup,
+        page_url: str,
+        page_id: str
+    ) -> None:
+        """Extract images from page and save to database."""
+        try:
+            images = soup.find_all('img')
+            logger.debug(f"Found {len(images)} images on {page_url}")
+
+            for img in images:
+                src = img.get('src')
+                if not src:
+                    continue
+
+                # Resolve relative URLs
+                absolute_src = urljoin(page_url, src)
+
+                # Get image metadata
+                alt_text = img.get('alt')
+                title_text = img.get('title')
+                width = img.get('width')
+                height = img.get('height')
+
+                # Convert width/height to integers if they exist
+                try:
+                    width = int(width) if width and str(width).isdigit() else None
+                    height = int(height) if height and str(height).isdigit() else None
+                except (ValueError, TypeError):
+                    width = None
+                    height = None
+
+                image_data = {
+                    "id": str(uuid4()),
+                    "crawl_id": str(self.crawl.id),
+                    "page_id": str(page_id),
+                    "src": absolute_src,
+                    "alt": alt_text[:500] if alt_text else None,  # Limit length
+                    "title": title_text[:500] if title_text else None,
+                    "width": width,
+                    "height": height,
+                    "has_alt": bool(alt_text and alt_text.strip()),
+                    "is_broken": False,  # Will be checked later if needed
+                    "status_code": None,
+                    "error": None,
+                    "created_at": datetime.now().isoformat(),
+                    "updated_at": datetime.now().isoformat()
+                }
+
+                # Save to database
+                await self._save_image(image_data)
+
+        except Exception as e:
+            logger.error(f"Error extracting images: {e}")
+
+    async def _save_image(self, image_data: Dict) -> None:
+        """Save image to database."""
+        try:
+            result = supabase_client.table("images").insert(image_data).execute()
+            if hasattr(result, "error") and result.error:
+                logger.error(f"Error saving image: {result.error}")
+            else:
+                logger.debug(f"Saved image {image_data['src'][:100]}")
+        except Exception as e:
+            logger.error(f"Error saving image: {e}")
+
     def _normalize_url(self, url: str) -> str:
         """Normalize URL to avoid duplicates."""
         parsed = urlparse(url)

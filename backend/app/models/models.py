@@ -130,6 +130,7 @@ class PageBase(BaseModel):
     content_hash: Optional[str] = None
     html_storage_path: Optional[str] = None
     text_excerpt: Optional[str] = None
+    full_content: Optional[str] = None  # Complete page content (not truncated)
     word_count: Optional[int] = None
     canonical_url: Optional[str] = None
     is_indexable: bool = True
@@ -149,6 +150,7 @@ class PageUpdate(BaseModel):
     content_hash: Optional[str] = None
     html_storage_path: Optional[str] = None
     text_excerpt: Optional[str] = None
+    full_content: Optional[str] = None
     word_count: Optional[int] = None
     canonical_url: Optional[str] = None
     is_indexable: Optional[bool] = None

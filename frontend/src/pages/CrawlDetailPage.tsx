@@ -124,9 +124,43 @@ const CrawlDetailPage: React.FC = () => {
     setRerunning(true);
 
     try {
+      // Remove existing suffixes (counter, timestamp, or "(Re-run)")
+      let baseName = crawl.name
+        .replace(/\s*\(Re-run\)\s*/g, '')  // Remove "(Re-run)"
+        .replace(/\s*#\d+\s*-\s*.+$/, '')   // Remove "#2 - Jan 15, 2:30 PM"
+        .replace(/\s*#\d+$/, '')            // Remove trailing "#2"
+        .trim();
+
+      // Fetch all crawls to determine next counter
+      const allCrawls = await apiService.getCrawls();
+
+      // Find all crawls with this base name
+      const pattern = new RegExp(`^${baseName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\s*#(\\d+))?`, 'i');
+      const matchingCrawls = allCrawls.filter(c => pattern.test(c.name));
+
+      // Determine next counter number
+      const existingNumbers = matchingCrawls
+        .map(c => {
+          const match = c.name.match(/#(\d+)/);
+          return match ? parseInt(match[1], 10) : 1;
+        });
+
+      const nextNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) + 1 : 2;
+
+      // Create timestamp
+      const timestamp = new Date().toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+
+      // Create new name: "My Crawl #2 - Jan 15, 02:30 PM"
+      const newName = `${baseName} #${nextNumber} - ${timestamp}`;
+
       await apiService.createCrawl({
         url: crawl.url,
-        name: `${crawl.name} (Re-run)`,
+        name: newName,
         max_depth: crawl.max_depth,
         max_pages: crawl.max_pages,
         respect_robots_txt: crawl.respect_robots_txt,

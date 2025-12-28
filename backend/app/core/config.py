@@ -41,9 +41,14 @@ class Settings(BaseSettings):
         "on",
     }
     
-    # Supabase settings
+    # Supabase settings (supports both new and legacy keys)
     SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")
-    SUPABASE_KEY: str = os.getenv("SUPABASE_SECRET_KEY", "") or os.getenv("SUPABASE_KEY", "")
+    # Prefer new secret key format (sb_secret_*), fallback to legacy service_role JWT
+    SUPABASE_KEY: str = (
+        os.getenv("SUPABASE_SECRET_KEY", "") or 
+        os.getenv("SUPABASE_API_KEY", "") or 
+        os.getenv("SUPABASE_KEY", "")
+    )
     
     # CORS settings
     BACKEND_CORS_ORIGINS: list[str] = [

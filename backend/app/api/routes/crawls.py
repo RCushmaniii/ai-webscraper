@@ -371,6 +371,48 @@ async def list_crawl_links(
         logger.error(f"Error listing links: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to list links: {str(e)}")
 
+@router.get("/{crawl_id}/images", response_model=List[Dict[str, Any]])
+async def list_crawl_images(
+    crawl_id: UUID,
+    skip: int = 0,
+    limit: int = 100,
+    has_alt: Optional[bool] = None,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    List all images for a specific crawl with optional filters.
+    """
+    try:
+        # Check crawl exists and belongs to user
+        crawl_response = supabase_client.table("crawls").select("*").eq("id", str(crawl_id)).eq("user_id", str(current_user.id)).execute()
+
+        if hasattr(crawl_response, "error") and crawl_response.error is not None:
+            logger.error(f"Error checking crawl: {crawl_response.error}")
+            raise HTTPException(status_code=500, detail="Failed to check crawl")
+
+        if not crawl_response.data:
+            raise HTTPException(status_code=404, detail="Crawl not found")
+
+        # Build query
+        query = supabase_client.table("images").select("*").eq("crawl_id", str(crawl_id))
+
+        if has_alt is not None:
+            query = query.eq("has_alt", has_alt)
+
+        response = query.range(skip, skip + limit - 1).execute()
+
+        if hasattr(response, "error") and response.error is not None:
+            logger.error(f"Error listing images: {response.error}")
+            raise HTTPException(status_code=500, detail="Failed to list images")
+
+        return response.data
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error listing images: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to list images: {str(e)}")
+
 @router.get("/{crawl_id}/issues", response_model=List[Dict[str, Any]])
 async def list_crawl_issues(
     crawl_id: UUID,
