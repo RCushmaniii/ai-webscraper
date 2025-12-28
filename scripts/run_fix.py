@@ -2,14 +2,21 @@
 """Run the complete database fix"""
 import os
 from supabase import create_client
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv(os.path.join(os.path.dirname(__file__), '..', 'backend', '.env'))
 
 # Read the SQL file
 with open('COMPLETE_FIX.sql', 'r') as f:
     sql = f.read()
 
-# Connect to Supabase
-url = "https://kbltwyiowkbxzhhhozxf.supabase.co"
-key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtibHR3eWlvd2tieHpoaGhvenhmIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NTgzODE5OSwiZXhwIjoyMDgxNDE0MTk5fQ.LQ7_DIiaXLFGe7fnpqqMEmhkjCYLB3_jTJsjfF8P8-s"
+# Connect to Supabase using environment variables
+url = os.getenv('SUPABASE_URL')
+key = os.getenv('SUPABASE_SECRET_KEY')
+
+if not url or not key:
+    raise ValueError("SUPABASE_URL and SUPABASE_SECRET_KEY must be set in backend/.env")
 
 supabase = create_client(url, key)
 
