@@ -91,6 +91,22 @@ export interface Issue {
   created_at: string;
 }
 
+export interface Image {
+  id: string;
+  crawl_id: string;
+  page_id: string;
+  src: string;
+  alt?: string;
+  title?: string;
+  width?: number;
+  height?: number;
+  has_alt: boolean;
+  is_broken: boolean;
+  status_code?: number;
+  error?: string;
+  created_at: string;
+}
+
 // API class
 class ApiService {
   private api: AxiosInstance;
@@ -135,6 +151,19 @@ class ApiService {
       
       return config;
     });
+
+    // Handle 401 errors by logging out
+    this.api.interceptors.response.use(
+      (response) => response,
+      async (error) => {
+        if (error.response?.status === 401) {
+          console.error('401 Unauthorized - clearing session and redirecting to login');
+          await supabase.auth.signOut();
+          window.location.href = '/login';
+        }
+        return Promise.reject(error);
+      }
+    );
   }
   
   // User endpoints
@@ -214,12 +243,22 @@ class ApiService {
     return response.data;
   }
   
-  async getCrawlIssues(id: string, params?: { 
-    skip?: number; 
+  async getCrawlIssues(id: string, params?: {
+    skip?: number;
     limit?: number;
     severity?: string;
   }): Promise<Issue[]> {
     const response = await this.api.get(`/crawls/${id}/issues`, { params });
+    return response.data;
+  }
+
+  async getCrawlImages(id: string, params?: {
+    skip?: number;
+    limit?: number;
+    is_broken?: boolean;
+    has_alt?: boolean;
+  }): Promise<Image[]> {
+    const response = await this.api.get(`/crawls/${id}/images`, { params });
     return response.data;
   }
 

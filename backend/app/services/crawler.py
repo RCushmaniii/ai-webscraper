@@ -24,8 +24,8 @@ class Crawler:
     Crawler service responsible for crawling websites and extracting data.
     Follows Single Responsibility Principle by focusing only on crawling logic.
     """
-    
-    def __init__(self, crawl: Crawl):
+
+    def __init__(self, crawl: Crawl, db_client=None):
         self.crawl = crawl
         self.visited_urls: Set[str] = set()
         self.url_queue: List[Tuple[str, int, Optional[str]]] = []  # (url, depth, source_url)
@@ -38,6 +38,8 @@ class Crawler:
         )
         self.rate_limiter = RateLimiter(self.crawl.rate_limit)
         self.domain = urlparse(self.crawl.url).netloc
+        # Use provided db_client (service role) or fall back to default (anon)
+        self.db = db_client if db_client is not None else supabase_client
         
     def _get_headers(self) -> Dict[str, str]:
         """Get HTTP headers based on the crawl's user agent setting."""
@@ -74,38 +76,123 @@ class Crawler:
     async def _save_page_to_db(self, page: Page, seo_metadata: Optional[SEOMetadata]) -> None:
         """Save page and SEO metadata to database."""
         try:
-            # Convert page to dict for Supabase - match actual schema
+            # Use actual SEO metadata if available, otherwise use defaults
+            if seo_metadata:
+                title = seo_metadata.title or "No title found"
+                meta_description = seo_metadata.meta_description
+                h1_tags = [seo_metadata.h1] if seo_metadata.h1 else []
+                h2_tags = seo_metadata.h2 or []
+                internal_links_count = seo_metadata.internal_links
+                external_links_count = seo_metadata.external_links
+            else:
+                title = page.url
+                meta_description = None
+                h1_tags = []
+                h2_tags = []
+                internal_links_count = 0
+                external_links_count = 0
+
+            # Convert page to dict for Supabase - MATCH EXACT DATABASE SCHEMA
+            # NOTE: Images count will be 0 initially, updated later after images are saved
             page_data = {
                 "id": str(page.id),
                 "crawl_id": str(page.crawl_id),
                 "url": page.url,
-                "title": page.text_excerpt[:100] if page.text_excerpt else None,  # Use text excerpt as title
-                "meta_description": None,  # Will extract later
-                "content_summary": page.text_excerpt,
+                "title": title,  # REAL title from SEO metadata
+                "meta_description": meta_description,  # REAL meta description
+                "content_summary": page.text_excerpt,  # 5000 char excerpt for preview
                 "status_code": page.status_code,
                 "response_time": page.render_ms,
                 "content_type": page.content_type,
                 "content_length": page.page_size_bytes,
-                "h1_tags": [],  # Will extract later
-                "h2_tags": [],  # Will extract later
-                "internal_links": 0,  # Will count later
-                "external_links": 0,  # Will count later
-                "images": 0,  # Will count later
-                "scripts": 0,  # Will count later
-                "stylesheets": 0,  # Will count later
-                "seo_score": 0,  # Will calculate later
-                "issues": {}  # Will populate later
+                "h1_tags": h1_tags,  # REAL H1 tags
+                "h2_tags": h2_tags,  # REAL H2 tags
+                "internal_links": internal_links_count,  # REAL count
+                "external_links": external_links_count,  # REAL count
+                "images": 0,  # Will be updated after images are saved
+                "scripts": 0,  # TODO: Extract from HTML
+                "stylesheets": 0,  # TODO: Extract from HTML
+                "seo_score": self._calculate_seo_score_from_metadata(seo_metadata) if seo_metadata else 0,
+                "issues": {}  # Issues are saved to separate table
             }
-            
-            # Insert page
-            result = supabase_client.table("pages").insert(page_data).execute()
+
+            # Insert page (removed full_content - doesn't exist in schema)
+            result = self.db.table("pages").insert(page_data).execute()
             if hasattr(result, "error") and result.error:
                 logger.error(f"Error saving page to database: {result.error}")
             else:
-                logger.debug(f"Saved page {page.url} to database")
-                
+                logger.info(f"Saved page {page.url} to database with title: {title[:50]}")
+
+            # Save SEO metadata to separate table if available
+            if seo_metadata:
+                await self._save_seo_metadata_to_db(seo_metadata)
+
         except Exception as e:
-            logger.error(f"Error saving page to database: {e}")
+            logger.error(f"Error saving page to database: {e}", exc_info=True)
+
+    def _calculate_seo_score_from_metadata(self, seo_metadata: SEOMetadata) -> int:
+        """Calculate a basic SEO score from metadata."""
+        score = 100
+
+        # Title issues
+        if not seo_metadata.title:
+            score -= 20
+        elif seo_metadata.title_length > 60:
+            score -= 10
+        elif seo_metadata.title_length < 30:
+            score -= 5
+
+        # Meta description issues
+        if not seo_metadata.meta_description:
+            score -= 15
+        elif seo_metadata.meta_description_length > 160:
+            score -= 5
+        elif seo_metadata.meta_description_length < 120:
+            score -= 5
+
+        # H1 issues
+        if not seo_metadata.h1:
+            score -= 15
+
+        # Image alt text issues
+        if seo_metadata.image_alt_missing_count > 0:
+            score -= min(20, seo_metadata.image_alt_missing_count * 2)
+
+        return max(0, score)
+
+    async def _save_seo_metadata_to_db(self, seo_metadata: SEOMetadata) -> None:
+        """Save SEO metadata to the seo_metadata table."""
+        try:
+            seo_data = {
+                "id": str(uuid4()),
+                "page_id": str(seo_metadata.page_id),
+                "title": seo_metadata.title,
+                "title_length": seo_metadata.title_length,
+                "meta_description": seo_metadata.meta_description,
+                "meta_description_length": seo_metadata.meta_description_length,
+                "h1": seo_metadata.h1,
+                "h2": seo_metadata.h2,
+                "robots_meta": seo_metadata.robots_meta,
+                "hreflang": seo_metadata.hreflang,
+                "canonical": seo_metadata.canonical,
+                "og_tags": seo_metadata.og_tags,
+                "twitter_tags": seo_metadata.twitter_tags,
+                "json_ld": seo_metadata.json_ld,
+                "image_alt_missing_count": seo_metadata.image_alt_missing_count,
+                "internal_links": seo_metadata.internal_links,
+                "external_links": seo_metadata.external_links,
+                "created_at": datetime.now().isoformat(),
+                "updated_at": datetime.now().isoformat()
+            }
+
+            result = self.db.table("seo_metadata").insert(seo_data).execute()
+            if hasattr(result, "error") and result.error:
+                logger.error(f"Error saving SEO metadata: {result.error}")
+            else:
+                logger.debug(f"Saved SEO metadata for page {seo_metadata.page_id}")
+
+        except Exception as e:
+            logger.error(f"Error saving SEO metadata: {e}", exc_info=True)
     
     async def _process_robots_and_sitemaps(self) -> None:
         """Process robots.txt and sitemaps to respect crawling rules and discover URLs."""
@@ -183,12 +270,27 @@ class Crawler:
             
             # Crawl the URL
             try:
-                page, seo_metadata = await self._crawl_url(url, depth, source_url)
-                if page:
-                    # Save page to database
+                result = await self._crawl_url(url, depth, source_url)
+                if result and len(result) == 4:
+                    page, seo_metadata, soup, status_code = result
+
+                    # CRITICAL: Save page to database FIRST
                     await self._save_page_to_db(page, seo_metadata)
+
+                    # THEN save images and links (now page exists in DB for foreign key)
+                    if status_code == 200:
+                        await self._extract_and_process_links(soup, url, depth, page.id)
+                        images_count = await self._extract_and_save_images(soup, url, page.id)
+
+                        # Update page with actual image count
+                        if images_count > 0:
+                            self.db.table("pages").update({"images": images_count}).eq("id", str(page.id)).execute()
+
+                    # Only increment counter if page was successfully saved
+                    self.pages_crawled += 1
             except Exception as e:
                 logger.error(f"Error crawling {url}: {e}")
+                # Don't increment pages_crawled for failed pages
     
     async def _crawl_url(self, url: str, depth: int, source_url: Optional[str]) -> Tuple[Optional[Page], Optional[SEOMetadata]]:
         """Crawl a single URL."""
@@ -230,13 +332,14 @@ class Crawler:
             extractor = SmartContentExtractor(html_content, url)
             extracted_data = extractor.extract_all_data()
             
-            # Extract full text content
+            # Extract text content
             soup = BeautifulSoup(html_content, 'lxml')
-            full_content = extracted_data['content']['text'] if extracted_data['content']['text'] else self._extract_text_excerpt(soup)
-            text_excerpt = full_content[:1000] if full_content else ""  # Keep excerpt for listings
+            full_text = extracted_data['content']['text'] if extracted_data['content']['text'] else self._extract_text_excerpt(soup)
+            # Increase excerpt to 5000 characters for better content preview
+            text_excerpt = full_text[:5000] if full_text else ""
             word_count = extracted_data['content']['word_count']
 
-            # Create page record with full content
+            # Create page record (removed fields not in DB schema: full_content, html_storage_path)
             page = Page(
                 crawl_id=self.crawl.id,
                 url=url,
@@ -245,9 +348,7 @@ class Crawler:
                 method=method,
                 render_ms=render_time,
                 content_hash=content_hash,
-                html_storage_path=html_storage_path,
                 text_excerpt=text_excerpt,
-                full_content=full_content,  # Store complete content (not truncated)
                 word_count=word_count,
                 content_type=content_type,
                 page_size_bytes=len(html_content)
@@ -259,26 +360,14 @@ class Crawler:
             # Save comprehensive audit data
             await self._save_audit_data(page.id, extracted_data)
             
-            # Extract links
-            if status_code == 200:
-                await self._extract_and_process_links(soup, url, depth, page.id)
-                # Extract and save images
-                await self._extract_and_save_images(soup, url, page.id)
-
-            # Increment pages crawled
-            self.pages_crawled += 1
-            
-            # Update crawl progress in database every 5 pages or on completion
-            if self.pages_crawled % 5 == 0 or self.pages_crawled >= self.crawl.max_pages:
-                await self._update_crawl_progress()
-            
-            # Return the page and metadata
-            return page, seo_metadata
+            # Return the page, metadata, and soup for later processing
+            # DO NOT save images/links here - page must be saved to DB first!
+            return page, seo_metadata, soup, status_code
             
         except Exception as e:
-            logger.error(f"Error crawling {url}: {e}")
-            
-            # Create a page record for the failed crawl
+            logger.error(f"Error crawling {url}: {e}", exc_info=True)
+
+            # Create a page record for the failed crawl (removed fields not in DB schema)
             page = Page(
                 crawl_id=self.crawl.id,
                 url=url,
@@ -287,24 +376,64 @@ class Crawler:
                 method=method,
                 render_ms=int((time.time() - start_time) * 1000),
                 content_hash=None,
-                html_storage_path=None,
-                text_excerpt=f"Error: {str(e)}",
+                text_excerpt=f"Error: {str(e)[:500]}",  # Limit error message length
                 word_count=0,
                 content_type=None,
                 page_size_bytes=0
             )
-            
-            # Create an issue record
-            issue = Issue(
-                crawl_id=self.crawl.id,
-                page_id=page.id,
-                type="crawl_error",
-                severity="error",
-                message=f"Failed to crawl URL: {str(e)}",
-                context=url
-            )
-            
-            return page, None
+
+            # Save the error page to database so user can see what failed
+            try:
+                page_data = {
+                    "id": str(page.id),
+                    "crawl_id": str(page.crawl_id),
+                    "url": page.url,
+                    "title": f"Error crawling {url[:50]}",
+                    "meta_description": None,
+                    "content_summary": f"Failed to crawl: {str(e)[:200]}",
+                    "status_code": 0,
+                    "response_time": page.render_ms,
+                    "content_type": "error",
+                    "content_length": 0,
+                    "h1_tags": [],
+                    "h2_tags": [],
+                    "internal_links": 0,
+                    "external_links": 0,
+                    "images": 0,
+                    "scripts": 0,
+                    "stylesheets": 0,
+                    "seo_score": 0,
+                    "issues": {"crawl_error": str(e)[:500]}
+                }
+
+                result = self.db.table("pages").insert(page_data).execute()
+                if hasattr(result, "error") and result.error:
+                    logger.error(f"Error saving failed page to database: {result.error}")
+                else:
+                    logger.info(f"Saved error page for {url} to database")
+
+                # Also save to issues table for visibility
+                issue_data = {
+                    "id": str(uuid4()),
+                    "crawl_id": str(self.crawl.id),
+                    "page_id": str(page.id),
+                    "type": "Crawl Error",
+                    "severity": "high",
+                    "message": f"Failed to crawl URL: {str(e)[:500]}",
+                    "pointer": None,
+                    "context": url,
+                    "created_at": datetime.now().isoformat(),
+                    "updated_at": datetime.now().isoformat()
+                }
+
+                result = self.db.table("issues").insert(issue_data).execute()
+                if hasattr(result, "error") and result.error:
+                    logger.error(f"Error saving issue to database: {result.error}")
+
+            except Exception as save_error:
+                logger.error(f"Error saving failed page data: {save_error}")
+
+            return None  # Return None to indicate failure (don't increment pages_crawled)
     
     def _needs_js_rendering(self, response: httpx.Response) -> bool:
         """Determine if a page needs JavaScript rendering."""
@@ -512,7 +641,7 @@ class Crawler:
                 "error": None,
                 "latency_ms": None,
                 "anchor_text": link.text.strip()[:500] if link.text else None,  # Limit length
-                "is_nofollow": link.get('rel') and 'nofollow' in link.get('rel', []),
+                "is_nofollow": bool(link.get('rel') and 'nofollow' in link.get('rel', [])),  # Ensure boolean
                 "created_at": datetime.now().isoformat(),
                 "updated_at": datetime.now().isoformat()
             }
@@ -530,7 +659,7 @@ class Crawler:
     async def _save_link(self, link_data: Dict) -> None:
         """Save a link to the database."""
         try:
-            result = supabase_client.table("links").insert(link_data).execute()
+            result = self.db.table("links").insert(link_data).execute()
             if hasattr(result, "error") and result.error:
                 logger.error(f"Error saving link: {result.error}")
             else:
@@ -579,11 +708,12 @@ class Crawler:
         soup: BeautifulSoup,
         page_url: str,
         page_id: str
-    ) -> None:
-        """Extract images from page and save to database."""
+    ) -> int:
+        """Extract images from page and save to database. Returns count of images saved."""
+        saved_count = 0
         try:
             images = soup.find_all('img')
-            logger.debug(f"Found {len(images)} images on {page_url}")
+            logger.info(f"Found {len(images)} images on {page_url}")
 
             for img in images:
                 src = img.get('src')
@@ -625,21 +755,30 @@ class Crawler:
                 }
 
                 # Save to database
-                await self._save_image(image_data)
+                success = await self._save_image(image_data)
+                if success:
+                    saved_count += 1
+
+            logger.info(f"Saved {saved_count}/{len(images)} images for {page_url}")
+            return saved_count
 
         except Exception as e:
             logger.error(f"Error extracting images: {e}")
+            return saved_count
 
-    async def _save_image(self, image_data: Dict) -> None:
-        """Save image to database."""
+    async def _save_image(self, image_data: Dict) -> bool:
+        """Save image to database. Returns True if successful."""
         try:
-            result = supabase_client.table("images").insert(image_data).execute()
+            result = self.db.table("images").insert(image_data).execute()
             if hasattr(result, "error") and result.error:
                 logger.error(f"Error saving image: {result.error}")
+                return False
             else:
                 logger.debug(f"Saved image {image_data['src'][:100]}")
+                return True
         except Exception as e:
             logger.error(f"Error saving image: {e}")
+            return False
 
     def _normalize_url(self, url: str) -> str:
         """Normalize URL to avoid duplicates."""
@@ -753,30 +892,17 @@ class Crawler:
         """Save comprehensive audit data to database."""
         try:
             # Save SEO audit data
-            seo_audit = {
-                'page_id': page_id,
-                'crawl_id': str(self.crawl.id),
-                'title_issues': self._analyze_title_issues(extracted_data['seo']),
-                'meta_description_issues': self._analyze_meta_description_issues(extracted_data['seo']),
-                'heading_issues': self._analyze_heading_issues(extracted_data['content']['headings']),
-                'image_issues': self._analyze_image_issues(extracted_data['images']),
-                'content_quality_score': self._calculate_content_quality_score(extracted_data),
-                'seo_score': self._calculate_seo_score(extracted_data),
-                'technical_issues': self._identify_technical_issues(extracted_data['technical']),
-                'created_at': datetime.now().isoformat()
-            }
-            
-            # Insert SEO audit data
-            result = supabase_client.table("seo_audits").insert(seo_audit).execute()
-            if hasattr(result, "error") and result.error:
-                logger.error(f"Error saving SEO audit data: {result.error}")
-            
+            # NOTE: seo_audits table doesn't exist in schema - removed
+            # Keeping only issues table insert which does exist
+
             # Save individual issues for detailed reporting
             issues = self._generate_issues_list(page_id, extracted_data)
             if issues:
-                result = supabase_client.table("issues").insert(issues).execute()
+                result = self.db.table("issues").insert(issues).execute()
                 if hasattr(result, "error") and result.error:
                     logger.error(f"Error saving issues: {result.error}")
+                else:
+                    logger.debug(f"Saved {len(issues)} issues for page {page_id}")
                     
         except Exception as e:
             logger.error(f"Error saving audit data: {e}")
@@ -924,7 +1050,7 @@ class Crawler:
             issues.append({
                 'id': str(uuid4()),
                 'crawl_id': str(self.crawl.id),
-                'page_id': page_id,
+                'page_id': str(page_id),  # Convert UUID to string
                 'type': 'SEO',
                 'severity': 'high' if 'Missing' in issue else 'medium',
                 'message': issue,
@@ -997,7 +1123,7 @@ class Crawler:
                 "updated_at": datetime.now().isoformat()
             }
             
-            result = supabase_client.table("crawls").update(update_data).eq("id", str(self.crawl.id)).execute()
+            result = self.db.table("crawls").update(update_data).eq("id", str(self.crawl.id)).execute()
             
             if hasattr(result, "error") and result.error:
                 logger.error(f"Error updating crawl progress: {result.error}")

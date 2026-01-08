@@ -5,11 +5,15 @@ from typing import Dict, Any, List
 from uuid import UUID, uuid4
 from datetime import datetime
 import ssl
+from supabase import create_client
 
 from app.core.config import settings
 from app.models.models import Crawl, CrawlCreate
 from app.services.crawler import Crawler
 from app.db.supabase import supabase_client
+
+# Create service role client for Celery (bypasses RLS)
+service_client = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY)
 
 # Configure Celery with SSL support for Upstash Redis
 broker_use_ssl = {
@@ -64,8 +68,8 @@ def crawl_site(crawl_id: str) -> Dict[str, Any]:
     logger.info(f"Starting crawl task for crawl_id: {crawl_id}")
 
     try:
-        # 1. Fetch crawl data from Supabase
-        response = supabase_client.table("crawls").select("*").eq("id", crawl_id).single().execute()
+        # 1. Fetch crawl data from Supabase using service role (bypasses RLS)
+        response = service_client.table("crawls").select("*").eq("id", crawl_id).single().execute()
 
         if response.data is None:
             logger.error(f"Crawl with id {crawl_id} not found.")
@@ -74,24 +78,46 @@ def crawl_site(crawl_id: str) -> Dict[str, Any]:
         # 2. Instantiate Crawl model
         crawl_model = Crawl(**response.data)
 
-        # 3. Instantiate Crawler with the model
-        crawler = Crawler(crawl=crawl_model)
+        # 2.5. Mark crawl as running (removed started_at - column doesn't exist in DB)
+        service_client.table("crawls").update({
+            "status": "running",
+            "updated_at": datetime.now().isoformat()
+        }).eq("id", crawl_id).execute()
+
+        logger.info(f"Starting crawler for {crawl_model.url}")
+
+        # 3. Instantiate Crawler with the model and service client (bypasses RLS)
+        crawler = Crawler(crawl=crawl_model, db_client=service_client)
 
         # 4. Run the crawl (asynchronously)
         asyncio.run(crawler.start())
 
+        logger.info(f"Crawl finished for {crawl_id}. Pages crawled: {crawler.pages_crawled}")
+
         progress = crawler.get_progress()
 
         # 5. Update crawl status and final metrics in database
-        final_update = {
-            "status": "completed",
-            "pages_crawled": progress.pages_crawled,
-            "total_links": len(crawler.visited_urls) + len(crawler.url_queue),
-            "completed_at": datetime.now().isoformat(),
-            "updated_at": datetime.now().isoformat()
-        }
-        
-        supabase_client.table("crawls").update(final_update).eq("id", crawl_id).execute()
+        # IMPORTANT: Mark as failed if 0 pages were crawled
+        if progress.pages_crawled == 0:
+            final_update = {
+                "status": "failed",
+                "pages_crawled": 0,
+                "total_links": 0,
+                "error": "Crawl completed but no pages were successfully crawled. This could be due to: robots.txt blocking, connection issues, or invalid URL.",
+                "completed_at": datetime.now().isoformat(),
+                "updated_at": datetime.now().isoformat()
+            }
+            logger.warning(f"Crawl {crawl_id} completed with 0 pages - marking as failed")
+        else:
+            final_update = {
+                "status": "completed",
+                "pages_crawled": progress.pages_crawled,
+                "total_links": len(crawler.visited_urls) + len(crawler.url_queue),
+                "completed_at": datetime.now().isoformat(),
+                "updated_at": datetime.now().isoformat()
+            }
+
+        service_client.table("crawls").update(final_update).eq("id", crawl_id).execute()
 
         # 6. Run comprehensive SEO audit
         if settings.ENABLE_SEO_AUDIT:
@@ -113,11 +139,27 @@ def crawl_site(crawl_id: str) -> Dict[str, Any]:
 
     except Exception as e:
         logger.error(f"Error during crawl for {crawl_id}: {e}", exc_info=True)
-        supabase_client.table("crawls").update({"status": "failed", "error": str(e)}).eq("id", crawl_id).execute()
+
+        # Provide helpful error message
+        error_msg = str(e)
+        if "Connection" in error_msg or "timeout" in error_msg.lower():
+            error_msg = f"Connection failed: {error_msg}. The site may be blocking crawlers or is unreachable."
+        elif "SSL" in error_msg or "certificate" in error_msg.lower():
+            error_msg = f"SSL/Certificate error: {error_msg}. The site's security certificate may be invalid."
+        elif "robots" in error_msg.lower():
+            error_msg = f"Robots.txt blocking: {error_msg}. The site disallows crawling."
+
+        service_client.table("crawls").update({
+            "status": "failed",
+            "error": error_msg[:500],  # Limit error length
+            "completed_at": datetime.now().isoformat(),
+            "updated_at": datetime.now().isoformat()
+        }).eq("id", crawl_id).execute()
+
         return {
             "crawl_id": crawl_id,
             "status": "failed",
-            "error": str(e)
+            "error": error_msg
         }
 
 @celery_app.task(name="batch_crawl")
@@ -148,7 +190,7 @@ def batch_crawl(batch_id: str, user_id: str, site_urls: List[str], config: Dict[
         }
         
         try:
-            supabase_client.table("crawls").insert(crawl_data).execute()
+            service_client.table("crawls").insert(crawl_data).execute()
             crawl_site.delay(str(crawl_id))
             results["crawl_ids"].append(str(crawl_id))
         except Exception as e:

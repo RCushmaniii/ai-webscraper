@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { RefreshCw } from 'lucide-react';
-import { apiService, Crawl, Page, Link as CrawlLink, Issue } from '../services/api';
+import { apiService, Crawl, Page, Link as CrawlLink, Issue, Image } from '../services/api';
 import ConfirmationModal from '../components/ConfirmationModal';
 
 const CrawlDetailPage: React.FC = () => {
@@ -12,10 +12,12 @@ const CrawlDetailPage: React.FC = () => {
   const [pages, setPages] = useState<Page[]>([]);
   const [links, setLinks] = useState<CrawlLink[]>([]);
   const [issues, setIssues] = useState<Issue[]>([]);
+  const [images, setImages] = useState<Image[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('pages');
   const [pageLoading, setPageLoading] = useState(false);
+  const [linkFilter, setLinkFilter] = useState<'all' | 'internal' | 'external'>('all');
   const [deleting, setDeleting] = useState(false);
   const [rerunning, setRerunning] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -84,6 +86,12 @@ const CrawlDetailPage: React.FC = () => {
           if (issues.length === 0) {
             const issuesData = await apiService.getCrawlIssues(id);
             setIssues(issuesData);
+          }
+          break;
+        case 'images':
+          if (images.length === 0) {
+            const imagesData = await apiService.getCrawlImages(id);
+            setImages(imagesData);
           }
           break;
         default:
@@ -307,6 +315,16 @@ const CrawlDetailPage: React.FC = () => {
           >
             Issues
           </button>
+          <button
+            onClick={() => handleTabChange('images')}
+            className={`py-4 text-sm font-medium border-b-2 ${
+              activeTab === 'images'
+                ? 'border-secondary-500 text-secondary-500'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            Images
+          </button>
         </nav>
       </div>
 
@@ -400,8 +418,42 @@ const CrawlDetailPage: React.FC = () => {
             {/* Links Tab */}
             {activeTab === 'links' && (
               <div className="p-6">
-                <h2 className="mb-4 text-xl font-semibold text-gray-800">Links</h2>
-                
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-xl font-semibold text-gray-800">Links</h2>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setLinkFilter('all')}
+                      className={`px-4 py-2 text-sm font-medium rounded-md ${
+                        linkFilter === 'all'
+                          ? 'bg-secondary-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      All Links ({links.length})
+                    </button>
+                    <button
+                      onClick={() => setLinkFilter('internal')}
+                      className={`px-4 py-2 text-sm font-medium rounded-md ${
+                        linkFilter === 'internal'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      Internal ({links.filter(l => l.is_internal).length})
+                    </button>
+                    <button
+                      onClick={() => setLinkFilter('external')}
+                      className={`px-4 py-2 text-sm font-medium rounded-md ${
+                        linkFilter === 'external'
+                          ? 'bg-purple-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      External ({links.filter(l => !l.is_internal).length})
+                    </button>
+                  </div>
+                </div>
+
                 {links.length > 0 ? (
                   <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200">
@@ -425,7 +477,14 @@ const CrawlDetailPage: React.FC = () => {
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
-                        {links.map((link) => (
+                        {links
+                          .filter(link => {
+                            if (linkFilter === 'all') return true;
+                            if (linkFilter === 'internal') return link.is_internal;
+                            if (linkFilter === 'external') return !link.is_internal;
+                            return true;
+                          })
+                          .map((link) => (
                           <tr key={link.id} className="hover:bg-gray-50">
                             <td className="px-6 py-4">
                               <div className="text-sm text-gray-500 truncate max-w-xs" title={link.source_url}>
@@ -479,15 +538,15 @@ const CrawlDetailPage: React.FC = () => {
             {activeTab === 'issues' && (
               <div className="p-6">
                 <h2 className="mb-4 text-xl font-semibold text-gray-800">Issues</h2>
-                
+
                 {issues.length > 0 ? (
                   <div className="space-y-4">
                     {issues.map((issue) => (
-                      <div 
-                        key={issue.id} 
+                      <div
+                        key={issue.id}
                         className={`p-4 rounded-md ${
-                          issue.severity === 'high' 
-                            ? 'bg-red-50 border-l-4 border-red-500' 
+                          issue.severity === 'high'
+                            ? 'bg-red-50 border-l-4 border-red-500'
                             : issue.severity === 'medium'
                             ? 'bg-yellow-50 border-l-4 border-yellow-500'
                             : 'bg-blue-50 border-l-4 border-blue-500'
@@ -496,8 +555,8 @@ const CrawlDetailPage: React.FC = () => {
                         <div className="flex items-center justify-between">
                           <h3 className="text-lg font-medium text-gray-900">{issue.issue_type}</h3>
                           <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                            issue.severity === 'high' 
-                              ? 'bg-red-100 text-red-800' 
+                            issue.severity === 'high'
+                              ? 'bg-red-100 text-red-800'
                               : issue.severity === 'medium'
                               ? 'bg-yellow-100 text-yellow-800'
                               : 'bg-blue-100 text-blue-800'
@@ -515,6 +574,95 @@ const CrawlDetailPage: React.FC = () => {
                 ) : (
                   <div className="p-4 text-sm text-gray-700 bg-gray-100 rounded-md">
                     <p>No issues found for this crawl.</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Images Tab */}
+            {activeTab === 'images' && (
+              <div className="p-6">
+                <h2 className="mb-4 text-xl font-semibold text-gray-800">Images</h2>
+
+                {images.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
+                            Image
+                          </th>
+                          <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
+                            Source URL
+                          </th>
+                          <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
+                            Alt Text
+                          </th>
+                          <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
+                            Dimensions
+                          </th>
+                          <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
+                            Status
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {images.map((image) => (
+                          <tr key={image.id} className="hover:bg-gray-50">
+                            <td className="px-6 py-4">
+                              <img
+                                src={image.src}
+                                alt={image.alt || 'Image'}
+                                className="w-16 h-16 object-cover rounded"
+                                onError={(e) => {
+                                  e.currentTarget.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23ddd" width="100" height="100"/%3E%3Ctext fill="%23999" x="50%" y="50%" text-anchor="middle" dy=".3em"%3ENo Image%3C/text%3E%3C/svg%3E';
+                                }}
+                              />
+                            </td>
+                            <td className="px-6 py-4">
+                              <a
+                                href={image.src}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-sm text-secondary-600 hover:text-secondary-700 underline truncate max-w-xs block"
+                                title={image.src}
+                              >
+                                {image.src}
+                              </a>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="text-sm text-gray-900 max-w-xs truncate" title={image.alt}>
+                                {image.has_alt ? (
+                                  <span>{image.alt || 'Empty'}</span>
+                                ) : (
+                                  <span className="text-red-600">Missing</span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm text-gray-500">
+                                {image.width && image.height ? `${image.width} × ${image.height}` : 'N/A'}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              {image.is_broken ? (
+                                <span className="inline-flex px-2 py-1 text-xs font-semibold text-red-800 bg-red-100 rounded-full">
+                                  Broken {image.status_code ? `(${image.status_code})` : ''}
+                                </span>
+                              ) : (
+                                <span className="inline-flex px-2 py-1 text-xs font-semibold text-green-800 bg-green-100 rounded-full">
+                                  OK {image.status_code ? `(${image.status_code})` : ''}
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="p-4 text-sm text-gray-700 bg-gray-100 rounded-md">
+                    <p>No images found for this crawl.</p>
                   </div>
                 )}
               </div>
