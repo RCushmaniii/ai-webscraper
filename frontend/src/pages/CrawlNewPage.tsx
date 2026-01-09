@@ -32,17 +32,45 @@ const CrawlNewPage: React.FC = () => {
     }));
   };
 
+  const validateForm = (): string | null => {
+    if (!formData.url || !formData.url.startsWith('http')) {
+      return 'Please enter a valid URL starting with http:// or https://';
+    }
+    if (!formData.name || formData.name.trim().length === 0) {
+      return 'Please enter a crawl name';
+    }
+    if (formData.max_depth < 1 || formData.max_depth > 10) {
+      return 'Max depth must be between 1 and 10';
+    }
+    if (formData.max_pages < 1 || formData.max_pages > 1000) {
+      return 'Max pages must be between 1 and 1000';
+    }
+    if (formData.rate_limit < 0.1 || formData.rate_limit > 10) {
+      return 'Rate limit must be between 0.1 and 10 requests per second';
+    }
+    return null;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate form before submission
+    const validationError = validateForm();
+    if (validationError) {
+      toast.error(validationError);
+      return;
+    }
+
     setFormSubmitting(true);
 
     try {
       await apiService.createCrawl(formData);
       toast.success('Crawl created successfully');
       navigate('/crawls');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error creating crawl:', err);
-      toast.error('Failed to create crawl. Please check your inputs.');
+      const errorMessage = err?.response?.data?.detail || err?.message || 'Failed to create crawl';
+      toast.error(errorMessage);
     } finally {
       setFormSubmitting(false);
     }

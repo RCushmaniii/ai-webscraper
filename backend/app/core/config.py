@@ -41,14 +41,11 @@ class Settings(BaseSettings):
         "on",
     }
     
-    # Supabase settings (supports both new and legacy keys)
+    # Supabase settings
     SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")
-    # Prefer new secret key format (sb_secret_*), fallback to legacy service_role JWT
-    SUPABASE_KEY: str = (
-        os.getenv("SUPABASE_SECRET_KEY", "") or 
-        os.getenv("SUPABASE_API_KEY", "") or 
-        os.getenv("SUPABASE_KEY", "")
-    )
+    SUPABASE_KEY: str = os.getenv("SUPABASE_KEY", "")
+    SUPABASE_SERVICE_ROLE_KEY: str = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+    # JWT_SECRET not needed - using JWKS endpoint for ES256 validation
     
     # CORS settings
     BACKEND_CORS_ORIGINS: list[str] = [

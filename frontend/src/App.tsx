@@ -6,7 +6,8 @@ import ErrorBoundary from './components/ErrorBoundary';
 import Layout from './components/Layout';
 
 // Page imports
-import HomePage from './pages/HomePage';
+import MarketingHomePage from './pages/MarketingHomePage';
+import QuickStartPage from './pages/QuickStartPage';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
@@ -20,8 +21,12 @@ import UsersPage from './pages/UsersPage';
 import ProfilePage from './pages/ProfilePage';
 import PrivacyPage from './pages/PrivacyPage';
 import TermsPage from './pages/TermsPage';
+import CookiesPage from './pages/CookiesPage';
+import AboutPage from './pages/AboutPage';
+import UseCasesPage from './pages/UseCasesPage';
 import DocsPage from './pages/DocsPage';
 import NotFoundPage from './pages/NotFoundPage';
+import ImagesPage from './pages/ImagesPage';
 
 // Protected route component
 const ProtectedRoute: React.FC<{ element: React.ReactElement; adminOnly?: boolean }> = ({ 
@@ -53,17 +58,22 @@ function AppRoutes() {
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/" element={<Layout />}>
-        <Route index element={<HomePage />} />
+        <Route index element={<MarketingHomePage />} />
+        <Route path="quick-start" element={<QuickStartPage />} />
         <Route path="dashboard" element={<ProtectedRoute element={<DashboardPage />} />} />
         <Route path="crawls" element={<ProtectedRoute element={<CrawlsPage />} />} />
         <Route path="crawls/new" element={<ProtectedRoute element={<CrawlNewPage />} adminOnly={true} />} />
         <Route path="crawls/:id" element={<ProtectedRoute element={<CrawlDetailPage />} />} />
         <Route path="crawls/:crawlId/pages/:pageId" element={<ProtectedRoute element={<PageDetailPage />} />} />
+        <Route path="crawls/:crawlId/images" element={<ProtectedRoute element={<ImagesPage />} />} />
         <Route path="users" element={<ProtectedRoute element={<UsersPage />} adminOnly={true} />} />
         <Route path="profile" element={<ProtectedRoute element={<ProfilePage />} />} />
+        <Route path="about" element={<AboutPage />} />
+        <Route path="use-cases" element={<UseCasesPage />} />
         <Route path="docs" element={<DocsPage />} />
         <Route path="privacy" element={<PrivacyPage />} />
         <Route path="terms" element={<TermsPage />} />
+        <Route path="cookies" element={<CookiesPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>

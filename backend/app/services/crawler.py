@@ -40,6 +40,7 @@ class Crawler:
         self.domain = urlparse(self.crawl.url).netloc
         # Use provided db_client (service role) or fall back to default (anon)
         self.db = db_client if db_client is not None else supabase_client
+        self.crawl_deleted = False  # Track if crawl was deleted during processing
         
     def _get_headers(self) -> Dict[str, str]:
         """Get HTTP headers based on the crawl's user agent setting."""
@@ -58,6 +59,11 @@ class Crawler:
         """Start the crawling process."""
         logger.info(f"Starting crawl for {self.crawl.url}")
         
+        # Verify crawl exists before starting
+        if not await self._verify_crawl_exists():
+            logger.warning(f"Crawl {self.crawl.id} was deleted before starting. Exiting gracefully.")
+            return
+        
         # Initialize the queue with the start URL
         self.url_queue.append((self.crawl.url, 0, None))
         
@@ -71,7 +77,10 @@ class Crawler:
         # Close the HTTP client
         await self.client.aclose()
         
-        logger.info(f"Crawl completed for {self.crawl.url}")
+        if self.crawl_deleted:
+            logger.info(f"Crawl {self.crawl.id} was deleted during processing. Stopped gracefully.")
+        else:
+            logger.info(f"Crawl completed for {self.crawl.url}")
     
     async def _save_page_to_db(self, page: Page, seo_metadata: Optional[SEOMetadata]) -> None:
         """Save page and SEO metadata to database."""
@@ -252,11 +261,26 @@ class Crawler:
     
     async def _crawl(self) -> None:
         """Main crawling loop."""
+        last_existence_check = time.time()
+        
         while self.url_queue and self.pages_crawled < self.crawl.max_pages:
             # Check if max runtime exceeded
-            if time.time() - self.start_time > self.crawl.max_runtime_sec:
-                logger.info("Max runtime exceeded, stopping crawl")
+            elapsed_time = time.time() - self.start_time
+            if elapsed_time > self.crawl.max_runtime_sec:
+                logger.warning(f"Max runtime exceeded ({elapsed_time:.0f}s > {self.crawl.max_runtime_sec}s), stopping crawl")
                 break
+            
+            # Periodically check if crawl still exists (every 30 seconds)
+            if time.time() - last_existence_check > 30:
+                if not await self._verify_crawl_exists():
+                    logger.warning(f"Crawl {self.crawl.id} was deleted. Stopping gracefully.")
+                    self.crawl_deleted = True
+                    break
+                last_existence_check = time.time()
+            
+            # Log progress every 10 pages
+            if self.pages_crawled > 0 and self.pages_crawled % 10 == 0:
+                logger.info(f"Progress: {self.pages_crawled} pages crawled, {len(self.url_queue)} URLs in queue, {elapsed_time:.0f}s elapsed")
             
             # Get the next URL from the queue
             url, depth, source_url = self.url_queue.pop(0)
@@ -661,10 +685,22 @@ class Crawler:
         try:
             result = self.db.table("links").insert(link_data).execute()
             if hasattr(result, "error") and result.error:
+                error_msg = str(result.error)
+                # Check for foreign key violation (crawl was deleted)
+                if "23503" in error_msg or "foreign key constraint" in error_msg.lower():
+                    logger.warning(f"Crawl {self.crawl.id} was deleted. Skipping link save.")
+                    self.crawl_deleted = True
+                    return
                 logger.error(f"Error saving link: {result.error}")
             else:
                 logger.debug(f"Saved link {link_data['target_url'][:100]}")
         except Exception as e:
+            error_msg = str(e)
+            # Check for foreign key violation (crawl was deleted)
+            if "23503" in error_msg or "foreign key constraint" in error_msg.lower():
+                logger.warning(f"Crawl {self.crawl.id} was deleted. Skipping link save.")
+                self.crawl_deleted = True
+                return
             logger.error(f"Error saving link: {e}")
 
     async def _check_and_save_link(self, link_data: Dict) -> None:
@@ -712,10 +748,19 @@ class Crawler:
         """Extract images from page and save to database. Returns count of images saved."""
         saved_count = 0
         try:
+            # Check if crawl still exists before processing images
+            if self.crawl_deleted:
+                logger.info(f"Crawl was deleted. Skipping image extraction.")
+                return 0
+            
             images = soup.find_all('img')
             logger.info(f"Found {len(images)} images on {page_url}")
 
             for img in images:
+                # Stop if crawl was deleted
+                if self.crawl_deleted:
+                    logger.info(f"Crawl was deleted during image processing. Stopping.")
+                    break
                 src = img.get('src')
                 if not src:
                     continue
@@ -771,14 +816,39 @@ class Crawler:
         try:
             result = self.db.table("images").insert(image_data).execute()
             if hasattr(result, "error") and result.error:
+                error_msg = str(result.error)
+                # Check for foreign key violation (crawl was deleted)
+                if "23503" in error_msg or "foreign key constraint" in error_msg.lower():
+                    logger.warning(f"Crawl {self.crawl.id} was deleted. Skipping image save.")
+                    self.crawl_deleted = True
+                    return False
                 logger.error(f"Error saving image: {result.error}")
                 return False
             else:
                 logger.debug(f"Saved image {image_data['src'][:100]}")
                 return True
         except Exception as e:
+            error_msg = str(e)
+            # Check for foreign key violation (crawl was deleted)
+            if "23503" in error_msg or "foreign key constraint" in error_msg.lower():
+                logger.warning(f"Crawl {self.crawl.id} was deleted. Skipping image save.")
+                self.crawl_deleted = True
+                return False
             logger.error(f"Error saving image: {e}")
             return False
+
+    async def _verify_crawl_exists(self) -> bool:
+        """Verify that the crawl still exists in the database."""
+        try:
+            result = self.db.table("crawls").select("id").eq("id", str(self.crawl.id)).execute()
+            exists = result.data and len(result.data) > 0
+            if not exists:
+                self.crawl_deleted = True
+            return exists
+        except Exception as e:
+            logger.error(f"Error verifying crawl existence: {e}")
+            # Assume it exists if we can't verify (avoid false positives)
+            return True
 
     def _normalize_url(self, url: str) -> str:
         """Normalize URL to avoid duplicates."""

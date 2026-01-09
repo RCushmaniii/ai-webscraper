@@ -281,6 +281,31 @@ class ApiService {
     const response = await this.api.get(`/crawls/${crawlId}/screenshot/${pageId}`);
     return response.data;
   }
+
+  async searchCrawlData(crawlId: string, query: string, params?: {
+    skip?: number;
+    limit?: number;
+  }): Promise<{
+    query: string;
+    results: {
+      pages: Page[];
+      links: Link[];
+      images: Image[];
+    };
+    counts: {
+      pages: number;
+      links: number;
+      images: number;
+    };
+  }> {
+    const response = await this.api.get(`/crawls/${crawlId}/search`, {
+      params: {
+        query,
+        ...params
+      }
+    });
+    return response.data;
+  }
 }
 
 // Create and export a singleton instance

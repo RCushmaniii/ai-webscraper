@@ -5,7 +5,7 @@ from uuid import UUID, uuid4
 import logging
 from datetime import datetime
 
-from app.core.auth import get_current_user
+from app.core.auth import get_current_user, get_auth_client
 from app.core.config import settings
 from app.models.models import Crawl, CrawlCreate, CrawlUpdate, CrawlResponse, User
 from app.services.worker import crawl_site
@@ -28,6 +28,9 @@ async def create_crawl(
     crawl_id = uuid4()
 
     try:
+        # Use authenticated client for RLS
+        auth_client = get_auth_client()
+
         # Create crawl record in database
         now = datetime.now()
         raw_data = crawl.model_dump()
@@ -63,8 +66,8 @@ async def create_crawl(
         logger.debug(f"Inserting crawl data: {crawl_data}")
 
         # Insert into Supabase
-        response = supabase_client.table("crawls").insert(crawl_data).execute()
-        
+        response = auth_client.table("crawls").insert(crawl_data).execute()
+
         if hasattr(response, "error") and response.error is not None:
             logger.error(f"Error creating crawl in DB: {response.error.message}")
             raise HTTPException(status_code=500, detail=f"Failed to create crawl: {response.error.message}")
@@ -72,9 +75,9 @@ async def create_crawl(
         # Dispatch the crawl task to Celery
         crawl_site.delay(str(crawl_id))
         logger.info(f"Dispatched crawl task {crawl_id} to Celery.")
-        
+
         # Fetch the newly created record to ensure a valid response
-        fetch_response = supabase_client.table("crawls").select("*").eq("id", str(crawl_id)).single().execute()
+        fetch_response = auth_client.table("crawls").select("*").eq("id", str(crawl_id)).single().execute()
 
         if hasattr(fetch_response, "error") and fetch_response.error is not None:
             logger.error(f"Failed to fetch created crawl: {fetch_response.error.message}")
@@ -98,7 +101,9 @@ async def list_crawls(
     List all crawls for the current user.
     """
     try:
-        query = supabase_client.table("crawls").select("*").eq("user_id", str(current_user.id))
+        # Use authenticated client for RLS
+        auth_client = get_auth_client()
+        query = auth_client.table("crawls").select("*").eq("user_id", str(current_user.id))
         
         if status:
             query = query.eq("status", status)
@@ -124,7 +129,9 @@ async def get_crawl(
     Get a specific crawl by ID.
     """
     try:
-        response = supabase_client.table("crawls").select("*").eq("id", str(crawl_id)).eq("user_id", str(current_user.id)).execute()
+        # Use authenticated client for RLS
+        auth_client = get_auth_client()
+        response = auth_client.table("crawls").select("*").eq("id", str(crawl_id)).eq("user_id", str(current_user.id)).execute()
         
         if hasattr(response, "error") and response.error is not None:
             logger.error(f"Error getting crawl: {response.error}")
@@ -150,21 +157,24 @@ async def mark_crawl_failed(
     Manually mark a stuck crawl as failed.
     """
     try:
+        # Use authenticated client for RLS
+        auth_client = get_auth_client()
+
         # Check if crawl exists and belongs to user
-        response = supabase_client.table("crawls").select("*").eq("id", str(crawl_id)).eq("user_id", str(current_user.id)).execute()
-        
+        response = auth_client.table("crawls").select("*").eq("id", str(crawl_id)).eq("user_id", str(current_user.id)).execute()
+
         if not response.data:
             raise HTTPException(status_code=404, detail="Crawl not found")
-        
+
         crawl = response.data[0]
-        
+
         # Only allow marking non-terminal states as failed
         if crawl['status'] in ['completed', 'failed', 'cancelled']:
             raise HTTPException(status_code=400, detail=f"Cannot mark {crawl['status']} crawl as failed")
-        
+
         # Update to failed status
         from datetime import datetime, timezone
-        update_response = supabase_client.table("crawls").update({
+        update_response = auth_client.table("crawls").update({
             'status': 'failed',
             'error': 'Manually marked as failed by user',
             'updated_at': datetime.now(timezone.utc).isoformat()
@@ -191,9 +201,12 @@ async def delete_crawl(
     """
     try:
         logger.info(f"Attempting to delete crawl {crawl_id} for user {current_user.id}")
-        
+
+        # Use authenticated client for RLS
+        auth_client = get_auth_client()
+
         # First check if the crawl exists and belongs to the user
-        response = supabase_client.table("crawls").select("*").eq("id", str(crawl_id)).eq("user_id", str(current_user.id)).execute()
+        response = auth_client.table("crawls").select("*").eq("id", str(crawl_id)).eq("user_id", str(current_user.id)).execute()
         
         if hasattr(response, "error") and response.error is not None:
             logger.error(f"Error checking crawl: {response.error}")
@@ -212,7 +225,7 @@ async def delete_crawl(
         for table in tables:
             try:
                 logger.info(f"Deleting from table: {table}")
-                delete_response = supabase_client.table(table).delete().eq("crawl_id", str(crawl_id)).execute()
+                delete_response = auth_client.table(table).delete().eq("crawl_id", str(crawl_id)).execute()
                 if hasattr(delete_response, "error") and delete_response.error is not None:
                     logger.error(f"Error deleting from {table}: {delete_response.error}")
                     # Don't fail the entire operation for related table errors
@@ -221,10 +234,10 @@ async def delete_crawl(
             except Exception as table_error:
                 logger.error(f"Exception deleting from {table}: {table_error}")
                 # Continue with other tables
-        
+
         # Finally delete the crawl itself
         logger.info("Deleting crawl record")
-        delete_response = supabase_client.table("crawls").delete().eq("id", str(crawl_id)).execute()
+        delete_response = auth_client.table("crawls").delete().eq("id", str(crawl_id)).execute()
         
         if hasattr(delete_response, "error") and delete_response.error is not None:
             logger.error(f"Error deleting crawl: {delete_response.error}")
@@ -262,18 +275,21 @@ async def list_crawl_pages(
     List all pages for a specific crawl.
     """
     try:
+        # Use authenticated client for RLS
+        auth_client = get_auth_client()
+
         # First check if the crawl exists and belongs to the user
-        crawl_response = supabase_client.table("crawls").select("*").eq("id", str(crawl_id)).eq("user_id", str(current_user.id)).execute()
-        
+        crawl_response = auth_client.table("crawls").select("*").eq("id", str(crawl_id)).eq("user_id", str(current_user.id)).execute()
+
         if hasattr(crawl_response, "error") and crawl_response.error is not None:
             logger.error(f"Error checking crawl: {crawl_response.error}")
             raise HTTPException(status_code=500, detail="Failed to check crawl")
-        
+
         if not crawl_response.data:
             raise HTTPException(status_code=404, detail="Crawl not found")
-        
+
         # Get pages for this crawl
-        response = supabase_client.table("pages").select("*").eq("crawl_id", str(crawl_id)).range(skip, skip + limit - 1).execute()
+        response = auth_client.table("pages").select("*").eq("crawl_id", str(crawl_id)).range(skip, skip + limit - 1).execute()
         
         if hasattr(response, "error") and response.error is not None:
             logger.error(f"Error listing pages: {response.error}")
@@ -297,18 +313,21 @@ async def get_page_detail(
     Get detailed information for a specific page including full content.
     """
     try:
+        # Use authenticated client for RLS
+        auth_client = get_auth_client()
+
         # First check if the crawl exists and belongs to the user
-        crawl_response = supabase_client.table("crawls").select("*").eq("id", str(crawl_id)).eq("user_id", str(current_user.id)).execute()
-        
+        crawl_response = auth_client.table("crawls").select("*").eq("id", str(crawl_id)).eq("user_id", str(current_user.id)).execute()
+
         if hasattr(crawl_response, "error") and crawl_response.error is not None:
             logger.error(f"Error checking crawl: {crawl_response.error}")
             raise HTTPException(status_code=500, detail="Failed to check crawl")
-        
+
         if not crawl_response.data:
             raise HTTPException(status_code=404, detail="Crawl not found")
-        
+
         # Get the specific page
-        response = supabase_client.table("pages").select("*").eq("id", str(page_id)).eq("crawl_id", str(crawl_id)).single().execute()
+        response = auth_client.table("pages").select("*").eq("id", str(page_id)).eq("crawl_id", str(crawl_id)).single().execute()
         
         if hasattr(response, "error") and response.error is not None:
             logger.error(f"Error getting page: {response.error}")
@@ -338,18 +357,21 @@ async def list_crawl_links(
     List all links for a specific crawl with optional filters.
     """
     try:
+        # Use authenticated client for RLS
+        auth_client = get_auth_client()
+
         # First check if the crawl exists and belongs to the user
-        crawl_response = supabase_client.table("crawls").select("*").eq("id", str(crawl_id)).eq("user_id", str(current_user.id)).execute()
-        
+        crawl_response = auth_client.table("crawls").select("*").eq("id", str(crawl_id)).eq("user_id", str(current_user.id)).execute()
+
         if hasattr(crawl_response, "error") and crawl_response.error is not None:
             logger.error(f"Error checking crawl: {crawl_response.error}")
             raise HTTPException(status_code=500, detail="Failed to check crawl")
-        
+
         if not crawl_response.data:
             raise HTTPException(status_code=404, detail="Crawl not found")
-        
+
         # Build query for links
-        query = supabase_client.table("links").select("*").eq("crawl_id", str(crawl_id))
+        query = auth_client.table("links").select("*").eq("crawl_id", str(crawl_id))
         
         if is_broken is not None:
             query = query.eq("is_broken", is_broken)
@@ -383,8 +405,11 @@ async def list_crawl_images(
     List all images for a specific crawl with optional filters.
     """
     try:
+        # Use authenticated client for RLS
+        auth_client = get_auth_client()
+
         # Check crawl exists and belongs to user
-        crawl_response = supabase_client.table("crawls").select("*").eq("id", str(crawl_id)).eq("user_id", str(current_user.id)).execute()
+        crawl_response = auth_client.table("crawls").select("*").eq("id", str(crawl_id)).eq("user_id", str(current_user.id)).execute()
 
         if hasattr(crawl_response, "error") and crawl_response.error is not None:
             logger.error(f"Error checking crawl: {crawl_response.error}")
@@ -394,7 +419,7 @@ async def list_crawl_images(
             raise HTTPException(status_code=404, detail="Crawl not found")
 
         # Build query
-        query = supabase_client.table("images").select("*").eq("crawl_id", str(crawl_id))
+        query = auth_client.table("images").select("*").eq("crawl_id", str(crawl_id))
 
         if has_alt is not None:
             query = query.eq("has_alt", has_alt)
@@ -426,18 +451,21 @@ async def list_crawl_issues(
     List all issues for a specific crawl with optional filters.
     """
     try:
+        # Use authenticated client for RLS
+        auth_client = get_auth_client()
+
         # First check if the crawl exists and belongs to the user
-        crawl_response = supabase_client.table("crawls").select("*").eq("id", str(crawl_id)).eq("user_id", str(current_user.id)).execute()
-        
+        crawl_response = auth_client.table("crawls").select("*").eq("id", str(crawl_id)).eq("user_id", str(current_user.id)).execute()
+
         if hasattr(crawl_response, "error") and crawl_response.error is not None:
             logger.error(f"Error checking crawl: {crawl_response.error}")
             raise HTTPException(status_code=500, detail="Failed to check crawl")
-        
+
         if not crawl_response.data:
             raise HTTPException(status_code=404, detail="Crawl not found")
-        
+
         # Build query for issues
-        query = supabase_client.table("issues").select("*").eq("crawl_id", str(crawl_id))
+        query = auth_client.table("issues").select("*").eq("crawl_id", str(crawl_id))
         
         if severity:
             query = query.eq("severity", severity)
@@ -471,18 +499,21 @@ async def get_crawl_summary(
         raise HTTPException(status_code=404, detail="Not found")
 
     try:
+        # Use authenticated client for RLS
+        auth_client = get_auth_client()
+
         # First check if the crawl exists and belongs to the user
-        crawl_response = supabase_client.table("crawls").select("*").eq("id", str(crawl_id)).eq("user_id", str(current_user.id)).execute()
-        
+        crawl_response = auth_client.table("crawls").select("*").eq("id", str(crawl_id)).eq("user_id", str(current_user.id)).execute()
+
         if hasattr(crawl_response, "error") and crawl_response.error is not None:
             logger.error(f"Error checking crawl: {crawl_response.error}")
             raise HTTPException(status_code=500, detail="Failed to check crawl")
-        
+
         if not crawl_response.data:
             raise HTTPException(status_code=404, detail="Crawl not found")
-        
+
         # Get summary for this crawl
-        response = supabase_client.table("summaries").select("*").eq("crawl_id", str(crawl_id)).execute()
+        response = auth_client.table("summaries").select("*").eq("crawl_id", str(crawl_id)).execute()
         
         if hasattr(response, "error") and response.error is not None:
             logger.error(f"Error getting summary: {response.error}")
@@ -517,18 +548,21 @@ async def get_page_html(
     Get the HTML snapshot for a specific page.
     """
     try:
+        # Use authenticated client for RLS
+        auth_client = get_auth_client()
+
         # First check if the crawl exists and belongs to the user
-        crawl_response = supabase_client.table("crawls").select("*").eq("id", str(crawl_id)).eq("user_id", str(current_user.id)).execute()
-        
+        crawl_response = auth_client.table("crawls").select("*").eq("id", str(crawl_id)).eq("user_id", str(current_user.id)).execute()
+
         if hasattr(crawl_response, "error") and crawl_response.error is not None:
             logger.error(f"Error checking crawl: {crawl_response.error}")
             raise HTTPException(status_code=500, detail="Failed to check crawl")
-        
+
         if not crawl_response.data:
             raise HTTPException(status_code=404, detail="Crawl not found")
-        
+
         # Get page info
-        page_response = supabase_client.table("pages").select("*").eq("id", str(page_id)).eq("crawl_id", str(crawl_id)).execute()
+        page_response = auth_client.table("pages").select("*").eq("id", str(page_id)).eq("crawl_id", str(crawl_id)).execute()
         
         if hasattr(page_response, "error") and page_response.error is not None:
             logger.error(f"Error getting page: {page_response.error}")
@@ -570,18 +604,21 @@ async def get_page_screenshot(
     Get the screenshot for a specific page.
     """
     try:
+        # Use authenticated client for RLS
+        auth_client = get_auth_client()
+
         # First check if the crawl exists and belongs to the user
-        crawl_response = supabase_client.table("crawls").select("*").eq("id", str(crawl_id)).eq("user_id", str(current_user.id)).execute()
-        
+        crawl_response = auth_client.table("crawls").select("*").eq("id", str(crawl_id)).eq("user_id", str(current_user.id)).execute()
+
         if hasattr(crawl_response, "error") and crawl_response.error is not None:
             logger.error(f"Error checking crawl: {crawl_response.error}")
             raise HTTPException(status_code=500, detail="Failed to check crawl")
-        
+
         if not crawl_response.data:
             raise HTTPException(status_code=404, detail="Crawl not found")
-        
+
         # Get page info
-        page_response = supabase_client.table("pages").select("*").eq("id", str(page_id)).eq("crawl_id", str(crawl_id)).execute()
+        page_response = auth_client.table("pages").select("*").eq("id", str(page_id)).eq("crawl_id", str(crawl_id)).execute()
         
         if hasattr(page_response, "error") and page_response.error is not None:
             logger.error(f"Error getting page: {page_response.error}")
@@ -650,24 +687,27 @@ async def get_comprehensive_audit(
         raise HTTPException(status_code=404, detail="Not found")
 
     try:
+        # Use authenticated client for RLS
+        auth_client = get_auth_client()
+
         # First check if the crawl exists and belongs to the user
-        crawl_response = supabase_client.table("crawls").select("*").eq("id", str(crawl_id)).eq("user_id", str(current_user.id)).execute()
-        
+        crawl_response = auth_client.table("crawls").select("*").eq("id", str(crawl_id)).eq("user_id", str(current_user.id)).execute()
+
         if hasattr(crawl_response, "error") and crawl_response.error is not None:
             logger.error(f"Error checking crawl: {crawl_response.error}")
             raise HTTPException(status_code=500, detail="Failed to check crawl")
-        
+
         if not crawl_response.data:
             raise HTTPException(status_code=404, detail="Crawl not found")
-        
+
         # Try to get comprehensive audit results
         try:
-            response = supabase_client.table("comprehensive_audits").select("*").eq("crawl_id", str(crawl_id)).order("created_at", desc=True).limit(1).execute()
-            
+            response = auth_client.table("comprehensive_audits").select("*").eq("crawl_id", str(crawl_id)).order("created_at", desc=True).limit(1).execute()
+
             if hasattr(response, "error") and response.error is not None:
                 logger.warning(f"Comprehensive audits table may not exist: {response.error}")
                 # Fall back to basic audit data
-                return await _get_basic_audit_data(crawl_id)
+                return await _get_basic_audit_data(crawl_id, auth_client)
             
             if response.data:
                 audit_data = response.data[0]
@@ -687,10 +727,10 @@ async def get_comprehensive_audit(
         except Exception as e:
             logger.warning(f"Error accessing comprehensive audits: {e}")
             # Fall back to basic audit data
-            return await _get_basic_audit_data(crawl_id)
-        
+            return await _get_basic_audit_data(crawl_id, auth_client)
+
         # If no comprehensive audit exists, return basic audit data
-        return await _get_basic_audit_data(crawl_id)
+        return await _get_basic_audit_data(crawl_id, auth_client)
         
     except HTTPException:
         raise
@@ -698,26 +738,26 @@ async def get_comprehensive_audit(
         logger.error(f"Error getting comprehensive audit: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get comprehensive audit: {str(e)}")
 
-async def _get_basic_audit_data(crawl_id: UUID) -> Dict[str, Any]:
+async def _get_basic_audit_data(crawl_id: UUID, auth_client) -> Dict[str, Any]:
     """
     Get basic audit data from existing tables when comprehensive audit data is not available.
     """
     try:
         # Get basic crawl stats
-        crawl_response = supabase_client.table("crawls").select("pages_crawled, total_links, status").eq("id", str(crawl_id)).execute()
+        crawl_response = auth_client.table("crawls").select("pages_crawled, total_links, status").eq("id", str(crawl_id)).execute()
         crawl_data = crawl_response.data[0] if crawl_response.data else {}
-        
+
         # Get pages count
-        pages_response = supabase_client.table("pages").select("id, status_code").eq("crawl_id", str(crawl_id)).execute()
+        pages_response = auth_client.table("pages").select("id, status_code").eq("crawl_id", str(crawl_id)).execute()
         pages_data = pages_response.data if pages_response.data else []
-        
+
         # Get links count and broken links
-        links_response = supabase_client.table("links").select("id, is_broken, status_code").eq("crawl_id", str(crawl_id)).execute()
+        links_response = auth_client.table("links").select("id, is_broken, status_code").eq("crawl_id", str(crawl_id)).execute()
         links_data = links_response.data if links_response.data else []
-        
+
         # Get issues count
         try:
-            issues_response = supabase_client.table("issues").select("id, severity").eq("crawl_id", str(crawl_id)).execute()
+            issues_response = auth_client.table("issues").select("id, severity").eq("crawl_id", str(crawl_id)).execute()
             issues_data = issues_response.data if issues_response.data else []
         except:
             issues_data = []
@@ -806,3 +846,65 @@ async def _get_basic_audit_data(crawl_id: UUID) -> Dict[str, Any]:
             ],
             "status": "error"
         }
+
+@router.get("/{crawl_id}/search", response_model=Dict[str, Any])
+async def search_crawl_data(
+    crawl_id: UUID,
+    query: str = Query(..., min_length=2, description="Search query"),
+    skip: int = 0,
+    limit: int = 50,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Full-text search across pages, links, and images for a specific crawl.
+    Returns results grouped by type (pages, links, images).
+    """
+    try:
+        # Use authenticated client for RLS
+        auth_client = get_auth_client()
+
+        # Check crawl exists and belongs to user
+        crawl_response = auth_client.table("crawls").select("*").eq("id", str(crawl_id)).eq("user_id", str(current_user.id)).execute()
+
+        if hasattr(crawl_response, "error") and crawl_response.error is not None:
+            logger.error(f"Error checking crawl: {crawl_response.error}")
+            raise HTTPException(status_code=500, detail="Failed to check crawl")
+
+        if not crawl_response.data:
+            raise HTTPException(status_code=404, detail="Crawl not found")
+
+        # Search pages using full-text search
+        # Note: PostgreSQL full-text search uses to_tsvector and to_tsquery
+        pages_query = auth_client.table("pages").select("*").eq("crawl_id", str(crawl_id))
+
+        # For now, use simple text search until we set up proper full-text search
+        # This will search in title and content_summary
+        pages_response = pages_query.or_(f"title.ilike.%{query}%,content_summary.ilike.%{query}%,url.ilike.%{query}%").range(skip, skip + limit - 1).execute()
+
+        # Search links by anchor text or URL
+        links_query = auth_client.table("links").select("*").eq("crawl_id", str(crawl_id))
+        links_response = links_query.or_(f"anchor_text.ilike.%{query}%,target_url.ilike.%{query}%").range(skip, skip + limit - 1).execute()
+
+        # Search images by alt text or src
+        images_query = auth_client.table("images").select("*").eq("crawl_id", str(crawl_id))
+        images_response = images_query.or_(f"alt.ilike.%{query}%,src.ilike.%{query}%").range(skip, skip + limit - 1).execute()
+
+        return {
+            "query": query,
+            "results": {
+                "pages": pages_response.data if pages_response.data else [],
+                "links": links_response.data if links_response.data else [],
+                "images": images_response.data if images_response.data else []
+            },
+            "counts": {
+                "pages": len(pages_response.data) if pages_response.data else 0,
+                "links": len(links_response.data) if links_response.data else 0,
+                "images": len(images_response.data) if images_response.data else 0
+            }
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error searching crawl data: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to search crawl data: {str(e)}")

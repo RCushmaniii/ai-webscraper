@@ -34,7 +34,9 @@ passlib[bcrypt]==1.7.4
 pydantic-settings==2.1.0
 
 # LLM and AI (optional - for content analysis)
-openai==1.3.0
+openai>=1.40.0
+instructor>=1.3.0
+tiktoken>=0.7.0
 
 # Additional utilities that might be needed
 python-dateutil==2.8.2

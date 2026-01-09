@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { Outlet, Link, useLocation } from "react-router-dom";
 import { User, LogOut, ChevronDown } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
+import Footer from "./Footer";
 
 const Layout: React.FC = () => {
   const location = useLocation();
@@ -136,29 +137,7 @@ const Layout: React.FC = () => {
       </main>
 
       {/* Footer */}
-      <footer className="bg-white border-t border-primary-100">
-        <div className="max-w-7xl mx-auto px-8 py-6">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-            <div className="text-sm text-neutral-steel">
-              &copy; {new Date().getFullYear()} AI WebScraper by CushLabs.ai. All rights reserved.
-            </div>
-            <div className="flex space-x-6">
-              <Link
-                to="/privacy"
-                className="text-sm text-neutral-steel hover:text-neutral-charcoal transition-colors"
-              >
-                Privacy Policy
-              </Link>
-              <Link
-                to="/terms"
-                className="text-sm text-neutral-steel hover:text-neutral-charcoal transition-colors"
-              >
-                Terms of Service
-              </Link>
-            </div>
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 };

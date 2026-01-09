@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cmd /c start.bat)",
+      "Bash(cmd /c \"timeout /t 20 /nobreak >nul\")",
+      "Bash(tasklist:*)",
+      "Bash(findstr:*)",
+      "Bash(python scriptsmonitor_crawl.py:*)",
+      "Bash(cat:*)",
+      "Bash(python:*)",
+      "Bash(cmd /c \"start \"\"Celery Worker\"\" cmd /c \"\"title Celery Worker && venv\\\\Scripts\\\\activate && celery -A app.services.worker.celery_app worker --loglevel=info --pool=solo\"\"\")",
+      "Bash(source:*)",
+      "Bash(celery:*)",
+      "Bash(git add:*)"
+    ]
+  }
+}

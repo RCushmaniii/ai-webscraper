@@ -39,14 +39,31 @@ class SupabaseClient:
     def table(self, table_name: str):
         """
         Get a reference to a Supabase table.
-        
+
         Args:
             table_name: Name of the table
-            
+
         Returns:
             Supabase table reference
         """
         return self.client.table(table_name)
+
+    def get_client_with_auth(self, token: str):
+        """
+        Create a Supabase client with user's auth token.
+        This ensures RLS policies work correctly.
+
+        Args:
+            token: User's JWT token
+
+        Returns:
+            Supabase client with auth token set
+        """
+        # Create a new client instance with the user's token
+        client = create_client(self.url, self.key)
+        # Set the auth header for RLS
+        client.postgrest.auth(token)
+        return client
     
     def auth(self):
         """

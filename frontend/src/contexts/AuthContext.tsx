@@ -24,13 +24,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
+    // Get initial session and validate it
+    supabase.auth.getSession().then(async ({ data: { session }, error }) => {
+      if (error || !session) {
+        // Clear invalid session
+        await supabase.auth.signOut();
+        setSession(null);
+        setUser(null);
+        setLoading(false);
+        return;
+      }
+
+      // Validate session is not expired
+      const expiresAt = session.expires_at;
+      const now = Math.floor(Date.now() / 1000);
+      
+      if (expiresAt && expiresAt < now) {
+        // Session expired, try to refresh
+        const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+        
+        if (refreshError || !refreshData.session) {
+          // Refresh failed, clear session
+          await supabase.auth.signOut();
+          setSession(null);
+          setUser(null);
+          setLoading(false);
+          return;
+        }
+        
+        // Use refreshed session
+        setSession(refreshData.session);
+        setUser(refreshData.session.user);
+        checkUserRole(refreshData.session.user.id);
+      } else {
+        // Session is valid
+        setSession(session);
+        setUser(session.user);
         checkUserRole(session.user.id);
       }
+      
       setLoading(false);
     });
 
@@ -41,6 +73,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(session?.user ?? null);
         if (session?.user) {
           checkUserRole(session.user.id);
+        } else {
+          setIsAdmin(false);
         }
         setLoading(false);
       }
@@ -54,24 +88,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Check if user is admin
   const checkUserRole = async (userId: string) => {
     try {
+      console.log('🔍 checkUserRole: Starting for userId:', userId);
+      
       // Use backend API instead of direct Supabase query to avoid RLS issues
+      const session = await supabase.auth.getSession();
+      const token = session.data.session?.access_token;
+      
+      console.log('🔍 checkUserRole: Token exists:', !!token);
+      console.log('🔍 checkUserRole: Calling /users/me endpoint');
+      
       const response = await fetch(`${process.env.REACT_APP_API_URL}/users/me`, {
         headers: {
-          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       });
       
+      console.log('🔍 checkUserRole: Response status:', response.status);
+      
       if (!response.ok) {
-        console.error('Error fetching user role:', response.statusText);
+        const errorText = await response.text();
+        console.error('❌ checkUserRole: Error response:', response.status, errorText);
+        console.error('❌ checkUserRole: Token (first 50 chars):', token?.substring(0, 50));
+        
+        // Don't fail silently - this is causing the redirect loop
+        // Just set admin to false and continue
         setIsAdmin(false);
         return;
       }
       
       const data = await response.json();
+      console.log('✅ checkUserRole: Success, is_admin:', data?.is_admin);
       setIsAdmin(data?.is_admin || false);
     } catch (error) {
-      console.error('Error checking user role:', error);
+      console.error('❌ checkUserRole: Exception:', error);
       setIsAdmin(false);
     }
   };
@@ -106,10 +156,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = async () => {
     try {
+      console.log('🚪 Signing out - clearing all session data');
+      
+      // Sign out from Supabase (clears tokens and local storage)
       await supabase.auth.signOut();
+      
+      // Clear local state
+      setSession(null);
+      setUser(null);
       setIsAdmin(false);
+      
+      console.log('✅ Sign out complete');
     } catch (error) {
-      console.error('Error signing out:', error);
+      console.error('❌ Error signing out:', error);
     }
   };
 

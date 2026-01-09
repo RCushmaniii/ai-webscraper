@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { RefreshCw } from 'lucide-react';
 import { apiService, Crawl, Page, Link as CrawlLink, Issue, Image } from '../services/api';
 import ConfirmationModal from '../components/ConfirmationModal';
+import SearchBar from '../components/SearchBar';
 
 const CrawlDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -22,6 +23,9 @@ const CrawlDetailPage: React.FC = () => {
   const [rerunning, setRerunning] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showRerunConfirm, setShowRerunConfirm] = useState(false);
+  const [pageSort, setPageSort] = useState<string>('status_code');
+  const [linkSort, setLinkSort] = useState<string>('anchor_text');
+  const [imageSort, setImageSort] = useState<string>('has_alt');
 
   const fetchCrawl = async () => {
     if (!id) return;
@@ -187,6 +191,56 @@ const CrawlDetailPage: React.FC = () => {
     }
   };
 
+  const getSortedPages = () => {
+    const sorted = [...pages];
+    switch (pageSort) {
+      case 'title':
+        return sorted.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+      case 'status_code':
+        return sorted.sort((a, b) => a.status_code - b.status_code);
+      case 'load_time':
+        return sorted.sort((a, b) => (a.load_time_ms || 0) - (b.load_time_ms || 0));
+      case 'created_at':
+        return sorted.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+      default:
+        return sorted;
+    }
+  };
+
+  const getSortedLinks = () => {
+    const filtered = linkFilter === 'all'
+      ? links
+      : linkFilter === 'internal'
+        ? links.filter(l => l.is_internal)
+        : links.filter(l => !l.is_internal);
+
+    const sorted = [...filtered];
+    switch (linkSort) {
+      case 'anchor_text':
+        return sorted.sort((a, b) => (a.anchor_text || '').localeCompare(b.anchor_text || ''));
+      case 'target_url':
+        return sorted.sort((a, b) => a.target_url.localeCompare(b.target_url));
+      case 'status_code':
+        return sorted.sort((a, b) => (a.status_code || 0) - (b.status_code || 0));
+      default:
+        return sorted;
+    }
+  };
+
+  const getSortedImages = () => {
+    const sorted = [...images];
+    switch (imageSort) {
+      case 'has_alt':
+        return sorted.sort((a, b) => (a.has_alt === b.has_alt ? 0 : a.has_alt ? -1 : 1));
+      case 'is_broken':
+        return sorted.sort((a, b) => (a.is_broken === b.is_broken ? 0 : a.is_broken ? 1 : -1));
+      case 'size':
+        return sorted.sort((a, b) => ((a.width || 0) * (a.height || 0)) - ((b.width || 0) * (b.height || 0)));
+      default:
+        return sorted;
+    }
+  };
+
   const getStatusBadgeClass = (status: string) => {
     switch (status) {
       case 'completed':
@@ -282,6 +336,11 @@ const CrawlDetailPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Search Bar */}
+      <div className="mb-6 flex justify-center">
+        <SearchBar crawlId={id!} />
+      </div>
+
       {/* Tabs */}
       <div className="mb-6 border-b border-gray-200">
         <nav className="flex -mb-px space-x-8">
@@ -339,8 +398,24 @@ const CrawlDetailPage: React.FC = () => {
             {/* Pages Tab */}
             {activeTab === 'pages' && (
               <div className="p-6">
-                <h2 className="mb-4 text-xl font-semibold text-gray-800">Crawled Pages</h2>
-                
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-xl font-semibold text-gray-800">Crawled Pages</h2>
+                  <div className="flex items-center gap-2">
+                    <label htmlFor="page-sort" className="text-sm text-gray-600">Sort by:</label>
+                    <select
+                      id="page-sort"
+                      value={pageSort}
+                      onChange={(e) => setPageSort(e.target.value)}
+                      className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value="status_code">Status Code</option>
+                      <option value="title">Title</option>
+                      <option value="load_time">Load Time</option>
+                      <option value="created_at">Date Crawled</option>
+                    </select>
+                  </div>
+                </div>
+
                 {pages.length > 0 ? (
                   <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200">
@@ -364,7 +439,7 @@ const CrawlDetailPage: React.FC = () => {
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
-                        {pages.map((page) => (
+                        {getSortedPages().map((page) => (
                           <tr key={page.id} className="hover:bg-gray-50">
                             <td className="px-6 py-4">
                               <div className="text-sm font-medium text-gray-900">{page.title || 'No title'}</div>
@@ -420,37 +495,52 @@ const CrawlDetailPage: React.FC = () => {
               <div className="p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-xl font-semibold text-gray-800">Links</h2>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setLinkFilter('all')}
-                      className={`px-4 py-2 text-sm font-medium rounded-md ${
-                        linkFilter === 'all'
-                          ? 'bg-secondary-600 text-white'
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
-                    >
-                      All Links ({links.length})
-                    </button>
-                    <button
-                      onClick={() => setLinkFilter('internal')}
-                      className={`px-4 py-2 text-sm font-medium rounded-md ${
-                        linkFilter === 'internal'
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
-                    >
-                      Internal ({links.filter(l => l.is_internal).length})
-                    </button>
-                    <button
-                      onClick={() => setLinkFilter('external')}
-                      className={`px-4 py-2 text-sm font-medium rounded-md ${
-                        linkFilter === 'external'
-                          ? 'bg-purple-600 text-white'
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
-                    >
-                      External ({links.filter(l => !l.is_internal).length})
-                    </button>
+                  <div className="flex gap-4">
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setLinkFilter('all')}
+                        className={`px-4 py-2 text-sm font-medium rounded-md ${
+                          linkFilter === 'all'
+                            ? 'bg-secondary-600 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        All Links ({links.length})
+                      </button>
+                      <button
+                        onClick={() => setLinkFilter('internal')}
+                        className={`px-4 py-2 text-sm font-medium rounded-md ${
+                          linkFilter === 'internal'
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        Internal ({links.filter(l => l.is_internal).length})
+                      </button>
+                      <button
+                        onClick={() => setLinkFilter('external')}
+                        className={`px-4 py-2 text-sm font-medium rounded-md ${
+                          linkFilter === 'external'
+                            ? 'bg-purple-600 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        External ({links.filter(l => !l.is_internal).length})
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <label htmlFor="link-sort" className="text-sm text-gray-600">Sort by:</label>
+                      <select
+                        id="link-sort"
+                        value={linkSort}
+                        onChange={(e) => setLinkSort(e.target.value)}
+                        className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      >
+                        <option value="anchor_text">Anchor Text</option>
+                        <option value="target_url">Target URL</option>
+                        <option value="status_code">Status Code</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
 
@@ -477,14 +567,7 @@ const CrawlDetailPage: React.FC = () => {
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
-                        {links
-                          .filter(link => {
-                            if (linkFilter === 'all') return true;
-                            if (linkFilter === 'internal') return link.is_internal;
-                            if (linkFilter === 'external') return !link.is_internal;
-                            return true;
-                          })
-                          .map((link) => (
+                        {getSortedLinks().map((link) => (
                           <tr key={link.id} className="hover:bg-gray-50">
                             <td className="px-6 py-4">
                               <div className="text-sm text-gray-500 truncate max-w-xs" title={link.source_url}>
@@ -582,7 +665,22 @@ const CrawlDetailPage: React.FC = () => {
             {/* Images Tab */}
             {activeTab === 'images' && (
               <div className="p-6">
-                <h2 className="mb-4 text-xl font-semibold text-gray-800">Images</h2>
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-xl font-semibold text-gray-800">Images</h2>
+                  <div className="flex items-center gap-2">
+                    <label htmlFor="image-sort" className="text-sm text-gray-600">Sort by:</label>
+                    <select
+                      id="image-sort"
+                      value={imageSort}
+                      onChange={(e) => setImageSort(e.target.value)}
+                      className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value="has_alt">Alt Text Status</option>
+                      <option value="is_broken">Broken Status</option>
+                      <option value="size">Image Size</option>
+                    </select>
+                  </div>
+                </div>
 
                 {images.length > 0 ? (
                   <div className="overflow-x-auto">
@@ -607,7 +705,7 @@ const CrawlDetailPage: React.FC = () => {
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
-                        {images.map((image) => (
+                        {getSortedImages().map((image) => (
                           <tr key={image.id} className="hover:bg-gray-50">
                             <td className="px-6 py-4">
                               <img
