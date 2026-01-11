@@ -59,14 +59,14 @@ class CrawlBase(BaseModel):
     max_depth: int = 2
     max_pages: int = 100
     respect_robots_txt: bool = True
-    follow_external_links: bool = False
+    follow_external_links: bool = False  # Match database column name
+    max_external_links: int = 5  # Maximum number of external domains to follow
     js_rendering: bool = False
     rate_limit: int = 2
     user_agent: Optional[str] = None
     max_runtime_sec: int = 3600
     internal_depth: int = 2
-    follow_external: bool = False
-    external_depth: int = 1
+    external_depth: int = 1  # How deep to go on external sites (usually 1)
 
 
 class CrawlCreate(CrawlBase):
@@ -76,8 +76,9 @@ class CrawlCreate(CrawlBase):
 class CrawlUpdate(BaseModel):
     url: Optional[str] = None
     internal_depth: Optional[int] = None
-    follow_external: Optional[bool] = None
+    follow_external_links: Optional[bool] = None  # Fixed: was follow_external
     external_depth: Optional[int] = None
+    max_external_links: Optional[int] = None
     max_pages: Optional[int] = None
     max_runtime_sec: Optional[int] = None
     concurrency: Optional[int] = None
@@ -112,7 +113,7 @@ class CrawlResponse(CrawlBase):
     user_id: UUID
     status: str = "pending"
     started_at: Optional[datetime] = None
-    finished_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None  # Fixed: Database uses completed_at (not finished_at)
     total_pages: int = 0
     created_at: datetime
     updated_at: datetime
@@ -219,6 +220,8 @@ class LinkBase(BaseModel):
     is_broken: bool = False
     status_code: Optional[int] = None
     error_message: Optional[str] = None
+    nav_score: int = 0  # Navigation importance score (0-20+)
+    is_navigation: bool = False  # Is this a main navigation link?
 
 
 class LinkCreate(LinkBase):
@@ -343,7 +346,7 @@ class BatchResponse(BaseModel):
     notes: Optional[str] = None
     status: str
     started_at: Optional[datetime] = None
-    finished_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None  # Fixed: Database uses completed_at (not finished_at)
     total_sites: int = 0
     created_at: datetime
     updated_at: datetime

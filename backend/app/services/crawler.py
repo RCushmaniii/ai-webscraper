@@ -16,6 +16,8 @@ from app.db.supabase import supabase_client
 from app.core.config import settings
 from app.services.storage import store_html_snapshot
 from app.services.content_extractor import SmartContentExtractor
+from app.core.domain_blacklist import is_domain_blacklisted, get_blacklist_reason
+from app.services.nav_detector import NavDetector
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +30,7 @@ class Crawler:
     def __init__(self, crawl: Crawl, db_client=None):
         self.crawl = crawl
         self.visited_urls: Set[str] = set()
-        self.url_queue: List[Tuple[str, int, Optional[str]]] = []  # (url, depth, source_url)
+        self.url_queue: List[Tuple[str, int, Optional[str], int, bool]] = []  # (url, depth, source_url, nav_score, is_navigation)
         self.start_time = time.time()
         self.pages_crawled = 0
         self.client = httpx.AsyncClient(
@@ -41,6 +43,12 @@ class Crawler:
         # Use provided db_client (service role) or fall back to default (anon)
         self.db = db_client if db_client is not None else supabase_client
         self.crawl_deleted = False  # Track if crawl was deleted during processing
+        # Track external domains to enforce max_external_links limit
+        self.external_domains_crawled: Set[str] = set()
+        # Navigation detection - stores nav scores for priority crawling
+        self.nav_scores: Dict[str, int] = {}  # URL -> navigation score
+        self.primary_nav_urls: Set[str] = set()  # High-priority navigation URLs
+        self.nav_detection_done = False
         
     def _get_headers(self) -> Dict[str, str]:
         """Get HTTP headers based on the crawl's user agent setting."""
@@ -58,32 +66,196 @@ class Crawler:
     async def start(self) -> None:
         """Start the crawling process."""
         logger.info(f"Starting crawl for {self.crawl.url}")
-        
+
         # Verify crawl exists before starting
         if not await self._verify_crawl_exists():
             logger.warning(f"Crawl {self.crawl.id} was deleted before starting. Exiting gracefully.")
             return
-        
+
+        # ALWAYS run navigation detection on the homepage first
+        # This ensures we detect main nav links even if crawl starts from a subpage
+        await self._detect_navigation_from_homepage()
+
+        # Check if starting URL is the homepage
+        parsed_start = urlparse(self.crawl.url)
+        is_homepage = parsed_start.path in ('', '/', '') and not parsed_start.query
+
+        # Determine nav_score for starting URL
+        start_nav_score = self.nav_scores.get(self.crawl.url, 0)
+        start_is_nav = self.crawl.url in self.primary_nav_urls or start_nav_score >= 8 or is_homepage
+
         # Initialize the queue with the start URL
-        self.url_queue.append((self.crawl.url, 0, None))
-        
+        self.url_queue.append((self.crawl.url, 0, None, start_nav_score if not is_homepage else 10, start_is_nav))
+
         # Process robots.txt and sitemaps if policy allows
         if self.crawl.respect_robots_txt:
             await self._process_robots_and_sitemaps()
-        
+
         # Start crawling
         await self._crawl()
-        
+
+        # Post-crawl analysis: Apply small-site mode if needed
+        if not self.crawl_deleted:
+            await self._apply_small_site_mode()
+
         # Close the HTTP client
         await self.client.aclose()
-        
+
         if self.crawl_deleted:
             logger.info(f"Crawl {self.crawl.id} was deleted during processing. Stopped gracefully.")
         else:
             logger.info(f"Crawl completed for {self.crawl.url}")
-    
-    async def _save_page_to_db(self, page: Page, seo_metadata: Optional[SEOMetadata]) -> None:
-        """Save page and SEO metadata to database."""
+
+    async def _detect_navigation_from_homepage(self) -> None:
+        """
+        Always detect navigation links from the homepage.
+        This runs regardless of what URL the crawl starts from, ensuring
+        we identify main navigation links for priority crawling.
+        """
+        try:
+            # Construct homepage URL from the domain
+            parsed = urlparse(self.crawl.url)
+            homepage_url = f"{parsed.scheme}://{parsed.netloc}/"
+
+            logger.info(f"Running navigation detection on homepage: {homepage_url}")
+
+            # Fetch the homepage
+            await self.rate_limiter.wait()
+            response = await self.client.get(homepage_url)
+
+            if response.status_code != 200:
+                logger.warning(f"Homepage returned status {response.status_code}, skipping nav detection")
+                self.nav_detection_done = True
+                return
+
+            html_content = response.text
+
+            # Run NavDetector on homepage
+            detector = NavDetector(html_content, homepage_url)
+            nav_data = detector.extract_nav_links()
+
+            # Store navigation scores for prioritization
+            for link_info in nav_data.get('all_detected', []):
+                self.nav_scores[link_info['url']] = link_info['score']
+
+            # Store primary nav URLs for high-priority crawling
+            self.primary_nav_urls = set(nav_data.get('primary_nav', []))
+
+            logger.info(
+                f"Navigation detection complete: {len(self.primary_nav_urls)} primary nav links, "
+                f"{nav_data.get('total_nav_links', 0)} total nav links detected"
+            )
+
+            # Log the primary nav URLs for debugging
+            if self.primary_nav_urls:
+                logger.info(f"Primary navigation URLs: {list(self.primary_nav_urls)[:10]}")
+
+            self.nav_detection_done = True
+
+        except Exception as e:
+            logger.warning(f"Navigation detection from homepage failed: {e}")
+            self.nav_detection_done = True
+
+    async def _apply_small_site_mode(self) -> None:
+        """
+        Small-site mode: For sites with ≤6 pages, most pages ARE main pages.
+
+        Instead of trying to statistically infer navigation, we:
+        1. Assume all pages are "main candidates"
+        2. Exclude only obvious utility/legal pages
+        3. Mark remaining pages as is_primary=True
+
+        This handles the case where the site IS its navigation.
+        """
+        import re
+
+        SMALL_SITE_THRESHOLD = 6
+
+        try:
+            # Get count of pages for this crawl
+            result = self.db.table("pages").select("id, url, nav_score, is_primary").eq("crawl_id", str(self.crawl.id)).execute()
+
+            if not result.data:
+                return
+
+            total_pages = len(result.data)
+
+            # Only apply small-site mode for sites with few pages
+            if total_pages > SMALL_SITE_THRESHOLD:
+                logger.info(f"Normal mode: {total_pages} pages (threshold: {SMALL_SITE_THRESHOLD})")
+                return
+
+            logger.info(f"SMALL SITE MODE: {total_pages} pages detected. Marking most as main pages.")
+
+            # Utility/legal patterns to EXCLUDE from main pages
+            exclude_patterns = [
+                r'/privacy',
+                r'/terms',
+                r'/legal',
+                r'/cookie',
+                r'/gdpr',
+                r'/imprint',
+                r'/disclaimer',
+                r'/login',
+                r'/signin',
+                r'/signup',
+                r'/register',
+                r'/cart',
+                r'/checkout',
+                r'/account',
+                r'/404',
+                r'/error',
+            ]
+
+            pages_to_update = []
+
+            for page in result.data:
+                url = page.get('url', '')
+                path = urlparse(url).path.lower()
+
+                # Check if this is a utility/legal page
+                is_utility = False
+                for pattern in exclude_patterns:
+                    if re.search(pattern, path):
+                        is_utility = True
+                        break
+
+                # In small-site mode, non-utility pages are main pages
+                if not is_utility:
+                    # Only update if not already marked as primary
+                    current_score = page.get('nav_score', 0)
+                    if not page.get('is_primary') or current_score < 8:
+                        pages_to_update.append({
+                            'id': page['id'],
+                            'is_primary': True,
+                            'nav_score': max(current_score, 10)  # Ensure score >= 10
+                        })
+
+            # Batch update pages
+            if pages_to_update:
+                for page_update in pages_to_update:
+                    try:
+                        self.db.table("pages").update({
+                            'is_primary': page_update['is_primary'],
+                            'nav_score': page_update['nav_score']
+                        }).eq('id', page_update['id']).execute()
+                    except Exception as e:
+                        logger.warning(f"Failed to update page {page_update['id']}: {e}")
+
+                logger.info(f"Small-site mode: Marked {len(pages_to_update)} of {total_pages} pages as main pages")
+
+        except Exception as e:
+            logger.warning(f"Small-site mode analysis failed: {e}")
+
+    async def _save_page_to_db(self, page: Page, seo_metadata: Optional[SEOMetadata], nav_score: int = 0, is_navigation: bool = False) -> None:
+        """Save page and SEO metadata to database.
+
+        Args:
+            page: The page object to save
+            seo_metadata: Optional SEO metadata for the page
+            nav_score: Navigation importance score (0-20+) from link that led here
+            is_navigation: True if this page was linked from main navigation
+        """
         try:
             # Use actual SEO metadata if available, otherwise use defaults
             if seo_metadata:
@@ -122,7 +294,9 @@ class Crawler:
                 "scripts": 0,  # TODO: Extract from HTML
                 "stylesheets": 0,  # TODO: Extract from HTML
                 "seo_score": self._calculate_seo_score_from_metadata(seo_metadata) if seo_metadata else 0,
-                "issues": {}  # Issues are saved to separate table
+                "issues": {},  # Issues are saved to separate table
+                "nav_score": nav_score,  # Navigation importance score from link
+                "is_primary": is_navigation  # True if page is primary navigation target
             }
 
             # Insert page (removed full_content - doesn't exist in schema)
@@ -168,6 +342,111 @@ class Crawler:
             score -= min(20, seo_metadata.image_alt_missing_count * 2)
 
         return max(0, score)
+
+    def _calculate_nav_score(self, url: str, depth: int) -> int:
+        """
+        Calculate comprehensive navigation score for a URL.
+
+        Combines:
+        - NavDetector scores (from homepage analysis)
+        - Depth scoring (shallow = more important)
+        - URL pattern scoring (bonus for main pages, penalty for blog/legal)
+
+        Args:
+            url: The URL to score
+            depth: The crawl depth of this URL
+
+        Returns:
+            Navigation score (0-30+, higher = more likely main page)
+        """
+        import re
+
+        # Start with NavDetector score (if any)
+        score = self.nav_scores.get(url, 0)
+
+        # DEPTH SCORING - shallow URLs are more likely to be main pages
+        # Depth 0 (homepage): +10
+        # Depth 1 (directly linked from homepage): +8
+        # Depth 2: +4
+        # Depth 3+: +0
+        depth_bonuses = {0: 10, 1: 8, 2: 4}
+        score += depth_bonuses.get(depth, 0)
+
+        # URL PATTERN SCORING
+        parsed = urlparse(url)
+        path = parsed.path.lower()
+
+        # Bonus patterns - likely main pages (+5 each)
+        main_page_patterns = [
+            r'^/$',                      # Homepage
+            r'^/about',                  # About pages
+            r'^/contact',                # Contact
+            r'^/services',               # Services
+            r'^/products',               # Products
+            r'^/pricing',                # Pricing
+            r'^/features',               # Features
+            r'^/solutions',              # Solutions
+            r'^/team',                   # Team
+            r'^/careers?',               # Careers
+            r'^/case-stud',              # Case studies
+            r'^/portfolio',              # Portfolio
+            r'^/work$',                  # Work/Projects
+            r'^/clients',                # Clients
+            r'^/testimonials',           # Testimonials
+            r'^/faq',                    # FAQ
+            r'^/blog$',                  # Blog index (not posts)
+            r'^/news$',                  # News index
+        ]
+
+        for pattern in main_page_patterns:
+            if re.match(pattern, path):
+                score += 5
+                break
+
+        # Penalty patterns - likely NOT main pages (-10 each)
+        penalty_patterns = [
+            r'/blog/.+',                 # Blog posts (not index)
+            r'/news/.+',                 # News articles
+            r'/posts?/',                 # Posts
+            r'/articles?/',              # Articles
+            r'/\d{4}/\d{2}/',            # Date-based URLs
+            r'/tag/',                    # Tag pages
+            r'/tags/',
+            r'/category/',               # Category pages
+            r'/author/',                 # Author pages
+            r'/page/\d+',                # Pagination
+            r'\?',                       # Query strings
+        ]
+
+        for pattern in penalty_patterns:
+            if re.search(pattern, path):
+                score -= 10
+                break
+
+        # Legal/utility penalty (-15) - these are rarely "main" pages
+        utility_patterns = [
+            r'/privacy',
+            r'/terms',
+            r'/legal',
+            r'/cookie',
+            r'/gdpr',
+            r'/imprint',
+            r'/disclaimer',
+            r'/login',
+            r'/signin',
+            r'/signup',
+            r'/register',
+            r'/cart',
+            r'/checkout',
+            r'/account',
+        ]
+
+        for pattern in utility_patterns:
+            if re.search(pattern, path):
+                score -= 15
+                break
+
+        return max(0, score)  # Don't go negative
 
     async def _save_seo_metadata_to_db(self, seo_metadata: SEOMetadata) -> None:
         """Save SEO metadata to the seo_metadata table."""
@@ -254,7 +533,8 @@ class Crawler:
                         if loc:
                             url = loc.text
                             if self._should_crawl_url(url):
-                                self.url_queue.append((url, 0, None))
+                                # Use 5-tuple format: (url, depth, source_url, nav_score, is_navigation)
+                                self.url_queue.append((url, 0, None, 0, False))
         
         except Exception as e:
             logger.error(f"Error processing sitemap {sitemap_url}: {e}")
@@ -283,23 +563,33 @@ class Crawler:
                 logger.info(f"Progress: {self.pages_crawled} pages crawled, {len(self.url_queue)} URLs in queue, {elapsed_time:.0f}s elapsed")
             
             # Get the next URL from the queue
-            url, depth, source_url = self.url_queue.pop(0)
-            
+            queue_item = self.url_queue.pop(0)
+            # Handle both old format (3-tuple) and new format (5-tuple)
+            if len(queue_item) == 5:
+                url, depth, source_url, nav_score, is_navigation = queue_item
+            else:
+                url, depth, source_url = queue_item
+                nav_score, is_navigation = 0, False
+
             # Skip if already visited
             normalized_url = self._normalize_url(url)
             if normalized_url in self.visited_urls:
                 continue
-            
+
             self.visited_urls.add(normalized_url)
-            
+
             # Crawl the URL
             try:
                 result = await self._crawl_url(url, depth, source_url)
-                if result and len(result) == 4:
-                    page, seo_metadata, soup, status_code = result
+                if result and len(result) == 5:
+                    page, seo_metadata, soup, extracted_data, status_code = result
 
-                    # CRITICAL: Save page to database FIRST
-                    await self._save_page_to_db(page, seo_metadata)
+                    # CRITICAL: Save page to database FIRST (include navigation info)
+                    await self._save_page_to_db(page, seo_metadata, nav_score, is_navigation)
+
+                    # THEN save audit data (now page exists in DB for foreign key)
+                    if extracted_data:
+                        await self._save_audit_data(page.id, extracted_data)
 
                     # THEN save images and links (now page exists in DB for foreign key)
                     if status_code == 200:
@@ -381,12 +671,9 @@ class Crawler:
             # Use SmartContentExtractor for comprehensive SEO analysis
             seo_metadata = self._create_enhanced_seo_metadata(extracted_data, page.id)
             
-            # Save comprehensive audit data
-            await self._save_audit_data(page.id, extracted_data)
-            
-            # Return the page, metadata, and soup for later processing
-            # DO NOT save images/links here - page must be saved to DB first!
-            return page, seo_metadata, soup, status_code
+            # Return the page, metadata, soup, extracted_data, and status_code for later processing
+            # DO NOT save audit/images/links here - page must be saved to DB first!
+            return page, seo_metadata, soup, extracted_data, status_code
             
         except Exception as e:
             logger.error(f"Error crawling {url}: {e}", exc_info=True)
@@ -457,7 +744,8 @@ class Crawler:
             except Exception as save_error:
                 logger.error(f"Error saving failed page data: {save_error}")
 
-            return None  # Return None to indicate failure (don't increment pages_crawled)
+            # Return None to indicate failure (main loop will skip this page)
+            return None
     
     def _needs_js_rendering(self, response: httpx.Response) -> bool:
         """Determine if a page needs JavaScript rendering."""
@@ -496,9 +784,9 @@ class Crawler:
             page = await browser.new_page()
             
             try:
-                await page.goto(url, wait_until="networkidle", timeout=30000)
-                # Wait a bit more for any delayed JS execution
-                await asyncio.sleep(2)
+                await page.goto(url, wait_until="domcontentloaded", timeout=30000)
+                # Wait for JS to execute and render dynamic content
+                await asyncio.sleep(3)
                 html_content = await page.content()
                 render_time = int((time.time() - start_time) * 1000)
             finally:
@@ -621,38 +909,83 @@ class Crawler:
         )
     
     async def _extract_and_process_links(
-        self, 
-        soup: BeautifulSoup, 
-        source_url: str, 
-        depth: int, 
+        self,
+        soup: BeautifulSoup,
+        source_url: str,
+        depth: int,
         source_page_id: str
     ) -> None:
         """Extract links from HTML and process them."""
+        # Run navigation detection on the first page (homepage) to identify priority links
+        if not self.nav_detection_done and depth == 0:
+            try:
+                html_content = str(soup)
+                detector = NavDetector(html_content, source_url)
+                nav_data = detector.extract_nav_links()
+
+                # Store navigation scores for prioritization
+                for link_info in nav_data.get('all_detected', []):
+                    self.nav_scores[link_info['url']] = link_info['score']
+
+                # Store primary nav URLs for high-priority crawling
+                self.primary_nav_urls = set(nav_data.get('primary_nav', []))
+
+                logger.info(f"Navigation detection complete: {len(self.primary_nav_urls)} primary nav links, "
+                           f"{nav_data.get('total_nav_links', 0)} total nav links detected")
+                self.nav_detection_done = True
+            except Exception as e:
+                logger.warning(f"Navigation detection failed: {e}")
+                self.nav_detection_done = True
+
         links = soup.find_all('a', href=True)
-        
+
+        # PERFORMANCE: Batch collect all links before saving
+        links_to_save = []
+        links_to_check = []
+        nav_links_to_queue = []  # Priority queue for navigation links
+
         for link in links:
             href = link['href']
-            
+
             # Skip fragment-only and javascript links
             if href.startswith('#') or href.startswith('javascript:'):
                 continue
-            
+
             # Convert to absolute URL
             absolute_url = urljoin(source_url, href)
             parsed_url = urlparse(absolute_url)
-            
+
             # Determine if internal or external
             is_internal = parsed_url.netloc == self.domain
-            
+
             # Check if we should follow this link
             should_follow = False
             new_depth = depth + 1
-            
+
             if is_internal and new_depth <= self.crawl.internal_depth:
                 should_follow = True
-            elif not is_internal and self.crawl.follow_external and new_depth <= self.crawl.external_depth:
-                should_follow = True
-            
+            elif not is_internal and self.crawl.follow_external_links and new_depth <= self.crawl.external_depth:
+                # EXTERNAL LINK SAFETY CHECKS
+
+                # Check 1: Is domain blacklisted?
+                if is_domain_blacklisted(absolute_url):
+                    reason = get_blacklist_reason(absolute_url)
+                    logger.debug(f"Skipping blacklisted domain: {parsed_url.netloc} (reason: {reason})")
+                    should_follow = False
+                # Check 2: Have we reached max external domains limit?
+                elif parsed_url.netloc not in self.external_domains_crawled and len(self.external_domains_crawled) >= self.crawl.max_external_links:
+                    logger.debug(f"Max external domains reached ({self.crawl.max_external_links}). Skipping: {parsed_url.netloc}")
+                    should_follow = False
+                else:
+                    # Safe to follow - track this external domain
+                    self.external_domains_crawled.add(parsed_url.netloc)
+                    should_follow = True
+                    logger.info(f"Following external link to: {parsed_url.netloc} (external domains: {len(self.external_domains_crawled)}/{self.crawl.max_external_links})")
+
+            # Calculate comprehensive navigation score for this URL
+            nav_score = self._calculate_nav_score(absolute_url, new_depth)
+            is_navigation = absolute_url in self.primary_nav_urls or nav_score >= 8
+
             # Create link record matching database schema
             link_data = {
                 "id": str(uuid4()),
@@ -666,22 +999,49 @@ class Crawler:
                 "latency_ms": None,
                 "anchor_text": link.text.strip()[:500] if link.text else None,  # Limit length
                 "is_nofollow": bool(link.get('rel') and 'nofollow' in link.get('rel', [])),  # Ensure boolean
+                "nav_score": nav_score,  # Navigation importance score
+                "is_navigation": is_navigation,  # Is this a main navigation link?
                 "created_at": datetime.now().isoformat(),
                 "updated_at": datetime.now().isoformat()
             }
 
-            # Check link status (async)
+            # Handle link based on whether we'll crawl it
             if should_follow:
-                # Add to queue for crawling
-                self.url_queue.append((absolute_url, new_depth, source_url))
-                # Save link without status check
-                await self._save_link(link_data)
+                # Prioritize navigation links in the queue
+                # CRITICAL: Include nav_score and is_navigation in the 5-tuple!
+                if is_navigation and is_internal:
+                    # Navigation links go to front of queue
+                    nav_links_to_queue.append((absolute_url, new_depth, source_url, nav_score, is_navigation))
+                else:
+                    # Regular links go to back of queue
+                    self.url_queue.append((absolute_url, new_depth, source_url, nav_score, is_navigation))
+                # Collect for batch save
+                links_to_save.append(link_data)
             else:
-                # Check status and save with status info
+                # For links we won't crawl, decide if we need status check
+                if is_internal:
+                    # Check status for internal links we're not crawling
+                    links_to_check.append(link_data)
+                else:
+                    # Skip status check for external links to speed up crawl
+                    links_to_save.append(link_data)
+
+        # Insert navigation links at the FRONT of the queue for priority crawling
+        if nav_links_to_queue:
+            logger.info(f"Prioritizing {len(nav_links_to_queue)} navigation links in crawl queue")
+            self.url_queue = nav_links_to_queue + self.url_queue
+
+        # PERFORMANCE: Batch save all links in ONE database call
+        if links_to_save:
+            await self._save_links_batch(links_to_save)
+
+        # Check status for internal links that need it (done individually due to HTTP requests)
+        if links_to_check:
+            for link_data in links_to_check:
                 await self._check_and_save_link(link_data)
     
     async def _save_link(self, link_data: Dict) -> None:
-        """Save a link to the database."""
+        """Save a single link to the database."""
         try:
             result = self.db.table("links").insert(link_data).execute()
             if hasattr(result, "error") and result.error:
@@ -702,6 +1062,32 @@ class Crawler:
                 self.crawl_deleted = True
                 return
             logger.error(f"Error saving link: {e}")
+
+    async def _save_links_batch(self, links_data: List[Dict]) -> None:
+        """
+        PERFORMANCE: Save multiple links in ONE database call.
+        This is 10-50x faster than individual inserts.
+        """
+        try:
+            result = self.db.table("links").insert(links_data).execute()
+            if hasattr(result, "error") and result.error:
+                error_msg = str(result.error)
+                # Check for foreign key violation (crawl was deleted)
+                if "23503" in error_msg or "foreign key constraint" in error_msg.lower():
+                    logger.warning(f"Crawl {self.crawl.id} was deleted. Skipping batch link save.")
+                    self.crawl_deleted = True
+                    return
+                logger.error(f"Error batch saving links: {result.error}")
+            else:
+                logger.info(f"Batch saved {len(links_data)} links in one database call")
+        except Exception as e:
+            error_msg = str(e)
+            # Check for foreign key violation (crawl was deleted)
+            if "23503" in error_msg or "foreign key constraint" in error_msg.lower():
+                logger.warning(f"Crawl {self.crawl.id} was deleted. Skipping batch link save.")
+                self.crawl_deleted = True
+                return
+            logger.error(f"Error batch saving links: {e}")
 
     async def _check_and_save_link(self, link_data: Dict) -> None:
         """Check link status and save to database."""
@@ -746,21 +1132,23 @@ class Crawler:
         page_id: str
     ) -> int:
         """Extract images from page and save to database. Returns count of images saved."""
-        saved_count = 0
         try:
             # Check if crawl still exists before processing images
             if self.crawl_deleted:
                 logger.info(f"Crawl was deleted. Skipping image extraction.")
                 return 0
-            
+
             images = soup.find_all('img')
-            logger.info(f"Found {len(images)} images on {page_url}")
+
+            if not images:
+                return 0
+
+            logger.debug(f"Found {len(images)} images on {page_url}")
+
+            # PERFORMANCE: Batch collect all images before saving
+            images_to_save = []
 
             for img in images:
-                # Stop if crawl was deleted
-                if self.crawl_deleted:
-                    logger.info(f"Crawl was deleted during image processing. Stopping.")
-                    break
                 src = img.get('src')
                 if not src:
                     continue
@@ -799,20 +1187,23 @@ class Crawler:
                     "updated_at": datetime.now().isoformat()
                 }
 
-                # Save to database
-                success = await self._save_image(image_data)
-                if success:
-                    saved_count += 1
+                images_to_save.append(image_data)
 
-            logger.info(f"Saved {saved_count}/{len(images)} images for {page_url}")
-            return saved_count
+            # PERFORMANCE: Batch save all images in ONE database call
+            if images_to_save:
+                success = await self._save_images_batch(images_to_save)
+                if success:
+                    logger.info(f"Batch saved {len(images_to_save)} images for {page_url}")
+                    return len(images_to_save)
+
+            return 0
 
         except Exception as e:
             logger.error(f"Error extracting images: {e}")
-            return saved_count
+            return 0
 
     async def _save_image(self, image_data: Dict) -> bool:
-        """Save image to database. Returns True if successful."""
+        """Save a single image to database. Returns True if successful."""
         try:
             result = self.db.table("images").insert(image_data).execute()
             if hasattr(result, "error") and result.error:
@@ -835,6 +1226,35 @@ class Crawler:
                 self.crawl_deleted = True
                 return False
             logger.error(f"Error saving image: {e}")
+            return False
+
+    async def _save_images_batch(self, images_data: List[Dict]) -> bool:
+        """
+        PERFORMANCE: Save multiple images in ONE database call.
+        This is 10-50x faster than individual inserts.
+        """
+        try:
+            result = self.db.table("images").insert(images_data).execute()
+            if hasattr(result, "error") and result.error:
+                error_msg = str(result.error)
+                # Check for foreign key violation (crawl was deleted)
+                if "23503" in error_msg or "foreign key constraint" in error_msg.lower():
+                    logger.warning(f"Crawl {self.crawl.id} was deleted. Skipping batch image save.")
+                    self.crawl_deleted = True
+                    return False
+                logger.error(f"Error batch saving images: {result.error}")
+                return False
+            else:
+                logger.info(f"Batch saved {len(images_data)} images in one database call")
+                return True
+        except Exception as e:
+            error_msg = str(e)
+            # Check for foreign key violation (crawl was deleted)
+            if "23503" in error_msg or "foreign key constraint" in error_msg.lower():
+                logger.warning(f"Crawl {self.crawl.id} was deleted. Skipping batch image save.")
+                self.crawl_deleted = True
+                return False
+            logger.error(f"Error batch saving images: {e}")
             return False
 
     async def _verify_crawl_exists(self) -> bool:
@@ -1111,69 +1531,232 @@ class Crawler:
         return issues
     
     def _generate_issues_list(self, page_id: str, extracted_data: Dict) -> List[Dict]:
-        """Generate a list of issues for the issues table."""
+        """Generate comprehensive list of actionable issues (Phase 1: Using existing data)."""
         issues = []
+        url = extracted_data.get('url', '')
         
-        # Title issues
-        title_issues = self._analyze_title_issues(extracted_data['seo'])
-        for issue in title_issues:
+        # 1. PERFORMANCE ISSUES
+        
+        # Large page size (> 3MB)
+        page_size_bytes = extracted_data.get('technical', {}).get('page_size_bytes', 0)
+        if page_size_bytes > 3 * 1024 * 1024:  # 3MB
+            page_size_mb = page_size_bytes / (1024 * 1024)
             issues.append({
                 'id': str(uuid4()),
                 'crawl_id': str(self.crawl.id),
-                'page_id': str(page_id),  # Convert UUID to string
-                'type': 'SEO',
-                'severity': 'high' if 'Missing' in issue else 'medium',
-                'message': issue,
-                'pointer': None,
-                'context': extracted_data.get('url', ''),
+                'page_id': str(page_id),
+                'type': 'Performance',
+                'severity': 'high',
+                'message': f'Large page size: {page_size_mb:.1f}MB (recommended < 3MB)',
+                'pointer': 'page_size',
+                'context': url,
                 'created_at': datetime.now().isoformat(),
                 'updated_at': datetime.now().isoformat()
             })
-
-        # Meta description issues
-        meta_issues = self._analyze_meta_description_issues(extracted_data['seo'])
-        for issue in meta_issues:
+        
+        # 2. ACCESSIBILITY ISSUES
+        
+        # Images missing alt text
+        images = extracted_data.get('images', [])
+        images_without_alt = [img for img in images if not img.get('has_alt')]
+        if images_without_alt:
             issues.append({
                 'id': str(uuid4()),
                 'crawl_id': str(self.crawl.id),
-                'page_id': page_id,
-                'type': 'SEO',
-                'severity': 'high' if 'Missing' in issue else 'medium',
-                'message': issue,
-                'pointer': None,
-                'context': extracted_data.get('url', ''),
+                'page_id': str(page_id),
+                'type': 'Accessibility',
+                'severity': 'high',
+                'message': f'{len(images_without_alt)} image(s) missing alt text (accessibility & SEO issue)',
+                'pointer': 'images',
+                'context': url,
                 'created_at': datetime.now().isoformat(),
                 'updated_at': datetime.now().isoformat()
             })
-
-        # Heading issues
-        heading_issues = self._analyze_heading_issues(extracted_data['content']['headings'])
-        for issue in heading_issues:
+        
+        # Missing viewport meta tag
+        if not extracted_data.get('technical', {}).get('has_viewport_meta'):
             issues.append({
                 'id': str(uuid4()),
                 'crawl_id': str(self.crawl.id),
-                'page_id': page_id,
-                'type': 'SEO',
-                'severity': 'high' if 'Missing H1' in issue else 'medium',
-                'message': issue,
-                'pointer': None,
-                'context': extracted_data.get('url', ''),
+                'page_id': str(page_id),
+                'type': 'Accessibility',
+                'severity': 'critical',
+                'message': 'Missing viewport meta tag (mobile responsiveness issue)',
+                'pointer': 'viewport',
+                'context': url,
                 'created_at': datetime.now().isoformat(),
                 'updated_at': datetime.now().isoformat()
             })
-
-        # Technical issues
-        technical_issues = self._identify_technical_issues(extracted_data['technical'])
-        for issue in technical_issues:
+        
+        # 3. SEO ISSUES
+        
+        # Missing title
+        seo_data = extracted_data.get('seo', {})
+        if not seo_data.get('title'):
             issues.append({
                 'id': str(uuid4()),
                 'crawl_id': str(self.crawl.id),
-                'page_id': page_id,
+                'page_id': str(page_id),
+                'type': 'SEO',
+                'severity': 'critical',
+                'message': 'Missing title tag (critical SEO issue)',
+                'pointer': 'title',
+                'context': url,
+                'created_at': datetime.now().isoformat(),
+                'updated_at': datetime.now().isoformat()
+            })
+        # Title too short or too long
+        elif seo_data.get('title_length', 0) < 30:
+            issues.append({
+                'id': str(uuid4()),
+                'crawl_id': str(self.crawl.id),
+                'page_id': str(page_id),
+                'type': 'SEO',
+                'severity': 'medium',
+                'message': f'Title too short: {seo_data.get("title_length")} characters (recommended 30-60)',
+                'pointer': 'title',
+                'context': url,
+                'created_at': datetime.now().isoformat(),
+                'updated_at': datetime.now().isoformat()
+            })
+        elif seo_data.get('title_length', 0) > 60:
+            issues.append({
+                'id': str(uuid4()),
+                'crawl_id': str(self.crawl.id),
+                'page_id': str(page_id),
+                'type': 'SEO',
+                'severity': 'medium',
+                'message': f'Title too long: {seo_data.get("title_length")} characters (recommended 30-60)',
+                'pointer': 'title',
+                'context': url,
+                'created_at': datetime.now().isoformat(),
+                'updated_at': datetime.now().isoformat()
+            })
+        
+        # Missing meta description
+        if not seo_data.get('meta_description'):
+            issues.append({
+                'id': str(uuid4()),
+                'crawl_id': str(self.crawl.id),
+                'page_id': str(page_id),
+                'type': 'SEO',
+                'severity': 'high',
+                'message': 'Missing meta description (impacts click-through rate)',
+                'pointer': 'meta_description',
+                'context': url,
+                'created_at': datetime.now().isoformat(),
+                'updated_at': datetime.now().isoformat()
+            })
+        # Meta description too short or too long
+        elif seo_data.get('description_length', 0) < 120:
+            issues.append({
+                'id': str(uuid4()),
+                'crawl_id': str(self.crawl.id),
+                'page_id': str(page_id),
+                'type': 'SEO',
+                'severity': 'medium',
+                'message': f'Meta description too short: {seo_data.get("description_length")} characters (recommended 120-160)',
+                'pointer': 'meta_description',
+                'context': url,
+                'created_at': datetime.now().isoformat(),
+                'updated_at': datetime.now().isoformat()
+            })
+        elif seo_data.get('description_length', 0) > 160:
+            issues.append({
+                'id': str(uuid4()),
+                'crawl_id': str(self.crawl.id),
+                'page_id': str(page_id),
+                'type': 'SEO',
+                'severity': 'medium',
+                'message': f'Meta description too long: {seo_data.get("description_length")} characters (recommended 120-160)',
+                'pointer': 'meta_description',
+                'context': url,
+                'created_at': datetime.now().isoformat(),
+                'updated_at': datetime.now().isoformat()
+            })
+        
+        # 4. CONTENT QUALITY ISSUES
+        
+        # Thin content (< 300 words)
+        word_count = extracted_data.get('content', {}).get('word_count', 0)
+        if word_count > 0 and word_count < 300:
+            issues.append({
+                'id': str(uuid4()),
+                'crawl_id': str(self.crawl.id),
+                'page_id': str(page_id),
+                'type': 'Content Quality',
+                'severity': 'medium',
+                'message': f'Thin content: {word_count} words (recommended 500+ for key pages)',
+                'pointer': 'word_count',
+                'context': url,
+                'created_at': datetime.now().isoformat(),
+                'updated_at': datetime.now().isoformat()
+            })
+        
+        # Missing H1
+        headings = extracted_data.get('content', {}).get('headings', [])
+        h1_count = len([h for h in headings if h.get('level') == 1])
+        if h1_count == 0:
+            issues.append({
+                'id': str(uuid4()),
+                'crawl_id': str(self.crawl.id),
+                'page_id': str(page_id),
+                'type': 'SEO',
+                'severity': 'high',
+                'message': 'Missing H1 heading (important for SEO and accessibility)',
+                'pointer': 'h1',
+                'context': url,
+                'created_at': datetime.now().isoformat(),
+                'updated_at': datetime.now().isoformat()
+            })
+        # Multiple H1s
+        elif h1_count > 1:
+            issues.append({
+                'id': str(uuid4()),
+                'crawl_id': str(self.crawl.id),
+                'page_id': str(page_id),
+                'type': 'SEO',
+                'severity': 'medium',
+                'message': f'Multiple H1 headings found ({h1_count}). Use only one H1 per page.',
+                'pointer': 'h1',
+                'context': url,
+                'created_at': datetime.now().isoformat(),
+                'updated_at': datetime.now().isoformat()
+            })
+        
+        # Broken heading hierarchy
+        prev_level = 0
+        for heading in headings:
+            level = heading.get('level', 0)
+            if level > prev_level + 1 and prev_level > 0:
+                issues.append({
+                    'id': str(uuid4()),
+                    'crawl_id': str(self.crawl.id),
+                    'page_id': str(page_id),
+                    'type': 'SEO',
+                    'severity': 'low',
+                    'message': f'Heading hierarchy skip: H{prev_level} to H{level} (should be sequential)',
+                    'pointer': 'headings',
+                    'context': url,
+                    'created_at': datetime.now().isoformat(),
+                    'updated_at': datetime.now().isoformat()
+                })
+                break  # Only report first hierarchy issue
+            prev_level = level
+        
+        # 5. TECHNICAL ISSUES
+        
+        # Missing lang attribute
+        if not extracted_data.get('technical', {}).get('has_lang_attribute'):
+            issues.append({
+                'id': str(uuid4()),
+                'crawl_id': str(self.crawl.id),
+                'page_id': str(page_id),
                 'type': 'Technical',
-                'severity': 'low' if 'Large page size' in issue else 'medium',
-                'message': issue,
-                'pointer': None,
-                'context': extracted_data.get('url', ''),
+                'severity': 'medium',
+                'message': 'Missing lang attribute on <html> tag (accessibility & SEO)',
+                'pointer': 'lang',
+                'context': url,
                 'created_at': datetime.now().isoformat(),
                 'updated_at': datetime.now().isoformat()
             })

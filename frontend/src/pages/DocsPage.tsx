@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Book, Code, Settings, Shield, BarChart3, Layers, ChevronRight, ChevronDown } from 'lucide-react';
+import Footer from '../components/Footer';
 
 interface DocSection {
   id: string;
@@ -15,7 +16,7 @@ interface DocItem {
 }
 
 const DocsPage: React.FC = () => {
-  const [activeSection, setActiveSection] = useState<string>('introduction');
+  const [activeSection, setActiveSection] = useState<string>('overview');  // Auto-load Platform Overview
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['introduction']));
 
   const toggleSection = (sectionId: string) => {
@@ -553,63 +554,68 @@ Control what data is stored:
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">Documentation</h1>
-          <p className="text-xl text-gray-600">Complete guide to CushLabs Site Analysis (v1)</p>
-        </div>
-
-        <div className="flex gap-8">
-          {/* Sidebar Navigation */}
-          <div className="w-80 bg-white rounded-lg shadow-sm border p-6">
-            <nav className="space-y-2">
-              {docSections.map((section) => (
-                <div key={section.id}>
-                  <button
-                    onClick={() => toggleSection(section.id)}
-                    className="flex items-center justify-between w-full p-3 text-left rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      {section.icon}
-                      <span className="font-medium text-gray-900">{section.title}</span>
-                    </div>
-                    {expandedSections.has(section.id) ? 
-                      <ChevronDown className="h-4 w-4 text-gray-500" /> : 
-                      <ChevronRight className="h-4 w-4 text-gray-500" />
-                    }
-                  </button>
-                  
-                  {expandedSections.has(section.id) && (
-                    <div className="ml-6 mt-2 space-y-1">
-                      {section.items.map((item) => (
-                        <button
-                          key={item.id}
-                          onClick={() => setActiveSection(item.id)}
-                          className={`block w-full text-left p-2 rounded-md text-sm transition-colors ${
-                            activeSection === item.id
-                              ? 'bg-blue-50 text-blue-700 font-medium'
-                              : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                          }`}
-                        >
-                          {item.title}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </nav>
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      <div className="flex-grow">
+        <div className="max-w-7xl mx-auto px-4 py-8">
+          <div className="mb-8">
+            <h1 className="text-4xl font-bold text-gray-900 mb-2">Documentation</h1>
+            <p className="text-xl text-gray-600">Guide to the AI WebScraper by CushLabs.ai</p>
           </div>
 
-          {/* Main Content */}
-          <div className="flex-1 bg-white rounded-lg shadow-sm border p-8">
-            <div className="prose prose-lg max-w-none">
-              {renderMarkdown(getActiveContent())}
+          <div className="flex gap-8">
+            {/* Sidebar Navigation */}
+            <div className="w-80 bg-white rounded-lg shadow-sm border p-6">
+              <nav className="space-y-2">
+                {docSections.map((section) => (
+                  <div key={section.id}>
+                    <button
+                      onClick={() => toggleSection(section.id)}
+                      className="flex items-center justify-between w-full p-3 text-left rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        {section.icon}
+                        <span className="font-medium text-gray-900">{section.title}</span>
+                      </div>
+                      {expandedSections.has(section.id) ?
+                        <ChevronDown className="h-4 w-4 text-gray-500" /> :
+                        <ChevronRight className="h-4 w-4 text-gray-500" />
+                      }
+                    </button>
+
+                    {expandedSections.has(section.id) && (
+                      <div className="ml-6 mt-2 space-y-1">
+                        {section.items.map((item) => (
+                          <button
+                            key={item.id}
+                            onClick={() => setActiveSection(item.id)}
+                            className={`block w-full text-left p-2 rounded-md text-sm transition-colors ${
+                              activeSection === item.id
+                                ? 'bg-blue-50 text-blue-700 font-medium'
+                                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                            }`}
+                          >
+                            {item.title}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </nav>
+            </div>
+
+            {/* Main Content */}
+            <div className="flex-1 bg-white rounded-lg shadow-sm border p-8">
+              <div className="prose prose-lg max-w-none">
+                {renderMarkdown(getActiveContent())}
+              </div>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Footer */}
+      <Footer />
     </div>
   );
 };

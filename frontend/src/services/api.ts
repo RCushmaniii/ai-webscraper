@@ -67,28 +67,38 @@ export interface Page {
   screenshot_path?: string;
   crawl_depth: number;
   created_at: string;
+  is_primary?: boolean;  // True if page is a main navigation target
+  nav_score?: number;    // Navigation importance score (0-20+)
 }
 
 export interface Link {
   id: string;
   crawl_id: string;
-  source_url: string;
+  source_page_id?: string;
+  source_url?: string;
+  url?: string;  // Some backends use 'url' for target
   target_url: string;
   anchor_text: string;
+  link_type?: string;  // 'internal' or 'external'
   is_internal: boolean;
   is_broken: boolean;
   status_code?: number;
+  nav_score?: number;  // Navigation importance score (0-20+)
+  is_navigation?: boolean;  // Is this a main navigation link?
   created_at: string;
 }
 
 export interface Issue {
   id: string;
   crawl_id: string;
-  url: string;
-  issue_type: string;
-  description: string;
-  severity: 'low' | 'medium' | 'high';
+  page_id: string | null;
+  type: string;
+  severity: 'critical' | 'high' | 'medium' | 'low';
+  message: string;
+  pointer: string | null;
+  context: string;
   created_at: string;
+  updated_at: string;
 }
 
 export interface Image {
@@ -213,6 +223,11 @@ class ApiService {
     return response.data;
   }
   
+  async stopCrawl(id: string): Promise<{ message: string }> {
+    const response = await this.api.post(`/crawls/${id}/stop`);
+    return response.data;
+  }
+
   async deleteCrawl(id: string): Promise<{ message: string }> {
     const response = await this.api.delete(`/crawls/${id}`);
     return response.data;
@@ -304,6 +319,16 @@ class ApiService {
         ...params
       }
     });
+    return response.data;
+  }
+
+  async getPageLinks(crawlId: string, pageId: string): Promise<Link[]> {
+    const response = await this.api.get(`/crawls/${crawlId}/pages/${pageId}/links`);
+    return response.data;
+  }
+
+  async getPageImages(crawlId: string, pageId: string): Promise<Image[]> {
+    const response = await this.api.get(`/crawls/${crawlId}/pages/${pageId}/images`);
     return response.data;
   }
 }

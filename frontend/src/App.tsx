@@ -9,7 +9,7 @@ import Layout from './components/Layout';
 import MarketingHomePage from './pages/MarketingHomePage';
 import QuickStartPage from './pages/QuickStartPage';
 import LoginPage from './pages/LoginPage';
-import SignupPage from './pages/SignupPage';
+import SignupPage from './pages/SignUpPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import DashboardPage from './pages/DashboardPage';

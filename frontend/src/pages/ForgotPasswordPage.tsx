@@ -86,7 +86,7 @@ const ForgotPasswordPage: React.FC = () => {
             Back to sign in
           </Link>
           <Link to="/signup" className="text-secondary-500 hover:text-secondary-600">
-            Request access
+            Sign up
           </Link>
         </div>
       </div>

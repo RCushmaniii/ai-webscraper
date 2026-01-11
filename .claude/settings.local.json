@@ -11,7 +11,32 @@
       "Bash(cmd /c \"start \"\"Celery Worker\"\" cmd /c \"\"title Celery Worker && venv\\\\Scripts\\\\activate && celery -A app.services.worker.celery_app worker --loglevel=info --pool=solo\"\"\")",
       "Bash(source:*)",
       "Bash(celery:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(ls \"c:\\\\Users\\\\Robert Cushman\\\\.vscode\\\\Projects\\\\ai-webscraper\\\\frontend\\\\backend\\\\certs\"\" 2>&1 || echo \"Directory does not exist \")",
+      "Bash(if [ -d \"frontend/backend/certs\" ])",
+      "Bash(then echo \"Exists in frontend/backend/certs\")",
+      "Bash(elif [ -d \"backend/certs\" ])",
+      "Bash(then echo \"Exists in backend/certs\")",
+      "Bash(else echo \"Neither directory exists\")",
+      "Bash(fi)",
+      "Bash(supabase --version:*)",
+      "Bash(supabase db push:*)",
+      "Bash(supabase db execute:*)",
+      "Bash(powershell -Command \"$PROFILE\")",
+      "Bash(psql:*)",
+      "Bash(grep:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx supabase:*)",
+      "Bash(where:*)",
+      "Bash(\"C:\\\\Program Files\\\\PostgreSQL\\\\17\\\\bin\\\\psql.exe\" \"postgresql://postgres.kbltwyiowkbxzhhhozxf:Olverines17!@aws-0-us-east-1.pooler.supabase.com:6543/postgres\" -f \"database/migrations/008_fix_function_search_paths.sql\")",
+      "Bash(\"C:\\\\Program Files\\\\PostgreSQL\\\\17\\\\bin\\\\psql.exe\" \"postgresql://postgres:Olverines17!@db.kbltwyiowkbxzhhhozxf.supabase.co:5432/postgres\" -f \"database/migrations/008_fix_function_search_paths.sql\")",
+      "Bash(supabase status:*)",
+      "Bash(supabase projects:*)",
+      "Bash(copy:*)",
+      "Bash(supabase db lint:*)",
+      "Bash(supabase db dump:*)",
+      "Bash(PGPASSWORD='Olverines17!' \"/c/Program Files/PostgreSQL/17/bin/psql\" -h db.kbltwyiowkbxzhhhozxf.supabase.co -U postgres -d postgres -c \"SELECT tablename, policyname, qual, with_check FROM pg_policies WHERE schemaname = ''public'' ORDER BY tablename, policyname;\")",
+      "Bash(PGPASSWORD='Olverines17!' \"/c/Program Files/PostgreSQL/17/bin/psql\":*)"
     ]
   }
 }

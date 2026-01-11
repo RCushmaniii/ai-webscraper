@@ -12,8 +12,18 @@ from app.models.models import Crawl, CrawlCreate
 from app.services.crawler import Crawler
 from app.db.supabase import supabase_client
 
+# Configure logging
+logger = logging.getLogger(__name__)
+
+# Reduce verbosity of noisy libraries (only show warnings/errors)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+
 # Create service role client for Celery (bypasses RLS)
 service_client = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY)
+
+# Log service role key initialization (first 20 chars only for security)
+logger.info(f"Service client initialized with key: {settings.SUPABASE_SERVICE_ROLE_KEY[:20]}...")
 
 # Configure Celery with SSL support for Upstash Redis
 broker_use_ssl = {
@@ -51,9 +61,6 @@ celery_app.conf.update(
     worker_prefetch_multiplier=1,
 )
 
-# Configure logging
-logger = logging.getLogger(__name__)
-
 @celery_app.task(name="crawl_site")
 def crawl_site(crawl_id: str) -> Dict[str, Any]:
     """
@@ -69,10 +76,32 @@ def crawl_site(crawl_id: str) -> Dict[str, Any]:
 
     try:
         # 1. Fetch crawl data from Supabase using service role (bypasses RLS)
-        response = service_client.table("crawls").select("*").eq("id", crawl_id).single().execute()
+        logger.info(f"Fetching crawl {crawl_id} using service role client...")
+        
+        try:
+            response = service_client.table("crawls").select("*").eq("id", crawl_id).single().execute()
+        except Exception as fetch_error:
+            # Check if this is an RLS issue or a missing crawl
+            error_msg = str(fetch_error)
+            if "0 rows" in error_msg or "PGRST116" in error_msg:
+                # Could be either RLS blocking or crawl doesn't exist
+                # Try to fetch without .single() to see if it's an RLS issue
+                logger.warning(f"Single fetch failed, checking if crawl exists at all...")
+                check_response = service_client.table("crawls").select("id").eq("id", crawl_id).execute()
+                
+                if check_response.data and len(check_response.data) > 0:
+                    logger.error(f"Crawl {crawl_id} exists but service role can't access it - RLS issue!")
+                    raise ValueError(f"RLS blocking service role access to crawl {crawl_id}. Check RLS policies.")
+                else:
+                    logger.error(f"Crawl {crawl_id} does not exist in database (may have been deleted).")
+                    raise ValueError(f"Crawl not found: {crawl_id}")
+            else:
+                # Some other error
+                logger.error(f"Unexpected error fetching crawl: {error_msg}")
+                raise
 
         if response.data is None:
-            logger.error(f"Crawl with id {crawl_id} not found.")
+            logger.error(f"Crawl with id {crawl_id} not found (response.data is None).")
             raise ValueError(f"Crawl not found: {crawl_id}")
 
         # 2. Instantiate Crawl model
@@ -104,7 +133,7 @@ def crawl_site(crawl_id: str) -> Dict[str, Any]:
                 "pages_crawled": 0,
                 "total_links": 0,
                 "error": "Crawl completed but no pages were successfully crawled. This could be due to: robots.txt blocking, connection issues, or invalid URL.",
-                "completed_at": datetime.now().isoformat(),
+                "completed_at": datetime.now().isoformat(),  # Fixed: Use completed_at (database field name)
                 "updated_at": datetime.now().isoformat()
             }
             logger.warning(f"Crawl {crawl_id} completed with 0 pages - marking as failed")
@@ -113,13 +142,22 @@ def crawl_site(crawl_id: str) -> Dict[str, Any]:
                 "status": "completed",
                 "pages_crawled": progress.pages_crawled,
                 "total_links": len(crawler.visited_urls) + len(crawler.url_queue),
-                "completed_at": datetime.now().isoformat(),
+                "completed_at": datetime.now().isoformat(),  # Fixed: Use completed_at (database field name)
                 "updated_at": datetime.now().isoformat()
             }
 
         service_client.table("crawls").update(final_update).eq("id", crawl_id).execute()
 
-        # 6. Run comprehensive SEO audit
+        # 6. Run Phase 1 issue detection (only if crawl was successful)
+        if progress.pages_crawled > 0:
+            try:
+                from app.services.issue_detector import detect_and_store_issues
+                issues_count = asyncio.run(detect_and_store_issues(UUID(crawl_id)))
+                logger.info(f"Detected and stored {issues_count} issues for crawl {crawl_id}")
+            except Exception as issue_error:
+                logger.error(f"Error detecting issues for {crawl_id}: {issue_error}")
+
+        # 7. Run comprehensive SEO audit
         if settings.ENABLE_SEO_AUDIT:
             try:
                 from app.services.seo_auditor import SEOAuditor

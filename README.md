@@ -4,7 +4,7 @@
 
 A full-stack web application for intelligent website crawling, SEO analysis, and content extraction. Built with React, FastAPI, and Supabase.
 
-[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](https://github.com/RCushmaniii/ai-webscraper)
+[![Version](https://img.shields.io/badge/version-1.3.0-blue.svg)](https://github.com/RCushmaniii/ai-webscraper)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 ## ✨ Features
@@ -68,8 +68,10 @@ A full-stack web application for intelligent website crawling, SEO analysis, and
 
 ### 🔐 Security & Access Control
 
-- **User Authentication**: Secure auth with Supabase
-- **Row Level Security (RLS)**: Database-level access control
+- **User Authentication**: Secure auth with Supabase (OAuth ready: Google/GitHub)
+- **Enhanced Row Level Security (RLS)**: Production-grade database-level access control with USING and WITH CHECK policies
+- **Tier-Based Rate Limiting**: Automatic request throttling (Free: 10/min, Pro: 60/min, Enterprise: 300/min)
+- **Environment-Based CORS**: Strict origin validation (development/staging/production)
 - **Admin Panel**: User management and system administration
 - **Protected Routes**: Role-based access control
 
@@ -422,11 +424,16 @@ Contributions are welcome! Please:
 
 See [CHANGELOG.md](CHANGELOG.md) for detailed version history.
 
-**Current Version: 1.1.0**
+**Current Version: 1.2.0**
 
-- ✅ **Phase 1: Search & Filtering** (NEW!)
+- ✅ **Phase 1 Complete: Issue Detection & UX** (NEW!)
+  - Comprehensive issue detection (9 categories, 15-30 issues per crawl)
+  - Sortable column headers with visual indicators
+  - Enhanced page detail view with tabs (Overview, Links, Images)
+  - Improved search navigation (stays within app)
+  - **Critical Fixes**: Audit save order bug, 10-15x faster crawls
+- ✅ **Search & Filtering**
   - Global full-text search across pages, links, and images
-  - Advanced sorting on all tabs with ascending/descending toggle
   - PostgreSQL GIN indexes for optimized performance
   - Debounced search with grouped results dropdown
 - ✅ **Production-Ready Extraction Features**

@@ -30,6 +30,14 @@ backend/storage
 
 supabase/.temp
 
+# SSL Certificates (NEVER commit these!)
+backend/certs/
+frontend/backend/certs/
+*.crt
+*.pem
+*.key
+*.cert
+
 # Windows system files
 nul
 *.log

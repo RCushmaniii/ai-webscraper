@@ -99,10 +99,51 @@ async def list_crawls(
 ):
     """
     List all crawls for the current user.
+    Auto-detects and marks stale crawls as failed.
     """
     try:
         # Use authenticated client for RLS
         auth_client = get_auth_client()
+        
+        # STEP 1: Clean up stale crawls (running/queued/pending for > 30 minutes)
+        from datetime import timedelta
+        now = datetime.now()
+        stale_threshold = now - timedelta(minutes=30)
+        
+        logger.info(f"Checking for stale crawls. Now: {now}, Threshold: {stale_threshold}")
+        
+        # Find stale crawls for this user
+        stale_response = auth_client.table("crawls").select("id, name, status, updated_at").eq("user_id", str(current_user.id)).in_("status", ["running", "queued", "pending"]).execute()
+        
+        logger.info(f"Found {len(stale_response.data) if stale_response.data else 0} running/queued/pending crawls")
+        
+        if stale_response.data:
+            stale_crawl_ids = []
+            for crawl in stale_response.data:
+                try:
+                    updated_at = datetime.fromisoformat(crawl['updated_at'].replace('Z', '+00:00'))
+                    updated_at_naive = updated_at.replace(tzinfo=None)
+                    is_stale = updated_at_naive < stale_threshold
+                    logger.info(f"Crawl '{crawl['name']}': updated_at={updated_at_naive}, is_stale={is_stale}")
+                    
+                    if is_stale:
+                        stale_crawl_ids.append(crawl['id'])
+                        logger.info(f"Marking stale crawl as failed: {crawl['name']} (id: {crawl['id']}, status: {crawl['status']})")
+                except Exception as parse_error:
+                    logger.warning(f"Error parsing updated_at for crawl {crawl['id']}: {parse_error}")
+            
+            # Bulk update stale crawls to failed status
+            if stale_crawl_ids:
+                for crawl_id in stale_crawl_ids:
+                    auth_client.table("crawls").update({
+                        "status": "failed",
+                        "notes": "Crawl timed out (no activity for 30+ minutes)",
+                        "completed_at": now.isoformat(),  # Fixed: Database uses completed_at (not finished_at)
+                        "updated_at": now.isoformat()
+                    }).eq("id", crawl_id).execute()
+                logger.info(f"Marked {len(stale_crawl_ids)} stale crawls as failed")
+        
+        # STEP 2: Fetch crawls with optional status filter
         query = auth_client.table("crawls").select("*").eq("user_id", str(current_user.id))
         
         if status:
@@ -190,6 +231,59 @@ async def mark_crawl_failed(
     except Exception as e:
         logger.error(f"Error marking crawl as failed: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to mark crawl as failed: {str(e)}")
+
+@router.post("/{crawl_id}/stop", response_model=Dict[str, Any])
+async def stop_crawl(
+    crawl_id: UUID,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Stop a running or queued crawl.
+    """
+    try:
+        # Use authenticated client for RLS
+        auth_client = get_auth_client()
+        
+        # Check if crawl exists and belongs to user
+        response = auth_client.table("crawls").select("*").eq("id", str(crawl_id)).eq("user_id", str(current_user.id)).execute()
+        
+        if not response.data:
+            raise HTTPException(status_code=404, detail="Crawl not found")
+        
+        crawl = response.data[0]
+        
+        # Only allow stopping running or queued crawls
+        if crawl['status'] not in ['running', 'queued', 'pending']:
+            raise HTTPException(status_code=400, detail=f"Cannot stop crawl with status: {crawl['status']}")
+        
+        # Revoke the Celery task if it exists
+        if crawl.get('task_id'):
+            try:
+                from app.services.worker import celery_app
+                celery_app.control.revoke(crawl['task_id'], terminate=True, signal='SIGKILL')
+                logger.info(f"Revoked Celery task {crawl['task_id']} for crawl {crawl_id}")
+            except Exception as revoke_error:
+                logger.warning(f"Error revoking Celery task: {revoke_error}")
+        
+        # Update crawl status to stopped
+        from datetime import datetime
+        update_response = auth_client.table("crawls").update({
+            'status': 'stopped',
+            'completed_at': datetime.now().isoformat(),  # Fixed: Database uses completed_at (not finished_at)
+            'updated_at': datetime.now().isoformat()
+        }).eq("id", str(crawl_id)).execute()
+        
+        if hasattr(update_response, "error") and update_response.error is not None:
+            raise HTTPException(status_code=500, detail="Failed to update crawl status")
+        
+        logger.info(f"Stopped crawl {crawl_id}")
+        return {"message": "Crawl stopped successfully", "crawl_id": str(crawl_id)}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error stopping crawl: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to stop crawl: {str(e)}")
 
 @router.delete("/{crawl_id}", response_model=Dict[str, Any])
 async def delete_crawl(
@@ -846,6 +940,82 @@ async def _get_basic_audit_data(crawl_id: UUID, auth_client) -> Dict[str, Any]:
             ],
             "status": "error"
         }
+
+@router.get("/{crawl_id}/pages/{page_id}/links", response_model=List[Dict[str, Any]])
+async def list_page_links(
+    crawl_id: UUID,
+    page_id: UUID,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    List all links from a specific page.
+    """
+    try:
+        # Use authenticated client for RLS
+        auth_client = get_auth_client()
+
+        # Check crawl exists and belongs to user
+        crawl_response = auth_client.table("crawls").select("*").eq("id", str(crawl_id)).eq("user_id", str(current_user.id)).execute()
+
+        if hasattr(crawl_response, "error") and crawl_response.error is not None:
+            logger.error(f"Error checking crawl: {crawl_response.error}")
+            raise HTTPException(status_code=500, detail="Failed to check crawl")
+
+        if not crawl_response.data:
+            raise HTTPException(status_code=404, detail="Crawl not found")
+
+        # Get links for this page
+        response = auth_client.table("links").select("*").eq("source_page_id", str(page_id)).execute()
+
+        if hasattr(response, "error") and response.error is not None:
+            logger.error(f"Error listing page links: {response.error}")
+            raise HTTPException(status_code=500, detail="Failed to list page links")
+
+        return response.data
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error listing page links: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to list page links: {str(e)}")
+
+@router.get("/{crawl_id}/pages/{page_id}/images", response_model=List[Dict[str, Any]])
+async def list_page_images(
+    crawl_id: UUID,
+    page_id: UUID,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    List all images from a specific page.
+    """
+    try:
+        # Use authenticated client for RLS
+        auth_client = get_auth_client()
+
+        # Check crawl exists and belongs to user
+        crawl_response = auth_client.table("crawls").select("*").eq("id", str(crawl_id)).eq("user_id", str(current_user.id)).execute()
+
+        if hasattr(crawl_response, "error") and crawl_response.error is not None:
+            logger.error(f"Error checking crawl: {crawl_response.error}")
+            raise HTTPException(status_code=500, detail="Failed to check crawl")
+
+        if not crawl_response.data:
+            raise HTTPException(status_code=404, detail="Crawl not found")
+
+        # Get images for this page
+        response = auth_client.table("images").select("*").eq("page_id", str(page_id)).execute()
+
+        if hasattr(response, "error") and response.error is not None:
+            logger.error(f"Error listing page images: {response.error}")
+            raise HTTPException(status_code=500, detail="Failed to list page images")
+
+        return response.data
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error listing page images: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to list page images: {str(e)}")
 
 @router.get("/{crawl_id}/search", response_model=Dict[str, Any])
 async def search_crawl_data(

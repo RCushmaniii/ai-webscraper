@@ -9,6 +9,7 @@ from contextlib import asynccontextmanager
 from app.api.api import api_router
 from app.core.config import settings
 from app.services.crawl_monitor import check_and_fix_stale_crawls
+from app.middleware.rate_limiter import rate_limit_middleware
 
 # Configure logging
 logging.basicConfig(
@@ -16,6 +17,11 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+# Reduce verbosity of noisy libraries (only show warnings/errors)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+logging.getLogger("celery").setLevel(logging.WARNING)
 
 # Background task for monitoring stale crawls
 async def monitor_stale_crawls():
@@ -61,7 +67,11 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Configure CORS
+# ============================================================================
+# MIDDLEWARE CONFIGURATION
+# ============================================================================
+
+# 1. CORS Middleware - Must be first to handle preflight requests
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.BACKEND_CORS_ORIGINS,
@@ -70,7 +80,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Request logging middleware
+# 2. Rate Limiting Middleware - Apply rate limits based on subscription tier
+# NOTE: Currently using in-memory limiter for development
+# TODO: Switch to Redis-based limiter for production (see rate_limiter.py)
+app.middleware("http")(rate_limit_middleware)
+
+# 3. Request Logging Middleware - Log all requests for monitoring
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     start_time = time.time()

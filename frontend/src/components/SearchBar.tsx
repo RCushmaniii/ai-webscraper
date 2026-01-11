@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { MagnifyingGlassIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { useNavigate } from 'react-router-dom';
+import { Search, X } from 'lucide-react';
 import { apiService, Page, Link, Image } from '../services/api';
 
 interface SearchBarProps {
@@ -22,6 +23,7 @@ interface SearchResults {
 }
 
 export default function SearchBar({ crawlId, onResultsChange }: SearchBarProps) {
+  const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResults | null>(null);
   const [isSearching, setIsSearching] = useState(false);
@@ -73,7 +75,7 @@ export default function SearchBar({ crawlId, onResultsChange }: SearchBarProps) 
     <div className="relative w-full max-w-2xl">
       <div className="relative">
         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-          <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" />
+          <Search className="h-5 w-5 text-gray-400" />
         </div>
         <input
           type="text"
@@ -87,7 +89,7 @@ export default function SearchBar({ crawlId, onResultsChange }: SearchBarProps) 
             onClick={handleClear}
             className="absolute inset-y-0 right-0 pr-3 flex items-center"
           >
-            <XMarkIcon className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+            <X className="h-5 w-5 text-gray-400 hover:text-gray-600" />
           </button>
         )}
       </div>
@@ -109,7 +111,7 @@ export default function SearchBar({ crawlId, onResultsChange }: SearchBarProps) 
                 onClick={() => setShowResults(false)}
                 className="text-gray-400 hover:text-gray-600"
               >
-                <XMarkIcon className="h-5 w-5" />
+                <X className="h-5 w-5" />
               </button>
             </div>
 
@@ -124,15 +126,17 @@ export default function SearchBar({ crawlId, onResultsChange }: SearchBarProps) 
                     </h4>
                     <div className="space-y-2">
                       {searchResults.results.pages.slice(0, 5).map((page) => (
-                        <div key={page.id} className="text-sm">
-                          <a
-                            href={page.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-600 hover:underline font-medium"
-                          >
+                        <div
+                          key={page.id}
+                          className="text-sm cursor-pointer hover:bg-gray-50 p-2 rounded"
+                          onClick={() => {
+                            navigate(`/crawls/${crawlId}/pages/${page.id}`);
+                            setShowResults(false);
+                          }}
+                        >
+                          <div className="text-blue-600 hover:underline font-medium">
                             {page.title || 'Untitled'}
-                          </a>
+                          </div>
                           <p className="text-gray-500 text-xs truncate">{page.url}</p>
                         </div>
                       ))}

@@ -1,8 +1,13 @@
 from celery import Celery
 from app.core.config import settings
 import asyncio
+import logging
 from app.scrapers.base_scraper import ScraperFactory
 from app.services.supabase_service import SupabaseService, get_supabase_client
+
+# Configure logging - reduce verbosity of noisy libraries
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 # Initialize Celery
 celery_app = Celery(
