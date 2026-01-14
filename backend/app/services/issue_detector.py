@@ -12,7 +12,7 @@ from typing import List, Dict, Any, Optional
 from uuid import UUID
 from collections import Counter
 
-from app.core.auth import get_auth_client
+from app.db.supabase import supabase_client
 
 logger = logging.getLogger(__name__)
 
@@ -23,9 +23,11 @@ class IssueDetector:
     Focuses on Phase 1 detection using existing data only.
     """
 
-    def __init__(self, crawl_id: UUID):
+    def __init__(self, crawl_id: UUID, db_client=None):
         self.crawl_id = crawl_id
-        self.auth_client = get_auth_client()
+        # Use provided db_client (service role) or fall back to default supabase_client
+        # This allows the detector to work in both HTTP request context and Celery background tasks
+        self.db = db_client if db_client is not None else supabase_client
         self.issues: List[Dict[str, Any]] = []
 
     async def detect_all_issues(self) -> List[Dict[str, Any]]:
@@ -65,7 +67,7 @@ class IssueDetector:
     async def _fetch_pages(self) -> List[Dict[str, Any]]:
         """Fetch all pages for the crawl."""
         try:
-            response = self.auth_client.table("pages").select("*").eq("crawl_id", str(self.crawl_id)).execute()
+            response = self.db.table("pages").select("*").eq("crawl_id", str(self.crawl_id)).execute()
             return response.data if response.data else []
         except Exception as e:
             logger.error(f"Error fetching pages: {e}")
@@ -75,7 +77,7 @@ class IssueDetector:
         """Fetch all links for the crawl with source page URLs."""
         try:
             # Join with pages table to get source page URLs
-            response = self.auth_client.table("links").select(
+            response = self.db.table("links").select(
                 "*, pages!inner(url)"
             ).eq("crawl_id", str(self.crawl_id)).execute()
 
@@ -96,7 +98,7 @@ class IssueDetector:
         """Fetch all images for the crawl with page URLs."""
         try:
             # Join with pages table to get page URLs
-            response = self.auth_client.table("images").select(
+            response = self.db.table("images").select(
                 "*, pages!inner(url)"
             ).eq("crawl_id", str(self.crawl_id)).execute()
 
@@ -117,7 +119,7 @@ class IssueDetector:
         """Fetch all SEO metadata for the crawl with page URLs."""
         try:
             # Join with pages table to get page URLs
-            response = self.auth_client.table("seo_metadata").select(
+            response = self.db.table("seo_metadata").select(
                 "*, pages!inner(id, url, crawl_id)"
             ).eq("pages.crawl_id", str(self.crawl_id)).execute()
 
@@ -380,12 +382,19 @@ class IssueDetector:
         pass
 
 
-async def detect_and_store_issues(crawl_id: UUID) -> int:
+async def detect_and_store_issues(crawl_id: UUID, db_client=None) -> int:
     """
     Detect all issues for a crawl and store them in the database.
     Returns the number of issues detected.
+
+    Args:
+        crawl_id: The UUID of the crawl to analyze
+        db_client: Optional database client (use service role client for Celery tasks)
     """
-    detector = IssueDetector(crawl_id)
+    # Use provided client or fall back to default
+    db = db_client if db_client is not None else supabase_client
+
+    detector = IssueDetector(crawl_id, db_client=db)
     issues = await detector.detect_all_issues()
 
     if not issues:
@@ -394,14 +403,12 @@ async def detect_and_store_issues(crawl_id: UUID) -> int:
 
     # Store issues in database
     try:
-        auth_client = get_auth_client()
-
         # Delete existing issues for this crawl (if re-running detection)
-        auth_client.table("issues").delete().eq("crawl_id", str(crawl_id)).execute()
+        db.table("issues").delete().eq("crawl_id", str(crawl_id)).execute()
 
         # Insert new issues
         if issues:
-            response = auth_client.table("issues").insert(issues).execute()
+            response = db.table("issues").insert(issues).execute()
 
             if hasattr(response, "error") and response.error is not None:
                 logger.error(f"Error storing issues: {response.error}")
@@ -411,5 +418,5 @@ async def detect_and_store_issues(crawl_id: UUID) -> int:
         return len(issues)
 
     except Exception as e:
-        logger.error(f"Error storing issues for crawl {crawl_id}: {e}")
+        logger.error(f"Error storing issues for crawl {crawl_id}: {e}", exc_info=True)
         return 0

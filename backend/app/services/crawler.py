@@ -80,12 +80,16 @@ class Crawler:
         parsed_start = urlparse(self.crawl.url)
         is_homepage = parsed_start.path in ('', '/', '') and not parsed_start.query
 
-        # Determine nav_score for starting URL
-        start_nav_score = self.nav_scores.get(self.crawl.url, 0)
-        start_is_nav = self.crawl.url in self.primary_nav_urls or start_nav_score >= 8 or is_homepage
+        # Determine nav_score for starting URL using full calculation (includes depth bonus)
+        # BUG FIX: Previously only used nav_scores.get() which missed depth bonus
+        start_nav_score = self._calculate_nav_score(self.crawl.url, 0)  # Depth 0 = starting page
 
-        # Initialize the queue with the start URL
-        self.url_queue.append((self.crawl.url, 0, None, start_nav_score if not is_homepage else 10, start_is_nav))
+        # Starting URL is ALWAYS a main page (it's what the user wants to crawl!)
+        # Also consider it main if: in primary nav, high score, or is homepage
+        start_is_nav = True  # Starting URL is always primary
+
+        # Initialize the queue with the start URL (starting pages get max nav_score)
+        self.url_queue.append((self.crawl.url, 0, None, max(start_nav_score, 10), start_is_nav))
 
         # Process robots.txt and sitemaps if policy allows
         if self.crawl.respect_robots_txt:
@@ -156,98 +160,150 @@ class Crawler:
             logger.warning(f"Navigation detection from homepage failed: {e}")
             self.nav_detection_done = True
 
-    async def _apply_small_site_mode(self) -> None:
+    async def _finalize_primary_pages(self) -> None:
         """
-        Small-site mode: For sites with ≤6 pages, most pages ARE main pages.
+        Post-crawl finalization: Mark ONLY true main pages as primary.
 
-        Instead of trying to statistically infer navigation, we:
-        1. Assume all pages are "main candidates"
-        2. Exclude only obvious utility/legal pages
-        3. Mark remaining pages as is_primary=True
+        STRICT STRATEGY (aim for 8-15 main pages max):
+        1. Homepage is ALWAYS a main page
+        2. Only pages linked from PRIMARY navigation (nav_score >= 8)
+        3. Apply strict URL exclusions (blog posts, categories, paginated content)
+        4. Hard cap of 15 main pages maximum
+        5. For very small sites (≤6 pages), all non-excluded pages are main
 
-        This handles the case where the site IS its navigation.
+        This is intentionally restrictive - main pages are for client reports.
         """
         import re
 
-        SMALL_SITE_THRESHOLD = 6
+        MAX_MAIN_PAGES = 15  # Hard cap - never exceed this
+        MIN_NAV_SCORE = 8   # Only high-confidence nav links
 
         try:
-            # Get count of pages for this crawl
-            result = self.db.table("pages").select("id, url, nav_score, is_primary").eq("crawl_id", str(self.crawl.id)).execute()
+            # Get all pages for this crawl with their nav_scores
+            pages_result = self.db.table("pages").select("id, url, nav_score, is_primary, depth").eq("crawl_id", str(self.crawl.id)).execute()
 
-            if not result.data:
+            if not pages_result.data:
                 return
 
-            total_pages = len(result.data)
+            total_pages = len(pages_result.data)
+            logger.info(f"Finalizing primary pages for crawl {self.crawl.id} ({total_pages} pages)")
 
-            # Only apply small-site mode for sites with few pages
-            if total_pages > SMALL_SITE_THRESHOLD:
-                logger.info(f"Normal mode: {total_pages} pages (threshold: {SMALL_SITE_THRESHOLD})")
-                return
-
-            logger.info(f"SMALL SITE MODE: {total_pages} pages detected. Marking most as main pages.")
-
-            # Utility/legal patterns to EXCLUDE from main pages
+            # STRICT exclusion patterns - these are NEVER main pages
             exclude_patterns = [
-                r'/privacy',
-                r'/terms',
-                r'/legal',
-                r'/cookie',
-                r'/gdpr',
-                r'/imprint',
-                r'/disclaimer',
-                r'/login',
-                r'/signin',
-                r'/signup',
-                r'/register',
-                r'/cart',
-                r'/checkout',
-                r'/account',
-                r'/404',
-                r'/error',
+                # Legal/utility pages
+                r'/privacy', r'/terms', r'/legal', r'/cookie', r'/gdpr',
+                r'/imprint', r'/disclaimer', r'/login', r'/signin', r'/signup',
+                r'/register', r'/cart', r'/checkout', r'/account', r'/404', r'/error',
+                # Blog/news content (individual posts, not index)
+                r'/blog/.+', r'/news/.+', r'/article/', r'/post/',
+                r'/\d{4}/\d{2}/',  # Date-based URLs like /2024/01/post-title
+                # Categories, tags, archives
+                r'/category/', r'/tag/', r'/tags/', r'/author/', r'/archive/',
+                # Pagination
+                r'/page/\d+', r'\?page=', r'\?p=',
+                # Search results
+                r'/search', r'\?q=', r'\?s=',
+                # Media/files
+                r'/wp-content/', r'/uploads/', r'/media/', r'/assets/',
+                # Language/locale specific subpaths (but allow /en/, /es/ at root)
+                r'/[a-z]{2}/[a-z]+/.+',  # Like /en/blog/post - exclude deep content
             ]
 
-            pages_to_update = []
+            # First, reset ALL pages to is_primary=False (clean slate)
+            # Then selectively mark the true main pages
 
-            for page in result.data:
+            # Identify main page candidates
+            main_page_candidates = []
+
+            parsed_start = urlparse(self.crawl.url)
+            start_domain = parsed_start.netloc
+
+            for page in pages_result.data:
                 url = page.get('url', '')
-                path = urlparse(url).path.lower()
+                parsed = urlparse(url)
+                path = parsed.path.lower()
+                nav_score = page.get('nav_score', 0)
+                depth = page.get('depth', 99)
 
-                # Check if this is a utility/legal page
-                is_utility = False
-                for pattern in exclude_patterns:
-                    if re.search(pattern, path):
-                        is_utility = True
-                        break
+                # Skip if different domain (external links)
+                if parsed.netloc != start_domain:
+                    continue
 
-                # In small-site mode, non-utility pages are main pages
-                if not is_utility:
-                    # Only update if not already marked as primary
-                    current_score = page.get('nav_score', 0)
-                    if not page.get('is_primary') or current_score < 8:
-                        pages_to_update.append({
-                            'id': page['id'],
-                            'is_primary': True,
-                            'nav_score': max(current_score, 10)  # Ensure score >= 10
-                        })
+                # Check exclusion patterns - if ANY match, skip this page
+                is_excluded = any(re.search(pattern, path) for pattern in exclude_patterns)
+                if is_excluded:
+                    continue
 
-            # Batch update pages
-            if pages_to_update:
-                for page_update in pages_to_update:
+                # Check exclusion patterns in query string too
+                if parsed.query and any(re.search(pattern, '?' + parsed.query) for pattern in exclude_patterns):
+                    continue
+
+                # CRITERIA FOR MAIN PAGE:
+                is_homepage = path in ('', '/', '') and not parsed.query
+                is_high_nav_score = nav_score >= MIN_NAV_SCORE
+                is_very_small_site = total_pages <= 6
+
+                # Only consider as main page if:
+                # 1. It's the homepage, OR
+                # 2. It has high nav_score (linked from primary nav), OR
+                # 3. Site is very small (≤6 pages)
+                if is_homepage or is_high_nav_score or is_very_small_site:
+                    main_page_candidates.append({
+                        'id': page['id'],
+                        'url': url,
+                        'nav_score': nav_score,
+                        'depth': depth,
+                        'is_homepage': is_homepage
+                    })
+
+            # Sort candidates: homepage first, then by nav_score (desc), then by URL depth (asc)
+            # NOTE: Using URL slash count instead of crawl depth for tiebreaker
+            # Reason: In Mega Menus, ALL links have crawl_depth=1 (all on homepage)
+            # URL slash count correctly identifies /services as parent of /services/consulting/finance
+            main_page_candidates.sort(key=lambda x: (
+                not x['is_homepage'],  # Homepage first (False sorts before True)
+                -x['nav_score'],       # Higher scores first
+                x['url'].count('/')    # Shorter URLs first (structural hierarchy)
+            ))
+
+            # Apply hard cap
+            final_main_pages = main_page_candidates[:MAX_MAIN_PAGES]
+            main_page_ids = {p['id'] for p in final_main_pages}
+
+            logger.info(f"Selected {len(final_main_pages)} main pages from {len(main_page_candidates)} candidates (cap: {MAX_MAIN_PAGES})")
+
+            # Update database: mark selected pages as primary, others as not primary
+            updates_made = 0
+            for page in pages_result.data:
+                should_be_primary = page['id'] in main_page_ids
+                currently_primary = page.get('is_primary', False)
+
+                # Only update if state needs to change
+                if should_be_primary != currently_primary:
                     try:
                         self.db.table("pages").update({
-                            'is_primary': page_update['is_primary'],
-                            'nav_score': page_update['nav_score']
-                        }).eq('id', page_update['id']).execute()
+                            'is_primary': should_be_primary
+                        }).eq('id', page['id']).execute()
+                        updates_made += 1
                     except Exception as e:
-                        logger.warning(f"Failed to update page {page_update['id']}: {e}")
+                        logger.warning(f"Failed to update page {page['id']}: {e}")
 
-                logger.info(f"Small-site mode: Marked {len(pages_to_update)} of {total_pages} pages as main pages")
+            logger.info(f"Primary page finalization complete: {len(final_main_pages)} main pages, {updates_made} updates made")
+
+            # Log the selected main pages for debugging
+            if final_main_pages:
+                main_urls = [p['url'] for p in final_main_pages[:10]]  # Log first 10
+                logger.info(f"Main pages selected: {main_urls}")
 
         except Exception as e:
-            logger.warning(f"Small-site mode analysis failed: {e}")
+            logger.warning(f"Primary page finalization failed: {e}")
 
-    async def _save_page_to_db(self, page: Page, seo_metadata: Optional[SEOMetadata], nav_score: int = 0, is_navigation: bool = False) -> None:
+    # Keep old name as alias for backwards compatibility
+    async def _apply_small_site_mode(self) -> None:
+        """Alias for _finalize_primary_pages for backwards compatibility."""
+        await self._finalize_primary_pages()
+
+    async def _save_page_to_db(self, page: Page, seo_metadata: Optional[SEOMetadata], nav_score: int = 0, is_navigation: bool = False, depth: int = 0) -> None:
         """Save page and SEO metadata to database.
 
         Args:
@@ -255,6 +311,7 @@ class Crawler:
             seo_metadata: Optional SEO metadata for the page
             nav_score: Navigation importance score (0-20+) from link that led here
             is_navigation: True if this page was linked from main navigation
+            depth: Crawl depth (0 = starting URL, 1 = directly linked, etc.)
         """
         try:
             # Use actual SEO metadata if available, otherwise use defaults
@@ -282,6 +339,7 @@ class Crawler:
                 "title": title,  # REAL title from SEO metadata
                 "meta_description": meta_description,  # REAL meta description
                 "content_summary": page.text_excerpt,  # 5000 char excerpt for preview
+                "html_snapshot_path": page.html_storage_path,  # Path to full HTML for content retrieval
                 "status_code": page.status_code,
                 "response_time": page.render_ms,
                 "content_type": page.content_type,
@@ -296,7 +354,8 @@ class Crawler:
                 "seo_score": self._calculate_seo_score_from_metadata(seo_metadata) if seo_metadata else 0,
                 "issues": {},  # Issues are saved to separate table
                 "nav_score": nav_score,  # Navigation importance score from link
-                "is_primary": is_navigation  # True if page is primary navigation target
+                "is_primary": False,  # Set by _finalize_primary_pages at end of crawl
+                "depth": depth  # Crawl depth (0 = starting, 1 = linked from start, etc.)
             }
 
             # Insert page (removed full_content - doesn't exist in schema)
@@ -584,8 +643,8 @@ class Crawler:
                 if result and len(result) == 5:
                     page, seo_metadata, soup, extracted_data, status_code = result
 
-                    # CRITICAL: Save page to database FIRST (include navigation info)
-                    await self._save_page_to_db(page, seo_metadata, nav_score, is_navigation)
+                    # CRITICAL: Save page to database FIRST (include navigation info + depth)
+                    await self._save_page_to_db(page, seo_metadata, nav_score, is_navigation, depth)
 
                     # THEN save audit data (now page exists in DB for foreign key)
                     if extracted_data:
@@ -646,14 +705,16 @@ class Crawler:
             extractor = SmartContentExtractor(html_content, url)
             extracted_data = extractor.extract_all_data()
             
-            # Extract text content
+            # Extract text content - use full page text for marketing pages
             soup = BeautifulSoup(html_content, 'lxml')
-            full_text = extracted_data['content']['text'] if extracted_data['content']['text'] else self._extract_text_excerpt(soup)
-            # Increase excerpt to 5000 characters for better content preview
-            text_excerpt = full_text[:5000] if full_text else ""
+            # Prefer full_page_text (all visible content) over article-focused extraction
+            full_text = extracted_data['content'].get('full_page_text') or extracted_data['content']['text'] or self._extract_text_excerpt(soup)
+            # Store up to 50,000 characters (~7,500 words) to capture full marketing page copy
+            # This ensures hero sections, features, testimonials, CTAs are all captured
+            text_excerpt = full_text[:50000] if full_text else ""
             word_count = extracted_data['content']['word_count']
 
-            # Create page record (removed fields not in DB schema: full_content, html_storage_path)
+            # Create page record with HTML snapshot path for full content retrieval
             page = Page(
                 crawl_id=self.crawl.id,
                 url=url,
@@ -662,6 +723,7 @@ class Crawler:
                 method=method,
                 render_ms=render_time,
                 content_hash=content_hash,
+                html_storage_path=html_storage_path,  # Path to stored HTML file
                 text_excerpt=text_excerpt,
                 word_count=word_count,
                 content_type=content_type,

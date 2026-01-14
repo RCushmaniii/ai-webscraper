@@ -62,7 +62,7 @@ const PageDetailPage: React.FC = () => {
   const [copied, setCopied] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'links' | 'images'>('overview');
   const [technicalExpanded, setTechnicalExpanded] = useState(false);
-  const [contentTab, setContentTab] = useState<'reader' | 'raw'>('reader');
+  const [contentTab, setContentTab] = useState<'reader' | 'raw' | 'preview'>('reader');
   const [contentExpanded, setContentExpanded] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
@@ -883,12 +883,26 @@ const PageDetailPage: React.FC = () => {
                     >
                       Raw Text
                     </button>
+                    <button
+                      onClick={() => setContentTab('preview')}
+                      className={`px-3 py-1 text-xs font-medium transition-colors ${
+                        contentTab === 'preview'
+                          ? 'bg-secondary-500 text-white'
+                          : 'bg-white text-gray-600 hover:bg-gray-50'
+                      }`}
+                    >
+                      Live Preview
+                    </button>
                   </div>
                 </div>
                 <div className="relative">
                   <div
-                    className={`bg-gray-50 rounded-md overflow-hidden transition-all ${
-                      contentExpanded ? 'max-h-[600px]' : 'max-h-48'
+                    className={`bg-gray-50 rounded-md transition-all ${
+                      contentTab === 'preview'
+                        ? 'h-[500px]'
+                        : contentExpanded
+                          ? 'max-h-[600px] overflow-y-auto'
+                          : 'max-h-48 overflow-hidden'
                     }`}
                   >
                     {contentTab === 'reader' ? (
@@ -903,18 +917,29 @@ const PageDetailPage: React.FC = () => {
                           <p className="text-sm text-gray-400 italic">No content available</p>
                         )}
                       </div>
-                    ) : (
+                    ) : contentTab === 'raw' ? (
                       <pre className="p-4 text-xs text-gray-700 font-mono whitespace-pre-wrap overflow-x-auto">
                         {page.content_summary || 'No content available'}
                       </pre>
+                    ) : (
+                      <iframe
+                        src={page.url}
+                        title="Page Preview"
+                        className="w-full h-full border-0 rounded-md"
+                        sandbox="allow-same-origin"
+                        loading="lazy"
+                        onError={() => {
+                          console.log('iframe failed to load');
+                        }}
+                      />
                     )}
                   </div>
                   {/* Fade-out Gradient & Expand Button */}
-                  {page.content_summary && page.content_summary.length > 300 && !contentExpanded && (
+                  {contentTab !== 'preview' && page.content_summary && page.content_summary.length > 300 && !contentExpanded && (
                     <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-gray-50 to-transparent pointer-events-none" />
                   )}
                 </div>
-                {page.content_summary && page.content_summary.length > 300 && (
+                {contentTab !== 'preview' && page.content_summary && page.content_summary.length > 300 && (
                   <button
                     onClick={() => setContentExpanded(!contentExpanded)}
                     className="mt-2 w-full py-2 text-sm font-medium text-secondary-600 hover:text-secondary-700 hover:bg-gray-50 rounded-md transition-colors flex items-center justify-center gap-1"
@@ -931,6 +956,11 @@ const PageDetailPage: React.FC = () => {
                       </>
                     )}
                   </button>
+                )}
+                {contentTab === 'preview' && (
+                  <p className="text-xs text-gray-500 mt-2 text-center">
+                    Live preview loads the actual page in a sandboxed iframe. Some sites may block this.
+                  </p>
                 )}
               </div>
             </div>

@@ -152,10 +152,11 @@ def crawl_site(crawl_id: str) -> Dict[str, Any]:
         if progress.pages_crawled > 0:
             try:
                 from app.services.issue_detector import detect_and_store_issues
-                issues_count = asyncio.run(detect_and_store_issues(UUID(crawl_id)))
+                # Pass service_client to avoid auth issues in background task
+                issues_count = asyncio.run(detect_and_store_issues(UUID(crawl_id), db_client=service_client))
                 logger.info(f"Detected and stored {issues_count} issues for crawl {crawl_id}")
             except Exception as issue_error:
-                logger.error(f"Error detecting issues for {crawl_id}: {issue_error}")
+                logger.error(f"Error detecting issues for {crawl_id}: {issue_error}", exc_info=True)
 
         # 7. Run comprehensive SEO audit
         if settings.ENABLE_SEO_AUDIT:

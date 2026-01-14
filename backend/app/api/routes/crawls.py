@@ -35,6 +35,9 @@ async def create_crawl(
         now = datetime.now()
         raw_data = crawl.model_dump()
 
+        # Debug: Log the raw data received from frontend
+        logger.info(f"Raw data from request: js_rendering={raw_data.get('js_rendering')} (type: {type(raw_data.get('js_rendering'))})")
+
         # Map model fields to ACTUAL database column names (based on existing schema)
         crawl_data = {
             "id": str(crawl_id),
@@ -52,6 +55,9 @@ async def create_crawl(
             "created_at": now.isoformat(),
             "updated_at": now.isoformat(),
         }
+
+        # Debug: Log what we're saving to database
+        logger.info(f"Saving to DB: js_rendering={crawl_data['js_rendering']}")
 
         # If no name is provided, use the hostname from the URL
         if raw_data.get("name"):

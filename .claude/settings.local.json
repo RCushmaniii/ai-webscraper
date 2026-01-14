@@ -36,7 +36,10 @@
       "Bash(supabase db lint:*)",
       "Bash(supabase db dump:*)",
       "Bash(PGPASSWORD='Olverines17!' \"/c/Program Files/PostgreSQL/17/bin/psql\" -h db.kbltwyiowkbxzhhhozxf.supabase.co -U postgres -d postgres -c \"SELECT tablename, policyname, qual, with_check FROM pg_policies WHERE schemaname = ''public'' ORDER BY tablename, policyname;\")",
-      "Bash(PGPASSWORD='Olverines17!' \"/c/Program Files/PostgreSQL/17/bin/psql\":*)"
+      "Bash(PGPASSWORD='Olverines17!' \"/c/Program Files/PostgreSQL/17/bin/psql\":*)",
+      "Bash(head:*)",
+      "Bash(cut:*)",
+      "Bash(powershell:*)"
     ]
   }
 }

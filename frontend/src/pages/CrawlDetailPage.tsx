@@ -83,13 +83,24 @@ const CrawlDetailPage: React.FC = () => {
   const [issueSort, setIssueSort] = useState<string>('severity');
   const [issueSortDir, setIssueSortDir] = useState<'asc' | 'desc'>('desc');
   const [issueSeverityFilter, setIssueSeverityFilter] = useState<'all' | 'critical' | 'high' | 'medium' | 'low'>('all');
-  const [issueTypeFilter, setIssueTypeFilter] = useState<string>('all');
-  const [issueImpactFilter, setIssueImpactFilter] = useState<'all' | 'seo' | 'ux' | 'compliance' | 'performance'>('all');
   const [expandedIssueCards, setExpandedIssueCards] = useState<Set<string>>(new Set());
+  const [lightboxImage, setLightboxImage] = useState<Image | null>(null);
+
+  // ESC key handler for lightbox
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && lightboxImage) {
+        setLightboxImage(null);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [lightboxImage]);
 
   useEffect(() => {
     if (!id) return;
-    
+
     const fetchCrawlData = async () => {
       try {
         setLoading(true);
@@ -227,8 +238,9 @@ const CrawlDetailPage: React.FC = () => {
 
       const nextNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) + 1 : 2;
 
-      // Create timestamp
+      // Create timestamp (Mexico City timezone)
       const timestamp = new Date().toLocaleString('en-US', {
+        timeZone: 'America/Mexico_City',
         month: 'short',
         day: 'numeric',
         hour: '2-digit',
@@ -559,33 +571,41 @@ const CrawlDetailPage: React.FC = () => {
     });
   }, [issues]);
 
-  // Filter aggregated issues
+  // Filter aggregated issues (simplified - just severity filter)
   const filteredAggregatedIssues = useMemo(() => {
     return aggregatedIssues.filter(group => {
       if (issueSeverityFilter !== 'all' && group.severity !== issueSeverityFilter) return false;
-      if (issueTypeFilter !== 'all' && group.type !== issueTypeFilter) return false;
-      if (issueImpactFilter !== 'all' && group.impact !== issueImpactFilter) return false;
       return true;
     });
-  }, [aggregatedIssues, issueSeverityFilter, issueTypeFilter, issueImpactFilter]);
+  }, [aggregatedIssues, issueSeverityFilter]);
 
-  // Calculate site health score (0-100)
+  // Calculate site health score (0-100) - Ahrefs-style percentage based
   const siteHealthScore = useMemo(() => {
     if (pages.length === 0) return 100;
+    if (issues.length === 0) return 100;
 
-    let score = 100;
+    // Find unique pages with issues (by URL/context)
+    const pagesWithIssues = new Set(issues.map(i => i.context).filter(Boolean));
+    const affectedPageCount = pagesWithIssues.size;
+
+    // Base score: percentage of pages WITHOUT issues
+    // e.g., 95 clean pages out of 100 total = 95%
+    const cleanPagePercentage = ((pages.length - affectedPageCount) / pages.length) * 100;
+
+    // Small severity adjustment (max ±5 points)
+    // Critical/high issues slightly lower the score, but not drastically
     const criticalCount = issues.filter(i => i.severity === 'critical').length;
     const highCount = issues.filter(i => i.severity === 'high').length;
-    const mediumCount = issues.filter(i => i.severity === 'medium').length;
-    const lowCount = issues.filter(i => i.severity === 'low').length;
 
-    // Deduct points based on severity and count
-    score -= Math.min(40, criticalCount * 10);  // Up to -40 for critical
-    score -= Math.min(30, highCount * 5);        // Up to -30 for high
-    score -= Math.min(20, mediumCount * 2);      // Up to -20 for medium
-    score -= Math.min(10, lowCount * 1);         // Up to -10 for low
+    // Severity penalty scales with how many critical/high vs total pages
+    // Max penalty of 5 points even with many critical issues
+    const severityRatio = (criticalCount * 2 + highCount) / pages.length;
+    const severityPenalty = Math.min(5, severityRatio * 10);
 
-    return Math.max(0, score);
+    // Final score
+    const finalScore = Math.round(cleanPagePercentage - severityPenalty);
+
+    return Math.max(0, Math.min(100, finalScore));
   }, [issues, pages.length]);
 
   // Toggle expanded state for issue cards
@@ -935,7 +955,18 @@ const CrawlDetailPage: React.FC = () => {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString();
+    // Display in Mexico City timezone (America/Mexico_City)
+    // The database stores UTC timestamps, so we need to convert to local time
+    const date = new Date(dateString);
+    return date.toLocaleString('en-US', {
+      timeZone: 'America/Mexico_City',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
   };
 
   const calculateDuration = (startDate: string, endDate?: string) => {
@@ -1425,181 +1456,183 @@ const CrawlDetailPage: React.FC = () => {
               </div>
             )}
 
-            {/* Issues Tab - Command Center */}
+            {/* Issues Tab - Simplified UX */}
             {activeTab === 'issues' && (
               <div className="p-6">
-                {/* Site Health Score Widget */}
-                <div className="mb-6 p-6 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl border border-gray-200">
-                  <div className="flex items-center justify-between">
+                {/* Simplified Header */}
+                <div className="mb-8">
+                  <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-6">
-                      {/* Health Score Gauge */}
-                      <div className="relative w-24 h-24">
-                        <svg className="w-24 h-24 transform -rotate-90" viewBox="0 0 36 36">
+                      {/* Health Score - Compact */}
+                      <div className="relative w-20 h-20">
+                        <svg className="w-20 h-20 transform -rotate-90" viewBox="0 0 36 36">
                           <path
                             d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                             fill="none"
                             stroke="#e5e7eb"
-                            strokeWidth="3"
+                            strokeWidth="3.5"
                           />
                           <path
                             d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                             fill="none"
-                            stroke={siteHealthScore >= 80 ? '#22c55e' : siteHealthScore >= 60 ? '#eab308' : siteHealthScore >= 40 ? '#f97316' : '#ef4444'}
-                            strokeWidth="3"
+                            stroke={siteHealthScore >= 90 ? '#22c55e' : siteHealthScore >= 70 ? '#84cc16' : siteHealthScore >= 50 ? '#eab308' : '#ef4444'}
+                            strokeWidth="3.5"
                             strokeDasharray={`${siteHealthScore}, 100`}
+                            strokeLinecap="round"
                           />
                         </svg>
                         <div className="absolute inset-0 flex items-center justify-center">
-                          <span className={`text-2xl font-bold ${siteHealthScore >= 80 ? 'text-green-600' : siteHealthScore >= 60 ? 'text-yellow-600' : siteHealthScore >= 40 ? 'text-orange-600' : 'text-red-600'}`}>
+                          <span className={`text-xl font-bold ${siteHealthScore >= 90 ? 'text-green-600' : siteHealthScore >= 70 ? 'text-lime-600' : siteHealthScore >= 50 ? 'text-yellow-600' : 'text-red-600'}`}>
                             {siteHealthScore}
                           </span>
                         </div>
                       </div>
                       <div>
-                        <h3 className="text-lg font-semibold text-gray-800">Site Health Score</h3>
-                        <p className="text-sm text-gray-500">
-                          {siteHealthScore >= 80 ? 'Excellent! Few issues to address.' :
-                           siteHealthScore >= 60 ? 'Good, but some issues need attention.' :
-                           siteHealthScore >= 40 ? 'Needs work. Several issues to fix.' :
-                           'Critical issues detected. Immediate attention needed.'}
+                        <h2 className="text-xl font-semibold text-gray-900">
+                          {siteHealthScore >= 90 ? 'Excellent Site Health' :
+                           siteHealthScore >= 70 ? 'Good Site Health' :
+                           siteHealthScore >= 50 ? 'Needs Improvement' :
+                           'Attention Required'}
+                        </h2>
+                        <p className="text-sm text-gray-500 mt-1">
+                          {aggregatedIssues.length === 0
+                            ? 'No issues detected across all pages'
+                            : `${aggregatedIssues.length} issue type${aggregatedIssues.length !== 1 ? 's' : ''} found across ${pages.length} pages`}
                         </p>
                       </div>
                     </div>
-                    {/* Issue Summary */}
-                    <div className="flex gap-4">
-                      <div className="text-center px-4 py-2 bg-red-50 rounded-lg border border-red-200">
-                        <div className="text-2xl font-bold text-red-700">{issues.filter(i => i.severity === 'critical').length}</div>
-                        <div className="text-xs text-red-600">Critical</div>
-                      </div>
-                      <div className="text-center px-4 py-2 bg-orange-50 rounded-lg border border-orange-200">
-                        <div className="text-2xl font-bold text-orange-700">{issues.filter(i => i.severity === 'high').length}</div>
-                        <div className="text-xs text-orange-600">High</div>
-                      </div>
-                      <div className="text-center px-4 py-2 bg-yellow-50 rounded-lg border border-yellow-200">
-                        <div className="text-2xl font-bold text-yellow-700">{issues.filter(i => i.severity === 'medium').length}</div>
-                        <div className="text-xs text-yellow-600">Medium</div>
-                      </div>
-                      <div className="text-center px-4 py-2 bg-blue-50 rounded-lg border border-blue-200">
-                        <div className="text-2xl font-bold text-blue-700">{issues.filter(i => i.severity === 'low').length}</div>
-                        <div className="text-xs text-blue-600">Low</div>
-                      </div>
+
+                    {/* Actions */}
+                    <div className="flex items-center gap-3">
+                      <select
+                        value={issueSeverityFilter}
+                        onChange={(e) => setIssueSeverityFilter(e.target.value as any)}
+                        className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium focus:ring-2 focus:ring-secondary-500 focus:border-secondary-500"
+                      >
+                        <option value="all">All Severities</option>
+                        <option value="critical">Critical Only ({issues.filter(i => i.severity === 'critical').length})</option>
+                        <option value="high">High Only ({issues.filter(i => i.severity === 'high').length})</option>
+                        <option value="medium">Medium Only ({issues.filter(i => i.severity === 'medium').length})</option>
+                        <option value="low">Low Only ({issues.filter(i => i.severity === 'low').length})</option>
+                      </select>
+                      <button
+                        onClick={handleExportIssues}
+                        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                      >
+                        <Download className="w-4 h-4" />
+                        Export
+                      </button>
                     </div>
                   </div>
+
+                  {/* Quick Stats Bar */}
+                  {aggregatedIssues.length > 0 && (
+                    <div className="flex gap-2">
+                      {issues.filter(i => i.severity === 'critical').length > 0 && (
+                        <button
+                          onClick={() => setIssueSeverityFilter('critical')}
+                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                            issueSeverityFilter === 'critical'
+                              ? 'bg-red-600 text-white'
+                              : 'bg-red-100 text-red-700 hover:bg-red-200'
+                          }`}
+                        >
+                          <span className="w-2 h-2 rounded-full bg-current"></span>
+                          {issues.filter(i => i.severity === 'critical').length} Critical
+                        </button>
+                      )}
+                      {issues.filter(i => i.severity === 'high').length > 0 && (
+                        <button
+                          onClick={() => setIssueSeverityFilter('high')}
+                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                            issueSeverityFilter === 'high'
+                              ? 'bg-orange-600 text-white'
+                              : 'bg-orange-100 text-orange-700 hover:bg-orange-200'
+                          }`}
+                        >
+                          <span className="w-2 h-2 rounded-full bg-current"></span>
+                          {issues.filter(i => i.severity === 'high').length} High
+                        </button>
+                      )}
+                      {issues.filter(i => i.severity === 'medium').length > 0 && (
+                        <button
+                          onClick={() => setIssueSeverityFilter('medium')}
+                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                            issueSeverityFilter === 'medium'
+                              ? 'bg-yellow-600 text-white'
+                              : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
+                          }`}
+                        >
+                          <span className="w-2 h-2 rounded-full bg-current"></span>
+                          {issues.filter(i => i.severity === 'medium').length} Medium
+                        </button>
+                      )}
+                      {issues.filter(i => i.severity === 'low').length > 0 && (
+                        <button
+                          onClick={() => setIssueSeverityFilter('low')}
+                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                            issueSeverityFilter === 'low'
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                          }`}
+                        >
+                          <span className="w-2 h-2 rounded-full bg-current"></span>
+                          {issues.filter(i => i.severity === 'low').length} Low
+                        </button>
+                      )}
+                      {issueSeverityFilter !== 'all' && (
+                        <button
+                          onClick={() => setIssueSeverityFilter('all')}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors"
+                        >
+                          Clear filter
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
 
-                {/* Filters Row */}
-                <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-                  {/* Impact Filter Buttons */}
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      onClick={() => setIssueImpactFilter('all')}
-                      className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                        issueImpactFilter === 'all'
-                          ? 'bg-gray-800 text-white'
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
-                    >
-                      All Issues ({aggregatedIssues.length})
-                    </button>
-                    <button
-                      onClick={() => setIssueImpactFilter('seo')}
-                      className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                        issueImpactFilter === 'seo'
-                          ? 'bg-purple-600 text-white'
-                          : 'bg-purple-50 text-purple-700 hover:bg-purple-100'
-                      }`}
-                    >
-                      SEO Killers ({aggregatedIssues.filter(g => g.impact === 'seo').length})
-                    </button>
-                    <button
-                      onClick={() => setIssueImpactFilter('ux')}
-                      className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                        issueImpactFilter === 'ux'
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
-                      }`}
-                    >
-                      User Experience ({aggregatedIssues.filter(g => g.impact === 'ux').length})
-                    </button>
-                    <button
-                      onClick={() => setIssueImpactFilter('compliance')}
-                      className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                        issueImpactFilter === 'compliance'
-                          ? 'bg-green-600 text-white'
-                          : 'bg-green-50 text-green-700 hover:bg-green-100'
-                      }`}
-                    >
-                      Compliance ({aggregatedIssues.filter(g => g.impact === 'compliance').length})
-                    </button>
-                    <button
-                      onClick={() => setIssueImpactFilter('performance')}
-                      className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                        issueImpactFilter === 'performance'
-                          ? 'bg-orange-600 text-white'
-                          : 'bg-orange-50 text-orange-700 hover:bg-orange-100'
-                      }`}
-                    >
-                      Performance ({aggregatedIssues.filter(g => g.impact === 'performance').length})
-                    </button>
-                  </div>
-
-                  {/* Export Button */}
-                  <button
-                    onClick={handleExportIssues}
-                    className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                  >
-                    <Download className="w-4 h-4" />
-                    Export All Issues
-                  </button>
-                </div>
-
-                {/* Issue Cards */}
+                {/* Issue Cards - Cleaner Design */}
                 {filteredAggregatedIssues.length > 0 ? (
-                  <div className="space-y-4">
-                    {filteredAggregatedIssues.map((group) => {
-                      const isExpanded = expandedIssueCards.has(group.key);
+                  <div className="space-y-3">
+                    {filteredAggregatedIssues.map((group, index) => {
+                      // Auto-expand first critical/high issue
+                      const isExpanded = expandedIssueCards.has(group.key) ||
+                        (index === 0 && (group.severity === 'critical' || group.severity === 'high') && expandedIssueCards.size === 0);
                       const description = getIssueDescription(group.message);
-                      const severityColors = {
-                        critical: { border: 'border-l-red-600', bg: 'bg-red-50', text: 'text-red-700', badge: 'bg-red-100 text-red-800' },
-                        high: { border: 'border-l-orange-500', bg: 'bg-orange-50', text: 'text-orange-700', badge: 'bg-orange-100 text-orange-800' },
-                        medium: { border: 'border-l-yellow-500', bg: 'bg-yellow-50', text: 'text-yellow-700', badge: 'bg-yellow-100 text-yellow-800' },
-                        low: { border: 'border-l-blue-400', bg: 'bg-blue-50', text: 'text-blue-700', badge: 'bg-blue-100 text-blue-800' }
+
+                      const severityConfig = {
+                        critical: { border: 'border-l-red-500', bg: 'bg-red-50', dot: 'bg-red-500' },
+                        high: { border: 'border-l-orange-500', bg: 'bg-orange-50', dot: 'bg-orange-500' },
+                        medium: { border: 'border-l-yellow-500', bg: 'bg-yellow-50', dot: 'bg-yellow-500' },
+                        low: { border: 'border-l-blue-400', bg: 'bg-blue-50', dot: 'bg-blue-400' }
                       };
-                      const colors = severityColors[group.severity];
+                      const config = severityConfig[group.severity];
 
                       return (
-                        <div key={group.key} className={`border-l-4 ${colors.border} rounded-lg bg-white shadow-sm overflow-hidden`}>
-                          {/* Card Header */}
-                          <div
-                            className={`p-4 cursor-pointer hover:bg-gray-50 transition-colors`}
+                        <div
+                          key={group.key}
+                          className={`border-l-4 ${config.border} rounded-lg bg-white shadow-sm overflow-hidden transition-shadow hover:shadow-md`}
+                        >
+                          {/* Card Header - Simplified */}
+                          <button
+                            className="w-full p-4 text-left hover:bg-gray-50 transition-colors"
                             onClick={() => toggleIssueCard(group.key)}
                           >
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-3 mb-2">
-                                  <span className={`px-2 py-1 text-xs font-semibold rounded-full ${colors.badge}`}>
-                                    {group.severity.toUpperCase()}
-                                  </span>
-                                  <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-700 rounded-full">
-                                    {group.type}
-                                  </span>
-                                </div>
-                                <h3 className="text-lg font-semibold text-gray-900 mb-1">{group.message}</h3>
-                                <p className="text-sm text-gray-600">
-                                  Found <span className="font-semibold">{group.count}</span> {group.count === 1 ? 'instance' : 'instances'} across <span className="font-semibold">{group.pageCount}</span> {group.pageCount === 1 ? 'page' : 'pages'}
-                                </p>
-                                {description && (
-                                  <p className="mt-2 text-sm text-gray-500 italic">
-                                    {description}
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3 flex-1 min-w-0">
+                                <span className={`w-2.5 h-2.5 rounded-full ${config.dot} flex-shrink-0`}></span>
+                                <div className="min-w-0">
+                                  <h3 className="font-semibold text-gray-900 truncate">{group.message}</h3>
+                                  <p className="text-sm text-gray-500 mt-0.5">
+                                    {group.count} {group.count === 1 ? 'instance' : 'instances'} on {group.pageCount} {group.pageCount === 1 ? 'page' : 'pages'}
                                   </p>
-                                )}
+                                </div>
                               </div>
-                              <div className="flex items-center gap-3">
-                                <button
-                                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-                                >
-                                  {isExpanded ? 'Hide Details' : 'View Details'}
-                                </button>
+                              <div className="flex items-center gap-2 ml-4">
+                                <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">
+                                  {group.severity}
+                                </span>
                                 {isExpanded ? (
                                   <ChevronUp className="w-5 h-5 text-gray-400" />
                                 ) : (
@@ -1607,72 +1640,87 @@ const CrawlDetailPage: React.FC = () => {
                                 )}
                               </div>
                             </div>
-                          </div>
+                          </button>
 
-                          {/* Accordion Content - Shows actual specific instances */}
-                          {isExpanded && (() => {
-                            const instanceData = getIssueInstances(group);
-                            const maxItems = 25;
-                            const displayItems = instanceData.items.slice(0, maxItems);
+                          {/* Expanded Content */}
+                          {isExpanded && (
+                            <div className="border-t border-gray-100">
+                              {/* Why This Matters */}
+                              {description && (
+                                <div className={`px-4 py-3 ${config.bg} border-b border-gray-100`}>
+                                  <p className="text-sm text-gray-700">
+                                    <span className="font-medium">Why it matters:</span> {description}
+                                  </p>
+                                </div>
+                              )}
 
-                            return (
-                              <div className="border-t border-gray-200 bg-gray-50 p-4">
-                                {displayItems.length > 0 ? (
-                                  <div className="overflow-x-auto">
-                                    <table className="min-w-full divide-y divide-gray-200 bg-white rounded-lg overflow-hidden">
-                                      <thead className="bg-gray-100">
-                                        <tr>
-                                          {instanceData.columns.map((col) => (
-                                            <th
-                                              key={col.key}
-                                              className="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase"
-                                            >
-                                              {col.label}
-                                            </th>
-                                          ))}
-                                        </tr>
-                                      </thead>
-                                      <tbody className="divide-y divide-gray-200">
-                                        {displayItems.map((item, idx) => (
-                                          <tr key={item.id || idx} className="hover:bg-gray-50">
+                              {/* Affected Items */}
+                              {(() => {
+                                const instanceData = getIssueInstances(group);
+                                const maxItems = 10;
+                                const displayItems = instanceData.items.slice(0, maxItems);
+
+                                return displayItems.length > 0 ? (
+                                  <div className="p-4">
+                                    <h4 className="text-sm font-medium text-gray-700 mb-3">Affected Items</h4>
+                                    <div className="overflow-x-auto">
+                                      <table className="min-w-full">
+                                        <thead>
+                                          <tr className="border-b border-gray-200">
                                             {instanceData.columns.map((col) => (
-                                              <td key={col.key} className="px-4 py-3">
-                                                {col.render ? col.render(item) : item[col.key]}
-                                              </td>
+                                              <th
+                                                key={col.key}
+                                                className="px-3 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide text-left"
+                                              >
+                                                {col.label}
+                                              </th>
                                             ))}
                                           </tr>
-                                        ))}
-                                      </tbody>
-                                    </table>
-                                    {instanceData.items.length > maxItems && (
-                                      <div className="text-center py-3 text-sm text-gray-500">
-                                        Showing {maxItems} of {instanceData.items.length} items. Export CSV for full list.
-                                      </div>
-                                    )}
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-100">
+                                          {displayItems.map((item, idx) => (
+                                            <tr key={item.id || idx} className="hover:bg-gray-50">
+                                              {instanceData.columns.map((col) => (
+                                                <td key={col.key} className="px-3 py-2">
+                                                  {col.render ? col.render(item) : item[col.key]}
+                                                </td>
+                                              ))}
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                      {instanceData.items.length > maxItems && (
+                                        <p className="text-center py-2 text-sm text-gray-500">
+                                          +{instanceData.items.length - maxItems} more items. Export CSV for full list.
+                                        </p>
+                                      )}
+                                    </div>
                                   </div>
                                 ) : (
-                                  <div className="text-center py-6 text-sm text-gray-500">
-                                    <Info className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-                                    No specific instances found. This may be a summary-level issue.
+                                  <div className="p-4 text-center text-sm text-gray-500">
+                                    <Info className="w-6 h-6 mx-auto mb-2 text-gray-400" />
+                                    No specific items to display
                                   </div>
-                                )}
-                              </div>
-                            );
-                          })()}
+                                );
+                              })()}
+                            </div>
+                          )}
                         </div>
                       );
                     })}
                   </div>
                 ) : (
-                  <div className="text-center py-12 bg-gray-50 rounded-xl border border-gray-200">
-                    <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold text-gray-800 mb-2">
-                      {issues.length === 0 ? 'No Issues Found!' : 'No Matching Issues'}
+                  <div className="text-center py-16 bg-gradient-to-b from-green-50 to-white rounded-xl border border-green-200">
+                    <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <CheckCircle className="w-8 h-8 text-green-600" />
+                    </div>
+                    <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                      {issues.length === 0 ? 'All Clear!' : 'No Matching Issues'}
                     </h3>
-                    <p className="text-gray-500">
+                    <p className="text-gray-600 max-w-sm mx-auto">
                       {issues.length === 0
-                        ? 'Great job! This crawl found no issues to report.'
-                        : 'Try adjusting your filters to see more issues.'}
+                        ? 'No issues were detected during this crawl. Your site is looking great!'
+                        : 'No issues match your current filter. Try selecting a different severity level.'}
                     </p>
                   </div>
                 )}
@@ -1754,14 +1802,23 @@ const CrawlDetailPage: React.FC = () => {
                         {getSortedImages().map((image) => (
                           <tr key={image.id} className="hover:bg-gray-50">
                             <td className="px-6 py-4">
-                              <img
-                                src={image.src}
-                                alt={image.alt || 'Image'}
-                                className="w-16 h-16 object-cover rounded"
-                                onError={(e) => {
-                                  e.currentTarget.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23ddd" width="100" height="100"/%3E%3Ctext fill="%23999" x="50%" y="50%" text-anchor="middle" dy=".3em"%3ENo Image%3C/text%3E%3C/svg%3E';
-                                }}
-                              />
+                              <button
+                                onClick={() => setLightboxImage(image)}
+                                className="relative group cursor-pointer rounded overflow-hidden focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:ring-offset-2"
+                                title="Click to view full size"
+                              >
+                                <img
+                                  src={image.src}
+                                  alt={image.alt || 'Image'}
+                                  className="w-16 h-16 object-cover rounded transition-transform group-hover:scale-105"
+                                  onError={(e) => {
+                                    e.currentTarget.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23ddd" width="100" height="100"/%3E%3Ctext fill="%23999" x="50%" y="50%" text-anchor="middle" dy=".3em"%3ENo Image%3C/text%3E%3C/svg%3E';
+                                  }}
+                                />
+                                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all flex items-center justify-center">
+                                  <ExternalLink className="w-5 h-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                </div>
+                              </button>
                             </td>
                             <td className="px-6 py-4">
                               <a
@@ -1879,6 +1936,93 @@ const CrawlDetailPage: React.FC = () => {
         variant="warning"
         isLoading={stopping}
       />
+
+      {/* Image Lightbox Modal */}
+      {lightboxImage && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"
+          onClick={() => setLightboxImage(null)}
+        >
+          <div className="relative max-w-[90vw] max-h-[90vh] flex flex-col">
+            {/* Close button */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setLightboxImage(null);
+              }}
+              className="absolute -top-10 right-0 text-white hover:text-gray-300 transition-colors z-10"
+              aria-label="Close lightbox"
+            >
+              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+
+            {/* Image container */}
+            <div
+              className="bg-white rounded-lg overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <img
+                src={lightboxImage.src}
+                alt={lightboxImage.alt || 'Full size image'}
+                className="max-w-[85vw] max-h-[75vh] object-contain"
+                onError={(e) => {
+                  e.currentTarget.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="300"%3E%3Crect fill="%23f3f4f6" width="400" height="300"/%3E%3Ctext fill="%239ca3af" x="50%" y="50%" text-anchor="middle" dy=".3em" font-size="18"%3EImage failed to load%3C/text%3E%3C/svg%3E';
+                }}
+              />
+
+              {/* Image info footer */}
+              <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    {lightboxImage.alt ? (
+                      <div className="mb-2">
+                        <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Alt Text</span>
+                        <p className="text-sm text-gray-800">{lightboxImage.alt}</p>
+                      </div>
+                    ) : (
+                      <div className="mb-2">
+                        <span className="inline-flex items-center px-2 py-1 text-xs font-medium text-red-700 bg-red-100 rounded">
+                          Missing Alt Text
+                        </span>
+                      </div>
+                    )}
+                    <div>
+                      <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Source URL</span>
+                      <p className="text-sm text-gray-600 truncate" title={lightboxImage.src}>
+                        {lightboxImage.src}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end gap-2">
+                    {lightboxImage.width && lightboxImage.height && (
+                      <span className="text-sm text-gray-500">
+                        {lightboxImage.width} × {lightboxImage.height}
+                      </span>
+                    )}
+                    <a
+                      href={lightboxImage.src}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-secondary-600 bg-secondary-50 hover:bg-secondary-100 rounded-lg transition-colors"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      Open Original
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Keyboard hint */}
+            <p className="text-center text-gray-400 text-sm mt-4">
+              Press <kbd className="px-2 py-1 bg-gray-700 rounded text-gray-300 text-xs">ESC</kbd> or click outside to close
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -52,18 +52,28 @@ const CrawlsPage: React.FC = () => {
       variant: 'danger',
       onConfirm: async () => {
         setConfirmModal(prev => ({ ...prev, isOpen: false }));
+
+        // OPTIMISTIC UI UPDATE: Remove immediately for instant feedback
+        setCrawls(prev => prev.filter(crawl => crawl.id !== id));
+        setSelectedCrawls(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(id);
+          return newSet;
+        });
+
         try {
           await apiService.deleteCrawl(id);
-          setCrawls(crawls.filter(crawl => crawl.id !== id));
-          setSelectedCrawls(prev => {
-            const newSet = new Set(prev);
-            newSet.delete(id);
-            return newSet;
-          });
-          toast.success('Crawl deleted successfully');
-        } catch (err) {
-          console.error('Error deleting crawl:', err);
-          toast.error('Failed to delete crawl');
+          toast.success('Crawl deleted');
+        } catch (err: any) {
+          // 404 means already deleted - that's fine
+          const is404 = err?.response?.status === 404 || err?.message?.includes('404');
+          if (is404) {
+            toast.success('Crawl deleted');
+          } else {
+            console.error('Error deleting crawl:', err);
+            toast.error('Failed to delete crawl');
+            fetchCrawls(); // Refresh to restore accurate state
+          }
         }
       },
     });
@@ -103,22 +113,84 @@ const CrawlsPage: React.FC = () => {
       variant: 'danger',
       onConfirm: async () => {
         setConfirmModal(prev => ({ ...prev, isOpen: false }));
-        setBulkActionLoading(true);
-        const deletePromises = Array.from(selectedCrawls).map(id => apiService.deleteCrawl(id));
+        const idsToDelete = Array.from(selectedCrawls);
+        const totalCount = idsToDelete.length;
 
-        try {
-          await Promise.all(deletePromises);
-          setCrawls(crawls.filter(crawl => !selectedCrawls.has(crawl.id)));
-          setSelectedCrawls(new Set());
-          toast.success(`Deleted ${deletePromises.length} crawl(s) successfully`);
-        } catch (err) {
-          console.error('Error deleting crawls:', err);
-          toast.error('Failed to delete some crawls');
-        } finally {
-          setBulkActionLoading(false);
+        // OPTIMISTIC UI UPDATE: Remove from list immediately for instant feedback
+        setCrawls(prev => prev.filter(crawl => !selectedCrawls.has(crawl.id)));
+        setSelectedCrawls(new Set());
+
+        // Show loading toast
+        const toastId = toast.loading(`Deleting ${totalCount} crawl(s)...`);
+
+        // Use Promise.allSettled to continue even if some fail (e.g., 404 = already deleted)
+        const results = await Promise.allSettled(
+          idsToDelete.map(id => apiService.deleteCrawl(id))
+        );
+
+        // Count successes and failures
+        // Note: 404 means "not found" = already deleted = success from user's perspective
+        const succeeded = results.filter(r => r.status === 'fulfilled').length;
+        const alreadyDeleted = results.filter(r =>
+          r.status === 'rejected' &&
+          (r.reason?.response?.status === 404 || r.reason?.message?.includes('404'))
+        ).length;
+        const failed = results.filter(r =>
+          r.status === 'rejected' &&
+          !(r.reason?.response?.status === 404 || r.reason?.message?.includes('404'))
+        ).length;
+
+        // Update toast with result
+        if (failed === 0) {
+          toast.success(`Deleted ${totalCount} crawl(s)`, { id: toastId });
+        } else {
+          toast.error(`Deleted ${succeeded + alreadyDeleted} of ${totalCount}. ${failed} failed.`, { id: toastId });
+          // Refresh list to get accurate state from server
+          fetchCrawls();
         }
       },
     });
+  };
+
+  // Helper: Generate incremented rerun name (same logic as CrawlDetailPage)
+  const generateRerunName = (crawlName: string, allCrawls: Crawl[], reservedNumbers: Map<string, number>): string => {
+    // Remove existing suffixes (counter, timestamp, or "(Re-run)")
+    let baseName = crawlName
+      .replace(/\s*\(Re-run\)\s*/g, '')  // Remove "(Re-run)"
+      .replace(/\s*#\d+\s*-\s*.+$/, '')   // Remove "#2 - Jan 15, 2:30 PM"
+      .replace(/\s*#\d+$/, '')            // Remove trailing "#2"
+      .trim();
+
+    // Find all crawls with this base name
+    const pattern = new RegExp(`^${baseName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\s*#(\\d+))?`, 'i');
+    const matchingCrawls = allCrawls.filter(c => pattern.test(c.name));
+
+    // Determine next counter number from existing crawls
+    const existingNumbers = matchingCrawls
+      .map(c => {
+        const match = c.name.match(/#(\d+)/);
+        return match ? parseInt(match[1], 10) : 1;
+      });
+
+    // Also consider numbers we've already reserved in this batch
+    const reserved = reservedNumbers.get(baseName) || 0;
+    const maxExisting = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 1;
+    const nextNumber = Math.max(maxExisting, reserved) + 1;
+
+    // Reserve this number for the base name
+    reservedNumbers.set(baseName, nextNumber);
+
+    // Create timestamp (Mexico City timezone)
+    const timestamp = new Date().toLocaleString('en-US', {
+      timeZone: 'America/Mexico_City',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+
+    // Create new name: "My Crawl #2 - Jan 15, 02:30 PM"
+    return `${baseName} #${nextNumber} - ${timestamp}`;
   };
 
   const handleBulkRerun = async () => {
@@ -137,10 +209,14 @@ const CrawlsPage: React.FC = () => {
         setConfirmModal(prev => ({ ...prev, isOpen: false }));
         setBulkActionLoading(true);
         const selectedCrawlData = crawls.filter(c => selectedCrawls.has(c.id));
+
+        // Track reserved numbers to handle multiple crawls with same base name
+        const reservedNumbers = new Map<string, number>();
+
         const createPromises = selectedCrawlData.map(crawl =>
           apiService.createCrawl({
             url: crawl.url,
-            name: `${crawl.name} (Re-run)`,
+            name: generateRerunName(crawl.name, crawls, reservedNumbers),
             max_depth: crawl.max_depth,
             max_pages: crawl.max_pages,
             respect_robots_txt: crawl.respect_robots_txt,
@@ -167,9 +243,9 @@ const CrawlsPage: React.FC = () => {
   };
 
   const handleDeleteFailedCrawls = async () => {
-    const failedCrawls = crawls.filter(crawl => crawl.status === 'failed');
+    const failedCrawlsList = crawls.filter(crawl => crawl.status === 'failed');
 
-    if (failedCrawls.length === 0) {
+    if (failedCrawlsList.length === 0) {
       toast.info('No failed crawls to delete');
       return;
     }
@@ -177,21 +253,37 @@ const CrawlsPage: React.FC = () => {
     setConfirmModal({
       isOpen: true,
       title: 'Delete Failed Crawls',
-      message: `Are you sure you want to delete ${failedCrawls.length} failed crawl(s)? This action cannot be undone.`,
-      confirmText: `Delete ${failedCrawls.length} Failed Crawls`,
+      message: `Are you sure you want to delete ${failedCrawlsList.length} failed crawl(s)? This action cannot be undone.`,
+      confirmText: `Delete ${failedCrawlsList.length} Failed Crawls`,
       variant: 'danger',
       onConfirm: async () => {
         setConfirmModal(prev => ({ ...prev, isOpen: false }));
-        const deletePromises = failedCrawls.map(crawl => apiService.deleteCrawl(crawl.id));
+        const idsToDelete = failedCrawlsList.map(c => c.id);
+        const totalCount = idsToDelete.length;
 
-        toast.promise(Promise.all(deletePromises), {
-          loading: 'Deleting failed crawls...',
-          success: () => {
-            setCrawls(crawls.filter(crawl => crawl.status !== 'failed'));
-            return `Deleted ${failedCrawls.length} failed crawl(s)`;
-          },
-          error: 'Failed to delete some crawls',
-        });
+        // OPTIMISTIC UI UPDATE: Remove failed crawls immediately
+        setCrawls(prev => prev.filter(crawl => crawl.status !== 'failed'));
+
+        // Show loading toast
+        const toastId = toast.loading(`Deleting ${totalCount} failed crawl(s)...`);
+
+        // Use Promise.allSettled to continue even if some fail
+        const results = await Promise.allSettled(
+          idsToDelete.map(id => apiService.deleteCrawl(id))
+        );
+
+        // Count results (404 = already deleted = success)
+        const failed = results.filter(r =>
+          r.status === 'rejected' &&
+          !(r.reason?.response?.status === 404 || r.reason?.message?.includes('404'))
+        ).length;
+
+        if (failed === 0) {
+          toast.success(`Deleted ${totalCount} failed crawl(s)`, { id: toastId });
+        } else {
+          toast.error(`Deleted ${totalCount - failed} of ${totalCount}. ${failed} failed.`, { id: toastId });
+          fetchCrawls(); // Refresh to get accurate state
+        }
       },
     });
   };
@@ -213,6 +305,7 @@ const CrawlsPage: React.FC = () => {
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString('en-US', {
+      timeZone: 'America/Mexico_City',
       month: 'short',
       day: 'numeric',
       year: 'numeric',
