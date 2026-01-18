@@ -6,7 +6,7 @@ import time
 from bs4 import BeautifulSoup
 from datetime import datetime
 from typing import Dict, List, Optional, Set, Tuple, Any
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin, urlparse, unquote
 
 from playwright.async_api import async_playwright
 
@@ -651,7 +651,8 @@ class Crawler:
                         await self._save_audit_data(page.id, extracted_data)
 
                     # THEN save images and links (now page exists in DB for foreign key)
-                    if status_code == 200:
+                    # Only extract links/images for HTML pages (soup will be None for PDFs, images, etc.)
+                    if status_code == 200 and soup is not None:
                         await self._extract_and_process_links(soup, url, depth, page.id)
                         images_count = await self._extract_and_save_images(soup, url, page.id)
 
@@ -681,6 +682,54 @@ class Crawler:
             final_url = str(response.url)
             status_code = response.status_code
             content_type = response.headers.get("content-type", "")
+
+            # Skip non-HTML content types (PDFs, images, etc.) - don't try to parse them
+            if "text/html" not in content_type.lower():
+                render_time = int((time.time() - start_time) * 1000)
+
+                # Extract filename from URL for a meaningful title
+                parsed = urlparse(url)
+                filename = unquote(parsed.path.split('/')[-1]) or url
+                resource_type = content_type.split(';')[0].strip() if content_type else "Unknown"
+
+                # Create a basic page record for non-HTML resources
+                page = Page(
+                    crawl_id=self.crawl.id,
+                    url=url,
+                    final_url=final_url,
+                    status_code=status_code,
+                    method="http",
+                    render_ms=render_time,
+                    content_hash=None,
+                    text_excerpt=f"Non-HTML resource: {resource_type}",
+                    word_count=0,
+                    content_type=content_type,
+                    page_size_bytes=int(response.headers.get("content-length", 0))
+                )
+
+                # Create minimal SEO metadata with filename as title
+                seo_metadata = SEOMetadata(
+                    page_id=page.id,
+                    title=f"{filename} ({resource_type})",
+                    title_length=len(filename),
+                    meta_description=f"Non-HTML resource: {resource_type}",
+                    meta_description_length=0,
+                    h1=None,
+                    h2=[],
+                    canonical=None,
+                    robots_meta=None,
+                    og_tags=None,
+                    twitter_tags=None,
+                    json_ld=None,
+                    hreflang=None,
+                    internal_links=0,
+                    external_links=0,
+                    image_alt_missing_count=0
+                )
+
+                # Return consistent 5-item tuple
+                logger.info(f"Skipping non-HTML content ({resource_type}): {url}")
+                return page, seo_metadata, None, None, status_code
 
             # Check if we need to use Playwright for JavaScript rendering
             # Use JS rendering if explicitly enabled OR if auto-detection determines it's needed

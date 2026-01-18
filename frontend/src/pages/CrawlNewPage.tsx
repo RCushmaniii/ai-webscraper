@@ -1,8 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { ArrowLeft, Loader2, Plus } from 'lucide-react';
+import { ArrowLeft, Loader2, Plus, AlertTriangle, Info } from 'lucide-react';
 import { apiService, CrawlCreate } from '../services/api';
+
+interface UsageInfo {
+  crawl_count: number;
+  crawl_limit: number | null;
+  is_admin: boolean;
+  remaining_crawls: number | null;
+  limit_reached: boolean;
+}
 
 const CrawlNewPage: React.FC = () => {
   const navigate = useNavigate();
@@ -18,6 +26,23 @@ const CrawlNewPage: React.FC = () => {
     user_agent: 'AI WebScraper Bot'
   });
   const [formSubmitting, setFormSubmitting] = useState(false);
+  const [usage, setUsage] = useState<UsageInfo | null>(null);
+  const [usageLoading, setUsageLoading] = useState(true);
+
+  useEffect(() => {
+    fetchUsage();
+  }, []);
+
+  const fetchUsage = async () => {
+    try {
+      const data = await apiService.getUsage();
+      setUsage(data);
+    } catch (err) {
+      console.error('Error fetching usage:', err);
+    } finally {
+      setUsageLoading(false);
+    }
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target as HTMLInputElement;
@@ -69,8 +94,17 @@ const CrawlNewPage: React.FC = () => {
       navigate('/crawls');
     } catch (err: any) {
       console.error('Error creating crawl:', err);
-      const errorMessage = err?.response?.data?.detail || err?.message || 'Failed to create crawl';
-      toast.error(errorMessage);
+      const detail = err?.response?.data?.detail;
+
+      // Handle crawl limit reached error
+      if (detail?.error === 'crawl_limit_reached') {
+        toast.error(`Free tier limit reached. You have used all ${detail.limit} free crawls.`);
+        // Refresh usage to update the UI
+        fetchUsage();
+      } else {
+        const errorMessage = typeof detail === 'string' ? detail : detail?.message || err?.message || 'Failed to create crawl';
+        toast.error(errorMessage);
+      }
     } finally {
       setFormSubmitting(false);
     }
@@ -93,8 +127,42 @@ const CrawlNewPage: React.FC = () => {
         </p>
       </div>
 
+      {/* Usage Info / Limit Warning */}
+      {!usageLoading && usage && !usage.is_admin && (
+        <>
+          {usage.limit_reached ? (
+            <div className="mb-6 bg-error-50 border border-error-200 rounded-lg p-4 flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-error-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <h3 className="text-sm font-semibold text-error-700">Free Tier Limit Reached</h3>
+                <p className="text-sm text-error-600 mt-1">
+                  You have used all {usage.crawl_limit} free crawls. Upgrade to Pro to create unlimited crawls and unlock premium features.
+                </p>
+                <button
+                  type="button"
+                  className="mt-3 inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-secondary-500 hover:bg-secondary-hover rounded-lg transition-colors"
+                  onClick={() => toast.info('Pro upgrade coming soon!')}
+                >
+                  Upgrade to Pro
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="mb-6 bg-secondary-50 border border-secondary-200 rounded-lg p-4 flex items-start gap-3">
+              <Info className="w-5 h-5 text-secondary-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm text-secondary-700">
+                  <span className="font-semibold">{usage.remaining_crawls} of {usage.crawl_limit} free crawls remaining.</span>
+                  {' '}Upgrade to Pro for unlimited crawls.
+                </p>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
       {/* Form */}
-      <div className="bg-white rounded-lg shadow-soft-lg border border-primary-100 overflow-hidden">
+      <div className={`bg-white rounded-lg shadow-soft-lg border border-primary-100 overflow-hidden ${usage?.limit_reached ? 'opacity-50 pointer-events-none' : ''}`}>
         <form onSubmit={handleSubmit} style={{ padding: '2.5rem' }}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>

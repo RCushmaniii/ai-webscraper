@@ -1,15 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Plus, Loader2, Trash2, Eye, Globe, Settings2, RefreshCw } from 'lucide-react';
+import { Plus, Loader2, Trash2, Eye, Globe, Settings2, RefreshCw, Info } from 'lucide-react';
 import { apiService, Crawl } from '../services/api';
 import ConfirmationModal from '../components/ConfirmationModal';
+
+interface UsageInfo {
+  crawl_count: number;
+  crawl_limit: number | null;
+  is_admin: boolean;
+  remaining_crawls: number | null;
+  limit_reached: boolean;
+}
 
 const CrawlsPage: React.FC = () => {
   const [crawls, setCrawls] = useState<Crawl[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCrawls, setSelectedCrawls] = useState<Set<string>>(new Set());
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
+  const [usage, setUsage] = useState<UsageInfo | null>(null);
 
   // Confirmation modal state
   const [confirmModal, setConfirmModal] = useState<{
@@ -28,6 +37,7 @@ const CrawlsPage: React.FC = () => {
 
   useEffect(() => {
     fetchCrawls();
+    fetchUsage();
   }, []);
 
   const fetchCrawls = async () => {
@@ -40,6 +50,15 @@ const CrawlsPage: React.FC = () => {
       toast.error('Failed to load crawls. Please try again.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchUsage = async () => {
+    try {
+      const data = await apiService.getUsage();
+      setUsage(data);
+    } catch (err) {
+      console.error('Error fetching usage:', err);
     }
   };
 
@@ -359,13 +378,32 @@ const CrawlsPage: React.FC = () => {
                   Delete {failedCount} Failed
                 </button>
               )}
-              <Link
-                to="/crawls/new"
-                className="inline-flex items-center gap-2 px-6 py-3 text-sm font-medium text-white bg-secondary-500 hover:bg-secondary-hover rounded-lg shadow-soft transition-colors"
-              >
-                <Plus className="w-5 h-5" />
-                New Crawl
-              </Link>
+              {/* Usage indicator for non-admin users */}
+              {usage && !usage.is_admin && (
+                <div className="flex items-center gap-2 px-4 py-2 bg-secondary-50 border border-secondary-200 rounded-lg">
+                  <Info className="w-4 h-4 text-secondary-600" />
+                  <span className="text-sm text-secondary-700 font-medium">
+                    {usage.remaining_crawls} / {usage.crawl_limit} crawls left
+                  </span>
+                </div>
+              )}
+              {usage?.limit_reached ? (
+                <button
+                  onClick={() => toast.info('Pro upgrade coming soon!')}
+                  className="inline-flex items-center gap-2 px-6 py-3 text-sm font-medium text-white bg-secondary-500 hover:bg-secondary-hover rounded-lg shadow-soft transition-colors"
+                >
+                  <Plus className="w-5 h-5" />
+                  Upgrade to Pro
+                </button>
+              ) : (
+                <Link
+                  to="/crawls/new"
+                  className="inline-flex items-center gap-2 px-6 py-3 text-sm font-medium text-white bg-secondary-500 hover:bg-secondary-hover rounded-lg shadow-soft transition-colors"
+                >
+                  <Plus className="w-5 h-5" />
+                  New Crawl
+                </Link>
+              )}
             </div>
           )}
         </div>
@@ -484,13 +522,23 @@ const CrawlsPage: React.FC = () => {
             <p className="text-base text-neutral-steel mb-8 leading-comfortable">
               Start your first site analysis to begin crawling and inspecting web pages
             </p>
-            <Link
-              to="/crawls/new"
-              className="inline-flex items-center gap-2 px-8 py-4 text-base font-medium text-white bg-secondary-500 hover:bg-secondary-hover rounded-lg shadow-soft transition-colors"
-            >
-              <Plus className="w-5 h-5" />
-              Create First Crawl
-            </Link>
+            {usage?.limit_reached ? (
+              <button
+                onClick={() => toast.info('Pro upgrade coming soon!')}
+                className="inline-flex items-center gap-2 px-8 py-4 text-base font-medium text-white bg-secondary-500 hover:bg-secondary-hover rounded-lg shadow-soft transition-colors"
+              >
+                <Plus className="w-5 h-5" />
+                Upgrade to Pro
+              </button>
+            ) : (
+              <Link
+                to="/crawls/new"
+                className="inline-flex items-center gap-2 px-8 py-4 text-base font-medium text-white bg-secondary-500 hover:bg-secondary-hover rounded-lg shadow-soft transition-colors"
+              >
+                <Plus className="w-5 h-5" />
+                Create First Crawl
+              </Link>
+            )}
           </div>
         </div>
       )}

@@ -117,6 +117,63 @@ export interface Image {
   created_at: string;
 }
 
+export interface CrawlReport {
+  crawl_id: string;
+  crawl_name?: string;
+  site_url?: string;
+  generated_at: string;
+  report?: {
+    crawl_id: string;
+    generated_at: string;
+    site_url?: string;
+    crawl_name?: string;
+    metrics: {
+      total_pages: number;
+      total_issues: number;
+      broken_links: number;
+      missing_meta: number;
+      thin_content_pages: number;
+      critical_issues: number;
+      high_issues: number;
+    };
+    executive_summary: {
+      site_health_score: number;
+      one_line_summary: string;
+      technical_seo_score: number;
+      content_quality_score: number;
+      user_experience_score: number;
+      trust_signals_score: number;
+      critical_issues: Array<{
+        title: string;
+        description: string;
+        pages_affected: number;
+        recommended_action: string;
+        priority: 'critical' | 'high' | 'medium';
+      }>;
+      quick_wins: string[];
+      strategic_recommendations: Array<{
+        title: string;
+        description: string;
+        expected_impact: string;
+        effort_estimate: string;
+        timeline: string;
+      }>;
+      strengths_summary: string;
+      weaknesses_summary: string;
+      action_plan_summary: string;
+    };
+    top_issues: Array<{
+      type: string;
+      count: number;
+    }>;
+    usage?: {
+      total_cost_usd: number;
+      total_input_tokens: number;
+      total_output_tokens: number;
+    };
+  };
+}
+
 // API class
 class ApiService {
   private api: AxiosInstance;
@@ -286,7 +343,24 @@ class ApiService {
     const response = await this.api.get(`/crawls/${id}/summary`);
     return response.data;
   }
-  
+
+  async getCrawlReport(id: string): Promise<CrawlReport | null> {
+    try {
+      const response = await this.api.get(`/analysis/crawl/${id}/report`);
+      return response.data;
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  async generateCrawlReport(id: string): Promise<CrawlReport> {
+    const response = await this.api.post(`/analysis/crawl/${id}/report`);
+    return response.data;
+  }
+
   async getPageHtml(crawlId: string, pageId: string): Promise<{ html_content: string }> {
     const response = await this.api.get(`/crawls/${crawlId}/html/${pageId}`);
     return response.data;
@@ -329,6 +403,17 @@ class ApiService {
 
   async getPageImages(crawlId: string, pageId: string): Promise<Image[]> {
     const response = await this.api.get(`/crawls/${crawlId}/pages/${pageId}/images`);
+    return response.data;
+  }
+
+  async getUsage(): Promise<{
+    crawl_count: number;
+    crawl_limit: number | null;
+    is_admin: boolean;
+    remaining_crawls: number | null;
+    limit_reached: boolean;
+  }> {
+    const response = await this.api.get('/crawls/usage');
     return response.data;
   }
 }

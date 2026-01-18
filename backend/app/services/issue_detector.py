@@ -11,10 +11,42 @@ import logging
 from typing import List, Dict, Any, Optional
 from uuid import UUID
 from collections import Counter
+from urllib.parse import urlparse
 
 from app.db.supabase import supabase_client
 
 logger = logging.getLogger(__name__)
+
+
+def normalize_url_for_comparison(url: str) -> str:
+    """
+    Normalize a URL for duplicate comparison.
+    - Removes www. prefix
+    - Removes trailing slashes
+    - Lowercases the domain
+
+    This prevents www.example.com/page and example.com/page from being
+    counted as duplicates.
+    """
+    if not url:
+        return url
+
+    try:
+        parsed = urlparse(url)
+        # Normalize domain (remove www., lowercase)
+        domain = parsed.netloc.lower()
+        if domain.startswith('www.'):
+            domain = domain[4:]
+
+        # Normalize path (remove trailing slash unless it's just /)
+        path = parsed.path
+        if path != '/' and path.endswith('/'):
+            path = path.rstrip('/')
+
+        # Reconstruct normalized URL (without query/fragment for comparison)
+        return f"{parsed.scheme}://{domain}{path}"
+    except Exception:
+        return url
 
 
 class IssueDetector:
@@ -23,12 +55,54 @@ class IssueDetector:
     Focuses on Phase 1 detection using existing data only.
     """
 
+    # Content types that should be excluded from HTML-specific checks
+    NON_HTML_CONTENT_TYPES = [
+        'application/pdf',
+        'image/',
+        'video/',
+        'audio/',
+        'application/zip',
+        'application/octet-stream',
+        'text/plain',
+        'text/css',
+        'application/javascript',
+        'application/json',
+        'application/xml',
+    ]
+
     def __init__(self, crawl_id: UUID, db_client=None):
         self.crawl_id = crawl_id
         # Use provided db_client (service role) or fall back to default supabase_client
         # This allows the detector to work in both HTTP request context and Celery background tasks
         self.db = db_client if db_client is not None else supabase_client
         self.issues: List[Dict[str, Any]] = []
+
+    def _is_html_page(self, page: Dict[str, Any]) -> bool:
+        """Check if a page is an HTML page (not PDF, image, etc.)."""
+        content_type = page.get("content_type", "") or ""
+        title = page.get("title", "") or ""
+        url = page.get("url", "") or ""
+
+        # Check content type
+        for non_html_type in self.NON_HTML_CONTENT_TYPES:
+            if non_html_type in content_type.lower():
+                return False
+
+        # Check URL extension for common non-HTML files
+        url_lower = url.lower()
+        non_html_extensions = ['.pdf', '.jpg', '.jpeg', '.png', '.gif', '.svg', '.webp',
+                               '.mp4', '.mp3', '.wav', '.zip', '.doc', '.docx', '.xls',
+                               '.xlsx', '.ppt', '.pptx', '.csv', '.json', '.xml']
+        for ext in non_html_extensions:
+            if url_lower.endswith(ext):
+                return False
+
+        # Also check title pattern for non-HTML resources (fallback)
+        # Our crawler sets titles like "filename.pdf (application/pdf)" for non-HTML
+        if '(application/' in title or '(image/' in title:
+            return False
+
+        return True
 
     async def detect_all_issues(self) -> List[Dict[str, Any]]:
         """
@@ -116,11 +190,11 @@ class IssueDetector:
             return []
 
     async def _fetch_seo_metadata(self) -> List[Dict[str, Any]]:
-        """Fetch all SEO metadata for the crawl with page URLs."""
+        """Fetch all SEO metadata for the crawl with page URLs and content type."""
         try:
-            # Join with pages table to get page URLs
+            # Join with pages table to get page URLs and content_type
             response = self.db.table("seo_metadata").select(
-                "*, pages!inner(id, url, crawl_id)"
+                "*, pages!inner(id, url, crawl_id, content_type, title)"
             ).eq("pages.crawl_id", str(self.crawl_id)).execute()
 
             # Flatten the data structure
@@ -130,6 +204,8 @@ class IssueDetector:
                     page_data = item.pop("pages", {})
                     item["page_id"] = page_data.get("id")
                     item["page_url"] = page_data.get("url", "Unknown")
+                    item["content_type"] = page_data.get("content_type", "")
+                    item["page_title"] = page_data.get("title", "")
                     flattened.append(item)
                 return flattened
             return []
@@ -250,10 +326,12 @@ class IssueDetector:
             )
 
     async def _detect_thin_content(self, pages: List[Dict[str, Any]]):
-        """Detect pages with less than 300 words."""
+        """Detect pages with less than 300 words. Skips non-HTML resources like PDFs."""
         thin_pages = [
             page for page in pages
-            if page.get("word_count") is not None and page.get("word_count") < 300
+            if page.get("word_count") is not None
+            and page.get("word_count") < 300
+            and self._is_html_page(page)  # Skip PDFs, images, etc.
         ]
 
         for page in thin_pages:
@@ -267,7 +345,7 @@ class IssueDetector:
             )
 
     async def _detect_orphan_pages(self, pages: List[Dict[str, Any]], links: List[Dict[str, Any]]):
-        """Detect pages with no internal links pointing to them."""
+        """Detect pages with no internal links pointing to them. Skips non-HTML resources."""
         # Create a set of all target URLs from internal links
         linked_urls = {
             link.get("target_url")
@@ -275,11 +353,13 @@ class IssueDetector:
             if link.get("is_internal") and link.get("target_url")
         }
 
-        # Find pages not in the linked URLs set
+        # Find pages not in the linked URLs set (only HTML pages)
         homepage_url = pages[0].get("url") if pages else None
         orphan_pages = [
             page for page in pages
-            if page.get("url") not in linked_urls and page.get("url") != homepage_url  # Exclude homepage
+            if page.get("url") not in linked_urls
+            and page.get("url") != homepage_url  # Exclude homepage
+            and self._is_html_page(page)  # Skip PDFs, images, etc.
         ]
 
         for page in orphan_pages:
@@ -292,60 +372,76 @@ class IssueDetector:
             )
 
     async def _detect_duplicate_titles(self, seo_metadata: List[Dict[str, Any]]):
-        """Detect pages with duplicate title tags."""
-        # Count title occurrences
-        title_counts = Counter(
-            meta.get("title")
-            for meta in seo_metadata
-            if meta.get("title") and meta.get("title").strip()
-        )
+        """Detect pages with duplicate title tags.
 
-        # Find duplicates
-        duplicate_titles = {
-            title: count
-            for title, count in title_counts.items()
-            if count > 1
-        }
+        Uses URL normalization to avoid false positives from www vs non-www variants.
+        """
+        # Group pages by title, using normalized URLs to dedupe www vs non-www
+        title_to_pages: Dict[str, Dict[str, str]] = {}  # title -> {normalized_url: original_url}
 
-        for title, count in duplicate_titles.items():
-            # Find all pages with this title
-            pages_with_title = [
-                meta.get("page_url", "Unknown")
-                for meta in seo_metadata
-                if meta.get("title") == title
-            ]
+        for meta in seo_metadata:
+            title = meta.get("title")
+            page_url = meta.get("page_url", "Unknown")
+
+            if not title or not title.strip():
+                continue
+
+            if title not in title_to_pages:
+                title_to_pages[title] = {}
+
+            # Use normalized URL as key to dedupe www vs non-www
+            normalized = normalize_url_for_comparison(page_url)
+            # Keep the first (original) URL we see for this normalized path
+            if normalized not in title_to_pages[title]:
+                title_to_pages[title][normalized] = page_url
+
+        # Find titles used on multiple UNIQUE pages
+        for title, pages_dict in title_to_pages.items():
+            unique_page_count = len(pages_dict)
+            if unique_page_count <= 1:
+                continue  # Not a duplicate
+
+            # Get the original URLs for display
+            page_urls = list(pages_dict.values())
 
             self._add_issue(
                 issue_type="SEO - Duplicate Title Tag",
                 severity="high",
-                message=f"Title '{title}' is used on {count} pages. Create unique, descriptive titles for each page to improve search rankings.",
-                context=", ".join(pages_with_title[:3]) + ("..." if count > 3 else ""),
+                message=f"Title '{title}' is used on {unique_page_count} pages. Create unique, descriptive titles for each page to improve search rankings.",
+                context=", ".join(page_urls[:3]) + ("..." if unique_page_count > 3 else ""),
                 pointer=title
             )
 
     async def _detect_duplicate_descriptions(self, seo_metadata: List[Dict[str, Any]]):
-        """Detect pages with duplicate meta descriptions."""
-        # Count description occurrences
-        desc_counts = Counter(
-            meta.get("meta_description")
-            for meta in seo_metadata
-            if meta.get("meta_description") and meta.get("meta_description").strip()
-        )
+        """Detect pages with duplicate meta descriptions.
 
-        # Find duplicates
-        duplicate_descs = {
-            desc: count
-            for desc, count in desc_counts.items()
-            if count > 1
-        }
+        Uses URL normalization to avoid false positives from www vs non-www variants.
+        """
+        # Group pages by description, using normalized URLs to dedupe
+        desc_to_pages: Dict[str, Dict[str, str]] = {}  # desc -> {normalized_url: original_url}
 
-        for desc, count in duplicate_descs.items():
-            # Find all pages with this description
-            pages_with_desc = [
-                meta.get("page_url", "Unknown")
-                for meta in seo_metadata
-                if meta.get("meta_description") == desc
-            ]
+        for meta in seo_metadata:
+            desc = meta.get("meta_description")
+            page_url = meta.get("page_url", "Unknown")
+
+            if not desc or not desc.strip():
+                continue
+
+            if desc not in desc_to_pages:
+                desc_to_pages[desc] = {}
+
+            # Use normalized URL as key to dedupe www vs non-www
+            normalized = normalize_url_for_comparison(page_url)
+            if normalized not in desc_to_pages[desc]:
+                desc_to_pages[desc][normalized] = page_url
+
+        # Find descriptions used on multiple UNIQUE pages
+        for desc, pages_dict in desc_to_pages.items():
+            unique_page_count = len(pages_dict)
+            if unique_page_count <= 1:
+                continue  # Not a duplicate
+
+            page_urls = list(pages_dict.values())
 
             # Truncate long descriptions for display
             display_desc = (desc[:50] + "...") if len(desc) > 50 else desc
@@ -353,16 +449,21 @@ class IssueDetector:
             self._add_issue(
                 issue_type="SEO - Duplicate Meta Description",
                 severity="medium",
-                message=f"Meta description '{display_desc}' is used on {count} pages. Write unique, compelling descriptions to improve click-through rates.",
-                context=", ".join(pages_with_desc[:3]) + ("..." if count > 3 else ""),
+                message=f"Meta description '{display_desc}' is used on {unique_page_count} pages. Write unique, compelling descriptions to improve click-through rates.",
+                context=", ".join(page_urls[:3]) + ("..." if unique_page_count > 3 else ""),
                 pointer=desc
             )
 
     async def _detect_missing_h1(self, seo_metadata: List[Dict[str, Any]]):
-        """Detect pages without H1 tags."""
+        """Detect pages without H1 tags. Skips non-HTML resources like PDFs."""
         missing_h1_pages = [
             meta for meta in seo_metadata
-            if not meta.get("h1") or (isinstance(meta.get("h1"), str) and not meta.get("h1").strip())
+            if (not meta.get("h1") or (isinstance(meta.get("h1"), str) and not meta.get("h1").strip()))
+            and self._is_html_page({
+                "content_type": meta.get("content_type"),
+                "title": meta.get("page_title"),
+                "url": meta.get("page_url")  # Include URL for .pdf extension check
+            })
         ]
 
         for meta in missing_h1_pages:

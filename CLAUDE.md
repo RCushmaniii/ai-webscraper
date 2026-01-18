@@ -6,21 +6,21 @@
 
 ## Project Overview
 
-**AI Web Scraper by CushLabs** is an admin-only web crawling and site analysis platform designed for internal use.
+**AI Web Scraper by CushLabs** is a web crawling and site analysis platform with tiered access.
 
 ### Core Mission
 
 - Crawl websites starting from a URL
 - Extract and store page content for inspection
 - Detect high-signal SEO and technical issues
-- Provide lightweight heuristics for prioritization
+- Generate AI-powered analysis reports
+- Provide tier-based access (Free: 3 crawls, Admin: unlimited)
 
 ### Explicit Non-Goals (v1)
 
 - ❌ Selector-based scraping
-- ❌ Client-facing reports or exports
 - ❌ Real-time dashboards with WebSockets
-- ❌ AI-driven scoring (feature-flagged off by default)
+- ❌ Payment/billing integration (planned for v2)
 
 ---
 
@@ -205,7 +205,24 @@ All authenticated routes use the `ProtectedRoute` wrapper:
 - Stops ad networks
 - Always check `is_domain_blacklisted(url)` before following external links
 
-### 2. Row Level Security (RLS)
+### 2. User Tier System
+
+**Users have tier-based access**:
+
+| Tier | Crawl Limit | Access |
+|------|-------------|--------|
+| Free (`is_admin=false`) | 3 total crawls | Basic features |
+| Admin (`is_admin=true`) | Unlimited | All features + user management |
+
+**Implementation**:
+- `backend/app/api/routes/crawls.py` - `FREE_CRAWL_LIMIT = 3` constant
+- `/crawls/usage` endpoint returns current usage info
+- Frontend shows remaining crawls in CrawlsPage and CrawlNewPage
+- Limit check happens in `create_crawl()` before creating new crawl
+
+**New user defaults**: `is_admin=false` (free tier)
+
+### 3. Row Level Security (RLS)
 
 **ALL database tables use RLS**. When working with the database:
 
@@ -213,7 +230,19 @@ All authenticated routes use the `ProtectedRoute` wrapper:
 - Use `service_client` (service role key) for admin/system operations
 - Never bypass RLS in production code without explicit justification
 
-### 3. Python Bytecode Caching
+### 4. Non-HTML Content Handling
+
+**PDFs and other non-HTML files** require special handling:
+
+- **Crawler** (`backend/app/services/crawler.py`): Skips HTML parsing for non-HTML content types, creates filename-based titles
+- **Issue Detector** (`backend/app/services/issue_detector.py`): `_is_html_page()` checks both content-type AND URL extension
+
+**URL extensions that skip HTML checks**:
+`.pdf`, `.jpg`, `.jpeg`, `.png`, `.gif`, `.svg`, `.webp`, `.mp4`, `.mp3`, `.wav`, `.zip`, `.doc`, `.docx`, `.xls`, `.xlsx`, `.ppt`, `.pptx`, `.csv`, `.json`, `.xml`
+
+**Why this matters**: PDFs should not be flagged for "missing H1" or "thin content" - these are HTML-specific issues.
+
+### 5. Python Bytecode Caching
 
 **Problem**: After updating Python code, old bytecode (`*.pyc`) may persist.
 
@@ -227,7 +256,7 @@ powershell -Command "Get-ChildItem -Path . -Filter __pycache__ -Recurse -Directo
 powershell -Command "Get-ChildItem -Path . -Filter *.pyc -Recurse -File | Remove-Item -Force"
 ```
 
-### 4. Logging Verbosity
+### 6. Logging Verbosity
 
 **Issue**: httpx logs every HTTP request at INFO level (creates spam).
 
@@ -384,9 +413,11 @@ ai-webscraper/
 - `backend/app/main.py` - FastAPI app, logging config
 - `backend/app/services/worker.py` - Celery crawl task
 - `backend/app/services/crawler.py` - Core crawling logic
+- `backend/app/services/issue_detector.py` - SEO issue detection
 - `backend/app/core/domain_blacklist.py` - Blacklisted domains
 - `backend/app/models/models.py` - Pydantic models
-- `backend/app/api/routes/crawls.py` - Crawl API endpoints
+- `backend/app/api/routes/crawls.py` - Crawl API endpoints (includes usage endpoint)
+- `backend/app/api/routes/analysis.py` - AI report generation
 
 ### Frontend
 
@@ -508,5 +539,5 @@ https://deepwiki.com/RCushmaniii/ai-resume-tailor
 
 ---
 
-**Last Updated**: January 11, 2026
+**Last Updated**: January 18, 2026
 **Maintained By**: Claude (Anthropic) + CushLabs Team

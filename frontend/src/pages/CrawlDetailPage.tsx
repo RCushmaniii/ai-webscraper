@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { RefreshCw, ChevronUp, ChevronDown, Download, ExternalLink, FileText, AlertTriangle, AlertCircle, Info, CheckCircle } from 'lucide-react';
-import { apiService, Crawl, Page, Link as CrawlLink, Issue, Image } from '../services/api';
+import { apiService, Crawl, Page, Link as CrawlLink, Issue, Image, CrawlReport } from '../services/api';
 import ConfirmationModal from '../components/ConfirmationModal';
 import SearchBar from '../components/SearchBar';
 
@@ -85,6 +85,9 @@ const CrawlDetailPage: React.FC = () => {
   const [issueSeverityFilter, setIssueSeverityFilter] = useState<'all' | 'critical' | 'high' | 'medium' | 'low'>('all');
   const [expandedIssueCards, setExpandedIssueCards] = useState<Set<string>>(new Set());
   const [lightboxImage, setLightboxImage] = useState<Image | null>(null);
+  const [report, setReport] = useState<CrawlReport | null>(null);
+  const [reportLoading, setReportLoading] = useState(false);
+  const [generatingReport, setGeneratingReport] = useState(false);
 
   // ESC key handler for lightbox
   useEffect(() => {
@@ -159,6 +162,20 @@ const CrawlDetailPage: React.FC = () => {
             setImages(imagesData);
           }
           break;
+        case 'report':
+          if (!report) {
+            setReportLoading(true);
+            try {
+              const reportData = await apiService.getCrawlReport(id);
+              setReport(reportData);
+            } catch (err) {
+              // Report not generated yet - that's OK
+              console.log('Report not available yet');
+            } finally {
+              setReportLoading(false);
+            }
+          }
+          break;
         default:
           break;
       }
@@ -173,6 +190,23 @@ const CrawlDetailPage: React.FC = () => {
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
     fetchTabData(tab);
+  };
+
+  const handleGenerateReport = async () => {
+    if (!id) return;
+
+    setGeneratingReport(true);
+    try {
+      const reportData = await apiService.generateCrawlReport(id);
+      setReport({ report: reportData } as CrawlReport);
+      toast.success('Report generated successfully!');
+    } catch (err: any) {
+      console.error('Error generating report:', err);
+      const message = err.response?.data?.detail || 'Failed to generate report. Please try again.';
+      toast.error(message);
+    } finally {
+      setGeneratingReport(false);
+    }
   };
 
   const handleDelete = async () => {
@@ -465,11 +499,6 @@ const CrawlDetailPage: React.FC = () => {
       filtered = filtered.filter(issue => issue.severity === issueSeverityFilter);
     }
 
-    // Apply type filter
-    if (issueTypeFilter !== 'all') {
-      filtered = filtered.filter(issue => issue.type === issueTypeFilter);
-    }
-
     // If no sort column selected, return filtered without sorting
     if (!issueSort) {
       return filtered;
@@ -748,7 +777,19 @@ const CrawlDetailPage: React.FC = () => {
     // SEO issues (title, meta, h1) → Show pages with those issues
     if (message.includes('title') || message.includes('meta description') || message.includes('h1')) {
       // Get unique page URLs from the issues in this group
-      const affectedPageUrls = new Set(issueGroup.issues.map(i => i.context).filter(Boolean));
+      // Context may contain comma-separated URLs, so parse them
+      const affectedPageUrls = new Set<string>();
+      issueGroup.issues.forEach(i => {
+        if (i.context) {
+          // Split by comma and clean up each URL
+          i.context.split(',').forEach(url => {
+            const cleaned = url.trim().replace('...', '');
+            if (cleaned && cleaned.startsWith('http')) {
+              affectedPageUrls.add(cleaned);
+            }
+          });
+        }
+      });
       const affectedPages = pages.filter(p => affectedPageUrls.has(p.url));
 
       return {
@@ -799,7 +840,18 @@ const CrawlDetailPage: React.FC = () => {
     }
 
     // Generic fallback - show pages from issue context
-    const affectedPageUrls = new Set(issueGroup.issues.map(i => i.context).filter(Boolean));
+    // Context may contain comma-separated URLs, so parse them
+    const affectedPageUrls = new Set<string>();
+    issueGroup.issues.forEach(i => {
+      if (i.context) {
+        i.context.split(',').forEach(url => {
+          const cleaned = url.trim().replace('...', '');
+          if (cleaned && cleaned.startsWith('http')) {
+            affectedPageUrls.add(cleaned);
+          }
+        });
+      }
+    });
     const affectedPages = pages.filter(p => affectedPageUrls.has(p.url));
 
     return {
@@ -1119,6 +1171,16 @@ const CrawlDetailPage: React.FC = () => {
             Links
           </button>
           <button
+            onClick={() => handleTabChange('images')}
+            className={`py-4 text-sm font-medium border-b-2 ${
+              activeTab === 'images'
+                ? 'border-secondary-500 text-secondary-500'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            Images
+          </button>
+          <button
             onClick={() => handleTabChange('issues')}
             className={`py-4 text-sm font-medium border-b-2 ${
               activeTab === 'issues'
@@ -1129,14 +1191,14 @@ const CrawlDetailPage: React.FC = () => {
             Issues
           </button>
           <button
-            onClick={() => handleTabChange('images')}
+            onClick={() => handleTabChange('report')}
             className={`py-4 text-sm font-medium border-b-2 ${
-              activeTab === 'images'
+              activeTab === 'report'
                 ? 'border-secondary-500 text-secondary-500'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
           >
-            Images
+            AI Report
           </button>
         </nav>
       </div>
@@ -1864,6 +1926,228 @@ const CrawlDetailPage: React.FC = () => {
                 ) : (
                   <div className="p-4 text-sm text-gray-700 bg-gray-100 rounded-md">
                     <p>No images found for this crawl.</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* AI Report Tab */}
+            {activeTab === 'report' && (
+              <div className="p-6">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-xl font-semibold text-gray-800">AI Analysis Report</h2>
+                  {crawl && ['completed', 'stopped'].includes(crawl.status) && (
+                    <button
+                      onClick={handleGenerateReport}
+                      disabled={generatingReport}
+                      className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-secondary-600 rounded-md hover:bg-secondary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-secondary-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {generatingReport ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                          Generating...
+                        </>
+                      ) : (
+                        <>
+                          <FileText className="w-4 h-4" />
+                          {report ? 'Regenerate Report' : 'Generate Report'}
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
+
+                {reportLoading ? (
+                  <div className="flex items-center justify-center h-64">
+                    <div className="text-lg font-medium text-gray-500">Loading report...</div>
+                  </div>
+                ) : report?.report ? (
+                  <div className="space-y-6">
+                    {/* Health Score Overview */}
+                    <div className="bg-gradient-to-r from-secondary-50 to-blue-50 rounded-xl p-6 border border-secondary-100">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="text-lg font-semibold text-gray-900 mb-1">Site Health Score</h3>
+                          <p className="text-gray-600">{report.report.executive_summary?.one_line_summary}</p>
+                        </div>
+                        <div className="text-right">
+                          <div className={`text-5xl font-bold ${
+                            (report.report.executive_summary?.site_health_score || 0) >= 80 ? 'text-green-600' :
+                            (report.report.executive_summary?.site_health_score || 0) >= 60 ? 'text-yellow-600' :
+                            'text-red-600'
+                          }`}>
+                            {report.report.executive_summary?.site_health_score || 0}
+                          </div>
+                          <div className="text-sm text-gray-500">out of 100</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Score Breakdown */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      {[
+                        { label: 'Technical SEO', score: report.report.executive_summary?.technical_seo_score, color: 'blue' },
+                        { label: 'Content Quality', score: report.report.executive_summary?.content_quality_score, color: 'green' },
+                        { label: 'User Experience', score: report.report.executive_summary?.user_experience_score, color: 'purple' },
+                        { label: 'Trust Signals', score: report.report.executive_summary?.trust_signals_score, color: 'orange' },
+                      ].map((item) => (
+                        <div key={item.label} className="bg-white rounded-lg border border-gray-200 p-4">
+                          <div className="text-sm text-gray-600 mb-1">{item.label}</div>
+                          <div className={`text-2xl font-bold ${
+                            (item.score || 0) >= 80 ? 'text-green-600' :
+                            (item.score || 0) >= 60 ? 'text-yellow-600' :
+                            'text-red-600'
+                          }`}>
+                            {item.score || 0}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Metrics Summary */}
+                    <div className="bg-white rounded-lg border border-gray-200 p-6">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Crawl Metrics</h3>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-gray-900">{report.report.metrics?.total_pages || 0}</div>
+                          <div className="text-sm text-gray-500">Pages Crawled</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-red-600">{report.report.metrics?.total_issues || 0}</div>
+                          <div className="text-sm text-gray-500">Total Issues</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-orange-600">{report.report.metrics?.broken_links || 0}</div>
+                          <div className="text-sm text-gray-500">Broken Links</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-yellow-600">{report.report.metrics?.missing_meta || 0}</div>
+                          <div className="text-sm text-gray-500">Missing Meta</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Critical Issues */}
+                    {report.report.executive_summary?.critical_issues && report.report.executive_summary.critical_issues.length > 0 && (
+                      <div className="bg-white rounded-lg border border-red-200 p-6">
+                        <h3 className="text-lg font-semibold text-red-800 mb-4 flex items-center gap-2">
+                          <AlertCircle className="w-5 h-5" />
+                          Critical Issues
+                        </h3>
+                        <div className="space-y-4">
+                          {report.report.executive_summary.critical_issues.map((issue, index) => (
+                            <div key={index} className="border-l-4 border-red-500 pl-4 py-2">
+                              <div className="font-medium text-gray-900">{issue.title}</div>
+                              <div className="text-sm text-gray-600 mt-1">{issue.description}</div>
+                              <div className="text-sm text-gray-500 mt-1">
+                                <span className="font-medium">Affects:</span> {issue.pages_affected} pages
+                              </div>
+                              <div className="text-sm text-secondary-600 mt-1">
+                                <span className="font-medium">Action:</span> {issue.recommended_action}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Quick Wins */}
+                    {report.report.executive_summary?.quick_wins && report.report.executive_summary.quick_wins.length > 0 && (
+                      <div className="bg-white rounded-lg border border-green-200 p-6">
+                        <h3 className="text-lg font-semibold text-green-800 mb-4 flex items-center gap-2">
+                          <CheckCircle className="w-5 h-5" />
+                          Quick Wins
+                        </h3>
+                        <ul className="space-y-2">
+                          {report.report.executive_summary.quick_wins.map((win, index) => (
+                            <li key={index} className="flex items-start gap-2">
+                              <span className="text-green-500 mt-0.5">•</span>
+                              <span className="text-gray-700">{win}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* Strategic Recommendations */}
+                    {report.report.executive_summary?.strategic_recommendations && report.report.executive_summary.strategic_recommendations.length > 0 && (
+                      <div className="bg-white rounded-lg border border-gray-200 p-6">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Strategic Recommendations</h3>
+                        <div className="space-y-4">
+                          {report.report.executive_summary.strategic_recommendations.map((rec, index) => (
+                            <div key={index} className="border border-gray-100 rounded-lg p-4 bg-gray-50">
+                              <div className="font-medium text-gray-900">{rec.title}</div>
+                              <div className="text-sm text-gray-600 mt-1">{rec.description}</div>
+                              <div className="flex flex-wrap gap-4 mt-2 text-xs text-gray-500">
+                                <span><strong>Impact:</strong> {rec.expected_impact}</span>
+                                <span><strong>Effort:</strong> {rec.effort_estimate}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Strengths & Weaknesses */}
+                    <div className="grid md:grid-cols-2 gap-6">
+                      <div className="bg-white rounded-lg border border-green-200 p-6">
+                        <h3 className="text-lg font-semibold text-green-800 mb-3">Strengths</h3>
+                        <p className="text-gray-700">{report.report.executive_summary?.strengths_summary || 'No strengths summary available.'}</p>
+                      </div>
+                      <div className="bg-white rounded-lg border border-orange-200 p-6">
+                        <h3 className="text-lg font-semibold text-orange-800 mb-3">Areas for Improvement</h3>
+                        <p className="text-gray-700">{report.report.executive_summary?.weaknesses_summary || 'No weaknesses summary available.'}</p>
+                      </div>
+                    </div>
+
+                    {/* Action Plan */}
+                    {report.report.executive_summary?.action_plan_summary && (
+                      <div className="bg-secondary-50 rounded-lg border border-secondary-200 p-6">
+                        <h3 className="text-lg font-semibold text-secondary-900 mb-3">Recommended Action Plan</h3>
+                        <p className="text-gray-700">{report.report.executive_summary.action_plan_summary}</p>
+                      </div>
+                    )}
+
+                    {/* Report Metadata */}
+                    <div className="text-sm text-gray-500 text-center pt-4 border-t border-gray-200">
+                      Report generated on {new Date(report.report.generated_at).toLocaleString()}
+                      {report.report.usage && (
+                        <span className="ml-2">
+                          | Cost: ${report.report.usage.total_cost_usd?.toFixed(4) || '0.00'}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                      <FileText className="w-8 h-8 text-gray-400" />
+                    </div>
+                    <h3 className="text-xl font-semibold text-gray-900 mb-2">No Report Generated</h3>
+                    <p className="text-gray-600 max-w-sm mx-auto mb-6">
+                      {crawl && ['completed', 'stopped'].includes(crawl.status)
+                        ? 'Generate an AI-powered analysis report to get insights, recommendations, and a health score for your site.'
+                        : 'Complete the crawl first to generate a report.'}
+                    </p>
+                    {crawl && ['completed', 'stopped'].includes(crawl.status) && (
+                      <button
+                        onClick={handleGenerateReport}
+                        disabled={generatingReport}
+                        className="inline-flex items-center gap-2 px-6 py-3 text-sm font-medium text-white bg-secondary-600 rounded-md hover:bg-secondary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-secondary-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {generatingReport ? (
+                          <>
+                            <RefreshCw className="w-4 h-4 animate-spin" />
+                            Generating Report...
+                          </>
+                        ) : (
+                          <>
+                            <FileText className="w-4 h-4" />
+                            Generate AI Report
+                          </>
+                        )}
+                      </button>
+                    )}
                   </div>
                 )}
               </div>

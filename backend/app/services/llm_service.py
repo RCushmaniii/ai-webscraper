@@ -666,10 +666,18 @@ Top Issues by Frequency:
 Sample Page Summaries:
 {self._format_page_samples(site_data.get('page_samples', []))}
 
+IMPORTANT SCORING GUIDELINES:
+- A site with mostly working pages (200 status codes) and functional content is fundamentally healthy
+- Minor SEO issues (missing alt text, duplicate titles) should NOT dramatically lower the score
+- Focus critical issues on truly broken things (404s, server errors, completely missing critical content)
+- A site with good core functionality should score 70+ even with SEO improvements needed
+- Reserve scores below 50 for sites with serious structural or content problems
+- Duplicate SEO metadata across pages is a LOW priority issue, not critical
+
 Create a comprehensive executive summary with:
-1. Overall site health score and one-line summary
+1. Overall site health score (be fair - working sites with minor issues should score 70-85)
 2. Breakdown of technical, content, UX, and trust scores
-3. Critical issues requiring immediate attention
+3. Critical issues (only truly blocking problems)
 4. Quick wins for immediate impact
 5. Strategic recommendations for long-term improvement"""
         

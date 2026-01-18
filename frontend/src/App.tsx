@@ -62,7 +62,7 @@ function AppRoutes() {
         <Route path="quick-start" element={<QuickStartPage />} />
         <Route path="dashboard" element={<ProtectedRoute element={<DashboardPage />} />} />
         <Route path="crawls" element={<ProtectedRoute element={<CrawlsPage />} />} />
-        <Route path="crawls/new" element={<ProtectedRoute element={<CrawlNewPage />} adminOnly={true} />} />
+        <Route path="crawls/new" element={<ProtectedRoute element={<CrawlNewPage />} />} />
         <Route path="crawls/:id" element={<ProtectedRoute element={<CrawlDetailPage />} />} />
         <Route path="crawls/:crawlId/pages/:pageId" element={<ProtectedRoute element={<PageDetailPage />} />} />
         <Route path="crawls/:crawlId/images" element={<ProtectedRoute element={<ImagesPage />} />} />

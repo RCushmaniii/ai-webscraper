@@ -15,6 +15,11 @@ from app.db.supabase import supabase_client
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
+
+# Free tier crawl limit
+FREE_CRAWL_LIMIT = 3
+
+
 @router.post("/", response_model=CrawlResponse)
 async def create_crawl(
     crawl: CrawlCreate,
@@ -22,6 +27,8 @@ async def create_crawl(
 ):
     """
     Create a new crawl job.
+
+    Free users are limited to 3 crawls. Admins have unlimited crawls.
     """
     # Generate a new UUID for this crawl
     logger.info(f"Received crawl request: {crawl}")
@@ -30,6 +37,27 @@ async def create_crawl(
     try:
         # Use authenticated client for RLS
         auth_client = get_auth_client()
+
+        # Check crawl limit for non-admin users
+        if not current_user.is_admin:
+            # Count existing crawls for this user
+            count_response = auth_client.table("crawls").select(
+                "id", count="exact"
+            ).eq("user_id", str(current_user.id)).execute()
+
+            existing_crawl_count = count_response.count if hasattr(count_response, 'count') else len(count_response.data or [])
+
+            if existing_crawl_count >= FREE_CRAWL_LIMIT:
+                logger.info(f"User {current_user.email} has reached free crawl limit ({existing_crawl_count}/{FREE_CRAWL_LIMIT})")
+                raise HTTPException(
+                    status_code=403,
+                    detail={
+                        "error": "crawl_limit_reached",
+                        "message": f"Free tier limit reached. You have used {existing_crawl_count} of {FREE_CRAWL_LIMIT} free crawls. Upgrade to Pro for unlimited crawls.",
+                        "current_count": existing_crawl_count,
+                        "limit": FREE_CRAWL_LIMIT
+                    }
+                )
 
         # Create crawl record in database
         now = datetime.now()
@@ -42,7 +70,7 @@ async def create_crawl(
         crawl_data = {
             "id": str(crawl_id),
             "user_id": str(current_user.id),
-            "url": raw_data["url"],  # Direct mapping
+            "url": raw_data["url"],  # Database uses 'url' column
             "max_depth": raw_data.get("max_depth", 2),
             "max_pages": raw_data.get("max_pages", 100),
             "respect_robots_txt": raw_data.get("respect_robots_txt", True),
@@ -95,6 +123,48 @@ async def create_crawl(
     except Exception as e:
         logger.exception(f"An unexpected error occurred in create_crawl for crawl_id {crawl_id}")
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
+
+
+@router.get("/usage")
+async def get_crawl_usage(current_user: User = Depends(get_current_user)):
+    """
+    Get the current user's crawl usage and limits.
+
+    Returns:
+        - current_count: Number of crawls the user has created
+        - limit: Maximum crawls allowed (null for unlimited/admin)
+        - is_unlimited: Whether user has unlimited crawls (admin)
+        - remaining: Number of crawls remaining (null if unlimited)
+    """
+    try:
+        auth_client = get_auth_client()
+
+        # Count existing crawls for this user
+        count_response = auth_client.table("crawls").select(
+            "id", count="exact"
+        ).eq("user_id", str(current_user.id)).execute()
+
+        current_count = count_response.count if hasattr(count_response, 'count') else len(count_response.data or [])
+
+        if current_user.is_admin:
+            return {
+                "current_count": current_count,
+                "limit": None,
+                "is_unlimited": True,
+                "remaining": None
+            }
+        else:
+            return {
+                "current_count": current_count,
+                "limit": FREE_CRAWL_LIMIT,
+                "is_unlimited": False,
+                "remaining": max(0, FREE_CRAWL_LIMIT - current_count)
+            }
+
+    except Exception as e:
+        logger.error(f"Error getting crawl usage: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get crawl usage")
+
 
 @router.get("/", response_model=List[CrawlResponse])
 async def list_crawls(
@@ -156,11 +226,11 @@ async def list_crawls(
             query = query.eq("status", status)
         
         response = query.range(skip, skip + limit - 1).order("created_at", desc=True).execute()
-        
+
         if hasattr(response, "error") and response.error is not None:
             logger.error(f"Error listing crawls: {response.error}")
             raise HTTPException(status_code=500, detail="Failed to list crawls")
-        
+
         return response.data
         
     except Exception as e:
@@ -186,9 +256,9 @@ async def get_crawl(
         
         if not response.data:
             raise HTTPException(status_code=404, detail="Crawl not found")
-        
+
         return response.data[0]
-        
+
     except HTTPException:
         raise
     except Exception as e:
