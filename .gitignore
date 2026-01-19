@@ -40,4 +40,23 @@ frontend/backend/certs/
 
 # Windows system files
 nul
+Thumbs.db
+
+# macOS system files
+.DS_Store
+
+# Python bytecode
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# Log files
 *.log
