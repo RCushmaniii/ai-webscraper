@@ -11,7 +11,9 @@
 
 [**Documentation**](docs/) · [**Report Bug**](https://github.com/RCushmaniii/ai-webscraper/issues) · [**API Docs**](http://localhost:8000/docs)
 
-![AI WebScraper Analysis Report](.github/assets/ai-ws-analysis-report.jpg)
+| Login | AI Analysis Report |
+|:-----:|:------------------:|
+| ![Login](.github/assets/ai-ws-login.jpg) | ![Report](.github/assets/ai-ws-analysis-report.jpg) |
 
 </div>
 
@@ -49,17 +51,6 @@ AI WebScraper crawls websites, extracts SEO metadata, detects technical issues, 
 - **Row Level Security (RLS)** on all database tables
 - **Tier-based access control** with free tier limits (3 crawls for free users)
 - **Real-time monitoring** with automatic stale crawl detection
-
-<details>
-<summary>Screenshots</summary>
-
-### Login
-![Login Page](.github/assets/ai-ws-login.jpg)
-
-### AI Analysis Report
-![Analysis Report](.github/assets/ai-ws-analysis-report.jpg)
-
-</details>
 
 ---
 
