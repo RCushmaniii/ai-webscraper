@@ -1,44 +1,14 @@
 ---
-# =============================================================================
-# PORTFOLIO.md — AI WebScraper
-# =============================================================================
-
+# === CONTROL FLAGS ===
 portfolio_enabled: true
 portfolio_priority: 3
 portfolio_featured: true
-portfolio_last_reviewed: "2024-12-28"
 
+# === CARD DISPLAY ===
 title: "AI-Powered Web Scraper"
 tagline: "Full-stack data extraction platform with intelligent parsing and cloud storage"
 slug: "ai-webscraper"
-
 category: "AI Automation"
-target_audience: "Data teams and analysts needing automated web extraction"
-tags:
-  - "web-scraping"
-  - "data-extraction"
-  - "automation"
-  - "fastapi"
-  - "react"
-
-thumbnail: ""
-hero_images: []
-demo_video_url: ""
-
-live_url: ""
-case_study_url: ""
-
-problem_solved: |
-  Manual data extraction is tedious, error-prone, and doesn't scale. 
-  Teams waste hours copying data from websites when that time could 
-  be spent on analysis and decision-making.
-
-key_outcomes:
-  - "React frontend for easy configuration of scraping targets"
-  - "FastAPI backend for high-performance async processing"
-  - "Supabase integration for persistent, queryable data storage"
-  - "Modular architecture supporting multiple data sources"
-
 tech_stack:
   - "React"
   - "Python"
@@ -46,8 +16,19 @@ tech_stack:
   - "Supabase"
   - "PostgreSQL"
 
-complexity: "Production"
+# === DETAIL PAGE ===
 
+# === LINKS ===
+demo_url: ""
+live_url: ""
+
+# === OPTIONAL ===
+tags:
+  - "web-scraping"
+  - "data-extraction"
+  - "automation"
+  - "fastapi"
+  - "react"
 ---
 
 ## Overview
