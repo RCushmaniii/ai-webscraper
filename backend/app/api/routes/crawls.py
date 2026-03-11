@@ -38,27 +38,6 @@ async def create_crawl(
         # Use authenticated client for RLS
         auth_client = get_auth_client()
 
-        # Check crawl limit for non-admin users
-        if not current_user.is_admin:
-            # Count existing crawls for this user
-            count_response = auth_client.table("crawls").select(
-                "id", count="exact"
-            ).eq("user_id", str(current_user.id)).execute()
-
-            existing_crawl_count = count_response.count if hasattr(count_response, 'count') else len(count_response.data or [])
-
-            if existing_crawl_count >= FREE_CRAWL_LIMIT:
-                logger.info(f"User {current_user.email} has reached free crawl limit ({existing_crawl_count}/{FREE_CRAWL_LIMIT})")
-                raise HTTPException(
-                    status_code=403,
-                    detail={
-                        "error": "crawl_limit_reached",
-                        "message": f"Free tier limit reached. You have used {existing_crawl_count} of {FREE_CRAWL_LIMIT} free crawls. Upgrade to Pro for unlimited crawls.",
-                        "current_count": existing_crawl_count,
-                        "limit": FREE_CRAWL_LIMIT
-                    }
-                )
-
         # Create crawl record in database
         now = datetime.now()
         raw_data = crawl.model_dump()
@@ -105,6 +84,32 @@ async def create_crawl(
         if hasattr(response, "error") and response.error is not None:
             logger.error(f"Error creating crawl in DB: {response.error.message}")
             raise HTTPException(status_code=500, detail=f"Failed to create crawl: {response.error.message}")
+
+        # Race-condition-safe crawl limit enforcement: insert first, then check count.
+        # The old check-then-insert pattern had a TOCTOU race where two simultaneous
+        # requests could both pass the count check before either inserted. By inserting
+        # first and then counting, both concurrent requests will see the true total
+        # (including each other's rows) and the one that exceeds the limit gets rolled back.
+        if not current_user.is_admin:
+            count_response = auth_client.table("crawls").select(
+                "id", count="exact"
+            ).eq("user_id", str(current_user.id)).execute()
+
+            existing_crawl_count = count_response.count if hasattr(count_response, 'count') else len(count_response.data or [])
+
+            if existing_crawl_count > FREE_CRAWL_LIMIT:
+                # Over limit — delete the just-inserted crawl and reject
+                auth_client.table("crawls").delete().eq("id", str(crawl_id)).execute()
+                logger.info(f"User {current_user.email} exceeded free crawl limit ({existing_crawl_count}/{FREE_CRAWL_LIMIT}), rolled back crawl {crawl_id}")
+                raise HTTPException(
+                    status_code=403,
+                    detail={
+                        "error": "crawl_limit_reached",
+                        "message": f"Free tier limit reached. You have used {existing_crawl_count - 1} of {FREE_CRAWL_LIMIT} free crawls. Upgrade to Pro for unlimited crawls.",
+                        "current_count": existing_crawl_count - 1,
+                        "limit": FREE_CRAWL_LIMIT
+                    }
+                )
 
         # Dispatch the crawl task to Celery
         crawl_site.delay(str(crawl_id))
