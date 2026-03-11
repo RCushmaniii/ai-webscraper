@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from typing import List, Dict, Any, Optional
 from uuid import UUID
 import logging
 
 from app.core.auth import get_current_user, get_admin_user
+from app.core.audit import log_audit_event
 from app.models.models import User, UserCreate, UserUpdate, UserResponse
 from app.db.supabase import supabase_client
 
@@ -180,6 +181,7 @@ async def get_user(
 async def update_user(
     user_id: UUID,
     user_update: UserUpdate,
+    request: Request,
     current_user: User = Depends(get_admin_user)  # Only admins can update users
 ):
     """
@@ -209,13 +211,23 @@ async def update_user(
         
         # Update the user
         response = supabase_client.table("users").update(update_data).eq("id", str(user_id)).execute()
-        
+
         if hasattr(response, "error") and response.error is not None:
             logger.error(f"Error updating user: {response.error}")
             raise HTTPException(status_code=500, detail="Failed to update user")
-        
+
+        # Audit log: record what changed
+        log_audit_event(
+            user_id=str(current_user.id),
+            action="update_user",
+            entity_type="user",
+            entity_id=str(user_id),
+            details={"changes": update_data},
+            ip_address=request.client.host if request.client else None,
+        )
+
         return response.data[0]
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -225,6 +237,7 @@ async def update_user(
 @router.delete("/{user_id}", response_model=Dict[str, Any])
 async def delete_user(
     user_id: UUID,
+    request: Request,
     current_user: User = Depends(get_admin_user)  # Only admins can delete users
 ):
     """
@@ -245,13 +258,26 @@ async def delete_user(
         if str(user_id) == str(current_user.id):
             raise HTTPException(status_code=400, detail="Cannot delete your own user account")
         
+        # Capture user info before deletion for audit trail
+        deleted_user_email = check_response.data[0].get("email", "unknown")
+
         # Delete the user
         response = supabase_client.table("users").delete().eq("id", str(user_id)).execute()
-        
+
         if hasattr(response, "error") and response.error is not None:
             logger.error(f"Error deleting user: {response.error}")
             raise HTTPException(status_code=500, detail="Failed to delete user")
-        
+
+        # Audit log: record deletion with the deleted user's email for context
+        log_audit_event(
+            user_id=str(current_user.id),
+            action="delete_user",
+            entity_type="user",
+            entity_id=str(user_id),
+            details={"deleted_email": deleted_user_email},
+            ip_address=request.client.host if request.client else None,
+        )
+
         return {"message": "User deleted successfully"}
         
     except HTTPException:
@@ -259,6 +285,31 @@ async def delete_user(
     except Exception as e:
         logger.error(f"Error deleting user: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to delete user: {str(e)}")
+
+@router.get("/audit-logs", response_model=List[Dict[str, Any]])
+async def list_all_audit_logs(
+    skip: int = 0,
+    limit: int = 100,
+    current_user: User = Depends(get_admin_user)  # Only admins can view audit logs
+):
+    """
+    List all audit logs across all users (admin only).
+    Returns most recent entries first.
+    """
+    try:
+        response = supabase_client.table("audit_log").select("*").range(skip, skip + limit - 1).order("created_at", desc=True).execute()
+
+        if hasattr(response, "error") and response.error is not None:
+            logger.error(f"Error listing audit logs: {response.error}")
+            raise HTTPException(status_code=500, detail="Failed to list audit logs")
+
+        return response.data
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error listing audit logs: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to list audit logs: {str(e)}")
 
 @router.get("/{user_id}/audit-logs", response_model=List[Dict[str, Any]])
 async def get_user_audit_logs(
@@ -271,7 +322,8 @@ async def get_user_audit_logs(
     Get audit logs for a specific user (admin only).
     """
     try:
-        response = supabase_client.table("audit_logs").select("*").eq("user_id", str(user_id)).range(skip, skip + limit - 1).order("created_at", desc=True).execute()
+        # Fixed: table name is audit_log (singular), not audit_logs
+        response = supabase_client.table("audit_log").select("*").eq("user_id", str(user_id)).range(skip, skip + limit - 1).order("created_at", desc=True).execute()
         
         if hasattr(response, "error") and response.error is not None:
             logger.error(f"Error getting audit logs: {response.error}")
@@ -286,6 +338,7 @@ async def get_user_audit_logs(
 @router.post("/invite", response_model=Dict[str, Any])
 async def invite_user(
     user_create: UserCreate,
+    request: Request,
     current_user: User = Depends(get_admin_user)  # Only admins can invite users
 ):
     """
@@ -327,12 +380,21 @@ async def invite_user(
                     logger.error(f"Supabase invite error: {response.status_code} - {response.text}")
                     raise HTTPException(status_code=500, detail="Failed to send invitation")
                 
+                # Audit log: record the invitation
+                log_audit_event(
+                    user_id=str(current_user.id),
+                    action="invite_user",
+                    entity_type="user",
+                    details={"invited_email": user_create.email, "is_admin": user_create.is_admin},
+                    ip_address=request.client.host if request.client else None,
+                )
+
                 return {"message": f"Invitation sent to {user_create.email}"}
-                
+
         except Exception as e:
             logger.error(f"Error sending invitation: {e}")
             raise HTTPException(status_code=500, detail=f"Failed to send invitation: {str(e)}")
-        
+
     except HTTPException:
         raise
     except Exception as e:

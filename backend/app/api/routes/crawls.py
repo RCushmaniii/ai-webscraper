@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from urllib.parse import urlparse
 from typing import List, Dict, Any, Optional
 from uuid import UUID, uuid4
@@ -6,6 +6,7 @@ import logging
 from datetime import datetime
 
 from app.core.auth import get_current_user, get_auth_client
+from app.core.audit import log_audit_event
 from app.core.config import settings
 from app.models.models import Crawl, CrawlCreate, CrawlUpdate, CrawlResponse, User
 from app.services.worker import crawl_site
@@ -23,6 +24,7 @@ FREE_CRAWL_LIMIT = 3
 @router.post("/", response_model=CrawlResponse)
 async def create_crawl(
     crawl: CrawlCreate,
+    request: Request,
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -114,6 +116,16 @@ async def create_crawl(
         # Dispatch the crawl task to Celery
         crawl_site.delay(str(crawl_id))
         logger.info(f"Dispatched crawl task {crawl_id} to Celery.")
+
+        # Audit log: record crawl creation
+        log_audit_event(
+            user_id=str(current_user.id),
+            action="create_crawl",
+            entity_type="crawl",
+            entity_id=str(crawl_id),
+            details={"url": crawl_data["url"], "max_pages": crawl_data["max_pages"]},
+            ip_address=request.client.host if request.client else None,
+        )
 
         # Fetch the newly created record to ensure a valid response
         fetch_response = auth_client.table("crawls").select("*").eq("id", str(crawl_id)).single().execute()
@@ -369,6 +381,7 @@ async def stop_crawl(
 @router.delete("/{crawl_id}", response_model=Dict[str, Any])
 async def delete_crawl(
     crawl_id: UUID,
+    request: Request,
     current_user: User = Depends(get_current_user)
 ):
     """
@@ -430,6 +443,16 @@ async def delete_crawl(
             logger.warning(f"Error deleting files (non-fatal): {file_error}")
             # Don't fail the operation for file deletion errors
         
+        # Audit log: record crawl deletion
+        log_audit_event(
+            user_id=str(current_user.id),
+            action="delete_crawl",
+            entity_type="crawl",
+            entity_id=str(crawl_id),
+            details={"url": response.data[0].get("url", "unknown") if response.data else {}},
+            ip_address=request.client.host if request.client else None,
+        )
+
         logger.info(f"Successfully deleted crawl {crawl_id}")
         return {"message": "Crawl deleted successfully"}
         
