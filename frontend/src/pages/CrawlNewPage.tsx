@@ -58,8 +58,13 @@ const CrawlNewPage: React.FC = () => {
   };
 
   const validateForm = (): string | null => {
-    if (!formData.url || !formData.url.startsWith('http')) {
-      return 'Please enter a valid URL starting with http:// or https://';
+    try {
+      const parsed = new URL(formData.url);
+      if (!['http:', 'https:'].includes(parsed.protocol)) {
+        return 'URL must start with http:// or https://';
+      }
+    } catch {
+      return 'Please enter a valid URL';
     }
     if (!formData.name || formData.name.trim().length === 0) {
       return 'Please enter a crawl name';
@@ -78,7 +83,8 @@ const CrawlNewPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+    if (formSubmitting) return;
+
     // Validate form before submission
     const validationError = validateForm();
     if (validationError) {

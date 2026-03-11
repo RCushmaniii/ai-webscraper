@@ -190,27 +190,17 @@ class ApiService {
     this.api.interceptors.request.use(async (config) => {
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
-        
-        console.log('Auth interceptor - session check:', {
-          hasSession: !!session,
-          hasUser: !!session?.user,
-          hasToken: !!session?.access_token,
-          error: error?.message
-        });
-        
+
         if (error) {
-          console.error('Error getting session:', error);
+          console.error('Error getting session');
           return config;
         }
-        
+
         const token = session?.access_token;
-        
+
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
-          console.log('✅ Auth token added to request:', token.substring(0, 20) + '...');
-        } else {
-          console.warn('❌ No auth token available - user may not be logged in');
-          console.log('Session details:', session);
+          console.debug('Auth header attached');
         }
       } catch (error) {
         console.error('Error in auth interceptor:', error);

@@ -1,11 +1,11 @@
 from datetime import datetime
 from typing import List, Optional, Dict, Any, Union
 from uuid import UUID, uuid4
-from pydantic import BaseModel, Field, HttpUrl, validator
+from pydantic import BaseModel, EmailStr, Field, HttpUrl, field_validator, validator
 
 
 class UserBase(BaseModel):
-    email: str
+    email: EmailStr
     is_active: bool = True
     is_admin: bool = False
 
@@ -54,19 +54,26 @@ class UserResponse(BaseModel):
 
 
 class CrawlBase(BaseModel):
-    url: str
+    url: str = Field(..., max_length=2048)
     name: Optional[str] = None
-    max_depth: int = 2
-    max_pages: int = 100
+    max_depth: int = Field(default=2, ge=1, le=10)
+    max_pages: int = Field(default=100, ge=1, le=5000)
     respect_robots_txt: bool = True
     follow_external_links: bool = False  # Match database column name
     max_external_links: int = 5  # Maximum number of external domains to follow
     js_rendering: bool = False
-    rate_limit: int = 2
+    rate_limit: float = Field(default=2, ge=0.1, le=10)
     user_agent: Optional[str] = None
-    max_runtime_sec: int = 3600
+    max_runtime_sec: int = Field(default=3600, ge=60, le=86400)
     internal_depth: int = 2
     external_depth: int = 1  # How deep to go on external sites (usually 1)
+
+    @field_validator('url')
+    @classmethod
+    def validate_url(cls, v: str) -> str:
+        if not v.startswith(('http://', 'https://')):
+            raise ValueError('URL must start with http:// or https://')
+        return v
 
 
 class CrawlCreate(CrawlBase):

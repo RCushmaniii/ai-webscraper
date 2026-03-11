@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { apiService, User, UserCreate } from '../services/api';
+import ConfirmationModal from '../components/ConfirmationModal';
 
 const UsersPage: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
@@ -13,6 +14,19 @@ const UsersPage: React.FC = () => {
     is_admin: true,
   });
   const [formSubmitting, setFormSubmitting] = useState(false);
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    variant?: 'danger' | 'warning' | 'info';
+    confirmText?: string;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
 
   useEffect(() => {
     fetchUsers();
@@ -64,17 +78,23 @@ const UsersPage: React.FC = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
-      return;
-    }
-
-    try {
-      await apiService.deleteUser(id);
-      setUsers(users.filter(user => user.id !== id));
-    } catch (err) {
-      console.error('Error deleting user:', err);
-      setError('Failed to delete user. Please try again later.');
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete User',
+      message: 'Are you sure you want to delete this user? This action cannot be undone.',
+      confirmText: 'Delete',
+      variant: 'danger',
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        try {
+          await apiService.deleteUser(id);
+          setUsers(users.filter(user => user.id !== id));
+        } catch (err) {
+          console.error('Error deleting user:', err);
+          setError('Failed to delete user. Please try again later.');
+        }
+      },
+    });
   };
 
   const formatDate = (dateString: string) => {
@@ -261,6 +281,16 @@ const UsersPage: React.FC = () => {
           </button>
         </div>
       )}
+
+      <ConfirmationModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        confirmText={confirmModal.confirmText}
+        variant={confirmModal.variant}
+      />
     </div>
   );
 };

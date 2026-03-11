@@ -88,14 +88,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Check if user is admin
   const checkUserRole = async (userId: string) => {
     try {
-      console.log('🔍 checkUserRole: Starting for userId:', userId);
-      
       // Use backend API instead of direct Supabase query to avoid RLS issues
       const session = await supabase.auth.getSession();
       const token = session.data.session?.access_token;
-      
-      console.log('🔍 checkUserRole: Token exists:', !!token);
-      console.log('🔍 checkUserRole: Calling /users/me endpoint');
       
       const response = await fetch(`${process.env.REACT_APP_API_URL}/users/me`, {
         headers: {
@@ -104,12 +99,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       });
       
-      console.log('🔍 checkUserRole: Response status:', response.status);
-      
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ checkUserRole: Error response:', response.status, errorText);
-        console.error('❌ checkUserRole: Token (first 50 chars):', token?.substring(0, 50));
         
         // Don't fail silently - this is causing the redirect loop
         // Just set admin to false and continue
@@ -118,25 +108,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       
       const data = await response.json();
-      console.log('✅ checkUserRole: Success, is_admin:', data?.is_admin);
       setIsAdmin(data?.is_admin || false);
     } catch (error) {
-      console.error('❌ checkUserRole: Exception:', error);
+      console.error('Error checking user role');
       setIsAdmin(false);
     }
   };
 
   const signIn = async (email: string, password: string) => {
     try {
-      console.log('Attempting to sign in with email:', email);
-      console.log('Supabase URL:', process.env.REACT_APP_SUPABASE_URL);
-      
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
-
-      console.log('Sign in response:', { data, error });
 
       if (error) {
         console.error('Supabase auth error:', error);
@@ -156,19 +140,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = async () => {
     try {
-      console.log('🚪 Signing out - clearing all session data');
-      
-      // Sign out from Supabase (clears tokens and local storage)
       await supabase.auth.signOut();
-      
-      // Clear local state
+
       setSession(null);
       setUser(null);
       setIsAdmin(false);
-      
-      console.log('✅ Sign out complete');
     } catch (error) {
-      console.error('❌ Error signing out:', error);
+      console.error('Error signing out');
     }
   };
 

@@ -22,8 +22,7 @@ logging.getLogger("httpcore").setLevel(logging.WARNING)
 # Create service role client for Celery (bypasses RLS)
 service_client = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY)
 
-# Log service role key initialization (first 20 chars only for security)
-logger.info(f"Service client initialized with key: {settings.SUPABASE_SERVICE_ROLE_KEY[:20]}...")
+logger.info("Service client initialized")
 
 # Configure Celery with SSL support for Upstash Redis
 broker_use_ssl = {

@@ -80,12 +80,39 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 2. Rate Limiting Middleware - Apply rate limits based on subscription tier
+# 2. Security Headers Middleware - Add security headers to all responses
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "0"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    host = request.headers.get("host", "")
+    if not host.startswith("localhost") and not host.startswith("127.0.0.1"):
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    return response
+
+# 3. Request Body Size Limit Middleware - Reject requests larger than 10MB
+MAX_BODY_SIZE = 10 * 1024 * 1024  # 10MB
+
+@app.middleware("http")
+async def limit_request_body_size(request: Request, call_next):
+    content_length = request.headers.get("content-length")
+    if content_length and int(content_length) > MAX_BODY_SIZE:
+        return JSONResponse(
+            status_code=413,
+            content={"detail": "Request body too large. Maximum size is 10MB."}
+        )
+    return await call_next(request)
+
+# 4. Rate Limiting Middleware - Apply rate limits based on subscription tier
 # NOTE: Currently using in-memory limiter for development
 # TODO: Switch to Redis-based limiter for production (see rate_limiter.py)
 app.middleware("http")(rate_limit_middleware)
 
-# 3. Request Logging Middleware - Log all requests for monitoring
+# 5. Request Logging Middleware - Log all requests for monitoring
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     start_time = time.time()

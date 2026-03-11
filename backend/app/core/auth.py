@@ -6,6 +6,7 @@ import httpx
 from jose import jwt, JWTError, jwk
 from functools import lru_cache
 import time
+import hashlib
 
 from app.core.config import settings
 from app.models.models import User
@@ -49,7 +50,8 @@ async def get_jwks():
 async def verify_jwt_token(token: str) -> dict:
     """Verify JWT token using JWKS public keys."""
     try:
-        logger.info(f"Starting JWT verification for token: {token[:20]}...")
+        token_hash = hashlib.sha256(token.encode()).hexdigest()[:8]
+        logger.info(f"JWT verification for token hash: {token_hash}")
         
         # Get the unverified header to find the key ID
         unverified_header = jwt.get_unverified_header(token)
