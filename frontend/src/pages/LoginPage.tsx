@@ -70,7 +70,7 @@ const LoginPage: React.FC = () => {
         </div>
         
         {error && (
-          <div className="p-4 text-sm text-red-700 bg-red-100 rounded-md" role="alert">
+          <div id="login-error" className="p-4 text-sm text-red-700 bg-red-100 rounded-md" role="alert">
             {error}
           </div>
         )}
@@ -129,7 +129,7 @@ const LoginPage: React.FC = () => {
           </div>
         </div>
 
-        <form className="space-y-6" onSubmit={handleSubmit}>
+        <form className="space-y-6" onSubmit={handleSubmit} aria-label="Login form">
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-gray-700">
               Email address
@@ -140,6 +140,8 @@ const LoginPage: React.FC = () => {
               type="email"
               autoComplete="email"
               required
+              aria-required="true"
+              aria-describedby={error ? "login-error" : undefined}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="block w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-secondary-500 focus:border-secondary-500"
@@ -157,6 +159,8 @@ const LoginPage: React.FC = () => {
                 type={showPassword ? "text" : "password"}
                 autoComplete="current-password"
                 required
+                aria-required="true"
+                aria-describedby={error ? "login-error" : undefined}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="block w-full px-3 py-2 pr-10 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-secondary-500 focus:border-secondary-500"

@@ -51,7 +51,7 @@ const SignupPage: React.FC = () => {
           <h2 className="mt-2 text-xl font-semibold text-gray-700">Create account</h2>
         </div>
 
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+        <form className="mt-8 space-y-6" onSubmit={handleSubmit} aria-label="Sign up form">
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-gray-700">
               Email address
@@ -62,6 +62,7 @@ const SignupPage: React.FC = () => {
               type="email"
               autoComplete="email"
               required
+              aria-required="true"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="block w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-secondary-500 focus:border-secondary-500"
@@ -79,6 +80,7 @@ const SignupPage: React.FC = () => {
                 type={showPassword ? "text" : "password"}
                 autoComplete="new-password"
                 required
+                aria-required="true"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="block w-full px-3 py-2 pr-10 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-secondary-500 focus:border-secondary-500"

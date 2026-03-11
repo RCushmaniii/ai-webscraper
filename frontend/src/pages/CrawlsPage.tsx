@@ -411,7 +411,7 @@ const CrawlsPage: React.FC = () => {
 
       {/* Loading State */}
       {loading ? (
-        <div className="flex flex-col items-center justify-center py-24">
+        <div className="flex flex-col items-center justify-center py-24" role="status" aria-live="polite">
           <Loader2 className="w-10 h-10 text-secondary-500 animate-spin mb-4" />
           <p className="text-sm text-neutral-steel">Loading crawls...</p>
         </div>
@@ -426,6 +426,7 @@ const CrawlsPage: React.FC = () => {
                   type="checkbox"
                   checked={selectedCrawls.size === crawls.length && crawls.length > 0}
                   onChange={handleSelectAll}
+                  aria-label="Select all crawls"
                   className="w-4 h-4 text-secondary-500 border-primary-300 rounded focus:ring-secondary-500 cursor-pointer"
                 />
                 <span className="text-sm font-medium text-neutral-charcoal">
@@ -459,6 +460,7 @@ const CrawlsPage: React.FC = () => {
                       type="checkbox"
                       checked={selectedCrawls.has(crawl.id)}
                       onChange={() => handleSelectCrawl(crawl.id)}
+                      aria-label={`Select crawl: ${crawl.name}`}
                       className="mt-1 w-4 h-4 text-secondary-500 border-primary-300 rounded focus:ring-secondary-500 cursor-pointer"
                       onClick={(e) => e.stopPropagation()}
                     />

@@ -53,6 +53,10 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm"
       onClick={handleBackdropClick}
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="confirmation-modal-title"
+      aria-describedby="confirmation-modal-message"
     >
       <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4 animate-in fade-in zoom-in duration-200">
         {/* Header */}
@@ -62,8 +66,8 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
               <AlertCircle className="w-6 h-6" />
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
-              <p className="mt-2 text-sm text-gray-600">{message}</p>
+              <h3 id="confirmation-modal-title" className="text-lg font-semibold text-gray-900">{title}</h3>
+              <p id="confirmation-modal-message" className="mt-2 text-sm text-gray-600">{message}</p>
             </div>
           </div>
           <button

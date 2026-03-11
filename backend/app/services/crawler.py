@@ -741,15 +741,35 @@ class Crawler:
                 logger.info(f"Skipping non-HTML content ({resource_type}): {url}")
                 return page, seo_metadata, None, None, status_code
 
+            # Fix encoding before accessing response.text to avoid garbled content
+            if response.encoding is None or response.encoding == 'ascii':
+                content_type_header = response.headers.get('content-type', '')
+                if 'charset=' in content_type_header:
+                    charset = content_type_header.split('charset=')[-1].split(';')[0].strip()
+                    response.encoding = charset
+                else:
+                    response.encoding = 'utf-8'  # Safe default
+
             # Check if we need to use Playwright for JavaScript rendering
             # Use JS rendering if explicitly enabled OR if auto-detection determines it's needed
             if self.crawl.js_rendering or self._needs_js_rendering(response):
                 method = "js"
                 html_content, render_time = await self._render_with_playwright(url)
             else:
-                html_content = response.text
+                try:
+                    html_content = response.text
+                except UnicodeDecodeError:
+                    try:
+                        html_content = response.content.decode('utf-8', errors='replace')
+                    except Exception:
+                        logger.warning(f"Could not decode content from {url}")
+                        html_content = None
                 render_time = int((time.time() - start_time) * 1000)
-            
+
+            # If content could not be decoded, treat as a failed page
+            if html_content is None:
+                html_content = ""
+
             # Calculate content hash
             content_hash = hashlib.sha256(html_content.encode()).hexdigest()
             

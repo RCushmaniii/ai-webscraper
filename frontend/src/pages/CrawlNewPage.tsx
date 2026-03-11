@@ -109,7 +109,7 @@ const CrawlNewPage: React.FC = () => {
         fetchUsage();
       } else {
         const errorMessage = typeof detail === 'string' ? detail : detail?.message || err?.message || 'Failed to create crawl';
-        toast.error(errorMessage);
+        toast.error(errorMessage, { id: 'crawl-form-error' });
       }
     } finally {
       setFormSubmitting(false);
@@ -173,13 +173,14 @@ const CrawlNewPage: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label htmlFor="name" className="block text-sm font-semibold text-neutral-charcoal mb-2">
-                Crawl Name
+                Crawl Name<span className="text-red-500 ml-1">*</span>
               </label>
               <input
                 type="text"
                 name="name"
                 id="name"
                 required
+                aria-required="true"
                 value={formData.name}
                 onChange={handleInputChange}
                 placeholder="My Website Audit"
@@ -189,13 +190,14 @@ const CrawlNewPage: React.FC = () => {
 
             <div>
               <label htmlFor="url" className="block text-sm font-semibold text-neutral-charcoal mb-2">
-                Start URL
+                Start URL<span className="text-red-500 ml-1">*</span>
               </label>
               <input
                 type="url"
                 name="url"
                 id="url"
                 required
+                aria-required="true"
                 value={formData.url}
                 onChange={handleInputChange}
                 placeholder="https://example.com"

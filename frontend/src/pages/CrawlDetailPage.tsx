@@ -89,6 +89,32 @@ const CrawlDetailPage: React.FC = () => {
   const [reportLoading, setReportLoading] = useState(false);
   const [generatingReport, setGeneratingReport] = useState(false);
 
+  // Pagination state
+  const ITEMS_PER_PAGE = 50;
+  const [currentPage, setCurrentPage] = useState<Record<string, number>>({
+    pages: 1,
+    links: 1,
+    images: 1,
+    issues: 1,
+  });
+
+  // Reset pagination to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(prev => ({ ...prev, pages: 1 }));
+  }, [pageStatusFilter]);
+
+  useEffect(() => {
+    setCurrentPage(prev => ({ ...prev, links: 1 }));
+  }, [linkFilter, linkStatusFilter]);
+
+  useEffect(() => {
+    setCurrentPage(prev => ({ ...prev, images: 1 }));
+  }, [imageAltFilter, imageBrokenFilter]);
+
+  useEffect(() => {
+    setCurrentPage(prev => ({ ...prev, issues: 1 }));
+  }, [issueSeverityFilter]);
+
   // ESC key handler for lightbox
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -189,6 +215,7 @@ const CrawlDetailPage: React.FC = () => {
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
+    setCurrentPage(prev => ({ ...prev, [tab]: 1 }));
     fetchTabData(tab);
   };
 
@@ -1043,7 +1070,7 @@ const CrawlDetailPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex items-center justify-center h-64" role="status" aria-live="polite">
         <div className="text-lg font-medium text-gray-500">Loading crawl data...</div>
       </div>
     );
@@ -1149,49 +1176,59 @@ const CrawlDetailPage: React.FC = () => {
 
       {/* Tabs */}
       <div className="mb-6 border-b border-gray-200">
-        <nav className="flex -mb-px space-x-8">
+        <nav className="flex -mb-px space-x-8" role="tablist" aria-label="Crawl detail tabs">
           <button
             onClick={() => handleTabChange('pages')}
+            role="tab"
+            aria-selected={activeTab === 'pages'}
             className={`py-4 text-sm font-medium border-b-2 ${
               activeTab === 'pages'
                 ? 'border-secondary-500 text-secondary-500'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
           >
-            Pages
+            Pages{pages.length > 0 ? ` (${pages.length})` : ''}
           </button>
           <button
             onClick={() => handleTabChange('links')}
+            role="tab"
+            aria-selected={activeTab === 'links'}
             className={`py-4 text-sm font-medium border-b-2 ${
               activeTab === 'links'
                 ? 'border-secondary-500 text-secondary-500'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
           >
-            Links
+            Links{links.length > 0 ? ` (${links.length})` : ''}
           </button>
           <button
             onClick={() => handleTabChange('images')}
+            role="tab"
+            aria-selected={activeTab === 'images'}
             className={`py-4 text-sm font-medium border-b-2 ${
               activeTab === 'images'
                 ? 'border-secondary-500 text-secondary-500'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
           >
-            Images
+            Images{images.length > 0 ? ` (${images.length})` : ''}
           </button>
           <button
             onClick={() => handleTabChange('issues')}
+            role="tab"
+            aria-selected={activeTab === 'issues'}
             className={`py-4 text-sm font-medium border-b-2 ${
               activeTab === 'issues'
                 ? 'border-secondary-500 text-secondary-500'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
           >
-            Issues
+            Issues{issues.length > 0 ? ` (${issues.length})` : ''}
           </button>
           <button
             onClick={() => handleTabChange('report')}
+            role="tab"
+            aria-selected={activeTab === 'report'}
             className={`py-4 text-sm font-medium border-b-2 ${
               activeTab === 'report'
                 ? 'border-secondary-500 text-secondary-500'
@@ -1204,9 +1241,9 @@ const CrawlDetailPage: React.FC = () => {
       </div>
 
       {/* Tab Content */}
-      <div className="bg-white rounded-lg shadow">
+      <div className="bg-white rounded-lg shadow" role="tabpanel" aria-busy={pageLoading}>
         {pageLoading ? (
-          <div className="flex items-center justify-center h-64">
+          <div className="flex items-center justify-center h-64" role="status" aria-live="polite">
             <div className="text-lg font-medium text-gray-500">Loading data...</div>
           </div>
         ) : (
@@ -1243,83 +1280,122 @@ const CrawlDetailPage: React.FC = () => {
                 </div>
 
                 {pages.length > 0 ? (
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th
-                            onClick={() => handlePageSort('title')}
-                            className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase cursor-pointer hover:bg-gray-100 select-none"
-                          >
-                            Title <SortIcon column="title" currentSort={pageSort} currentDir={pageSortDir} />
-                          </th>
-                          <th
-                            onClick={() => handlePageSort('url')}
-                            className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase cursor-pointer hover:bg-gray-100 select-none"
-                          >
-                            URL <SortIcon column="url" currentSort={pageSort} currentDir={pageSortDir} />
-                          </th>
-                          <th
-                            onClick={() => handlePageSort('status_code')}
-                            className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase cursor-pointer hover:bg-gray-100 select-none"
-                          >
-                            Status <SortIcon column="status_code" currentSort={pageSort} currentDir={pageSortDir} />
-                          </th>
-                          <th
-                            onClick={() => handlePageSort('load_time')}
-                            className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase cursor-pointer hover:bg-gray-100 select-none"
-                          >
-                            Load Time (ms) <SortIcon column="load_time" currentSort={pageSort} currentDir={pageSortDir} />
-                          </th>
-                          <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
-                            Actions
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {getSortedPages().map((page) => (
-                          <tr key={page.id} className="hover:bg-gray-50">
-                            <td className="px-6 py-4">
-                              <div className="text-sm font-medium text-gray-900">{page.title || 'No title'}</div>
-                            </td>
-                            <td className="px-6 py-4">
-                              <a 
-                                href={page.url} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className="text-sm text-secondary-600 hover:text-secondary-700 underline truncate max-w-xs block" 
-                                title={page.url}
+                  (() => {
+                    const allSortedPages = getSortedPages();
+                    const totalFilteredCount = allSortedPages.length;
+                    const totalPaginationPages = Math.ceil(totalFilteredCount / ITEMS_PER_PAGE);
+                    const pageStart = (currentPage.pages - 1) * ITEMS_PER_PAGE;
+                    const paginatedPages = allSortedPages.slice(pageStart, pageStart + ITEMS_PER_PAGE);
+
+                    return (
+                      <>
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full divide-y divide-gray-200">
+                            <thead className="bg-gray-50">
+                              <tr>
+                                <th
+                                  onClick={() => handlePageSort('title')}
+                                  className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase cursor-pointer hover:bg-gray-100 select-none"
+                                >
+                                  Title <SortIcon column="title" currentSort={pageSort} currentDir={pageSortDir} />
+                                </th>
+                                <th
+                                  onClick={() => handlePageSort('url')}
+                                  className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase cursor-pointer hover:bg-gray-100 select-none"
+                                >
+                                  URL <SortIcon column="url" currentSort={pageSort} currentDir={pageSortDir} />
+                                </th>
+                                <th
+                                  onClick={() => handlePageSort('status_code')}
+                                  className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase cursor-pointer hover:bg-gray-100 select-none"
+                                >
+                                  Status <SortIcon column="status_code" currentSort={pageSort} currentDir={pageSortDir} />
+                                </th>
+                                <th
+                                  onClick={() => handlePageSort('load_time')}
+                                  className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase cursor-pointer hover:bg-gray-100 select-none"
+                                >
+                                  Load Time (ms) <SortIcon column="load_time" currentSort={pageSort} currentDir={pageSortDir} />
+                                </th>
+                                <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
+                                  Actions
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                              {paginatedPages.map((page) => (
+                                <tr key={page.id} className="hover:bg-gray-50">
+                                  <td className="px-6 py-4">
+                                    <div className="text-sm font-medium text-gray-900">{page.title || 'No title'}</div>
+                                  </td>
+                                  <td className="px-6 py-4">
+                                    <a
+                                      href={page.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-sm text-secondary-600 hover:text-secondary-700 underline truncate max-w-xs block"
+                                      title={page.url}
+                                    >
+                                      {page.url}
+                                    </a>
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap">
+                                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                      page.status_code >= 200 && page.status_code < 300
+                                        ? 'bg-green-100 text-green-800'
+                                        : page.status_code >= 300 && page.status_code < 400
+                                        ? 'bg-yellow-100 text-yellow-800'
+                                        : 'bg-red-100 text-red-800'
+                                    }`}>
+                                      {page.status_code}
+                                    </span>
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap">
+                                    <div className="text-sm text-gray-500">{page.load_time_ms || 'N/A'}</div>
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap">
+                                    <Link
+                                      to={`/crawls/${id}/pages/${page.id}`}
+                                      className="text-sm font-medium text-secondary-600 hover:text-secondary-700"
+                                    >
+                                      View Content
+                                    </Link>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+
+                        {totalPaginationPages > 1 && (
+                          <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200">
+                            <span className="text-sm text-gray-600">
+                              Showing {pageStart + 1}-{Math.min(pageStart + ITEMS_PER_PAGE, totalFilteredCount)} of {totalFilteredCount} pages
+                            </span>
+                            <div className="flex items-center gap-3">
+                              <button
+                                onClick={() => setCurrentPage(prev => ({ ...prev, pages: prev.pages - 1 }))}
+                                disabled={currentPage.pages <= 1}
+                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                               >
-                                {page.url}
-                              </a>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                                page.status_code >= 200 && page.status_code < 300
-                                  ? 'bg-green-100 text-green-800'
-                                  : page.status_code >= 300 && page.status_code < 400
-                                  ? 'bg-yellow-100 text-yellow-800'
-                                  : 'bg-red-100 text-red-800'
-                              }`}>
-                                {page.status_code}
+                                Previous
+                              </button>
+                              <span className="text-sm text-gray-700 font-medium">
+                                Page {currentPage.pages} of {totalPaginationPages}
                               </span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm text-gray-500">{page.load_time_ms || 'N/A'}</div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <Link
-                                to={`/crawls/${id}/pages/${page.id}`}
-                                className="text-sm font-medium text-secondary-600 hover:text-secondary-700"
+                              <button
+                                onClick={() => setCurrentPage(prev => ({ ...prev, pages: prev.pages + 1 }))}
+                                disabled={currentPage.pages >= totalPaginationPages}
+                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                               >
-                                View Content
-                              </Link>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                                Next
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()
                 ) : (
                   <div className="p-4 text-sm text-gray-700 bg-gray-100 rounded-md">
                     <p>No pages found for this crawl.</p>
