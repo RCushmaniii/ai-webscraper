@@ -209,16 +209,40 @@ class ApiService {
       return config;
     });
 
-    // Handle 401 errors by logging out
+    // Handle 401 errors and retry transient failures with exponential backoff
+    const MAX_RETRIES = 3;
+    const RETRY_DELAY_MS = 1000;
+
     this.api.interceptors.response.use(
       (response) => response,
       async (error) => {
+        // Handle 401 — clear session and redirect (no retry)
         if (error.response?.status === 401) {
           console.error('401 Unauthorized - clearing session and redirecting to login');
           await supabase.auth.signOut();
           window.location.href = '/login';
+          return Promise.reject(error);
         }
-        return Promise.reject(error);
+
+        const config = error.config;
+
+        // Don't retry if no config or retries exhausted
+        if (!config || (config._retryCount || 0) >= MAX_RETRIES) {
+          return Promise.reject(error);
+        }
+
+        // Only retry on 5xx server errors or network errors (no response)
+        const status = error.response?.status;
+        if (status && status < 500) {
+          return Promise.reject(error);
+        }
+
+        config._retryCount = (config._retryCount || 0) + 1;
+        const delay = RETRY_DELAY_MS * Math.pow(2, config._retryCount - 1);
+        console.warn(`Retrying request (${config._retryCount}/${MAX_RETRIES}) after ${delay}ms: ${config.url}`);
+
+        await new Promise(resolve => setTimeout(resolve, delay));
+        return this.api(config);
       }
     );
   }

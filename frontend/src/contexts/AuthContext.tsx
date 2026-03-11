@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 
@@ -84,6 +84,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       subscription.unsubscribe();
     };
   }, []);
+
+  // Auto-refresh session before it expires (~5 minutes before expiry)
+  const refreshTimerRef = useRef<NodeJS.Timeout>();
+
+  useEffect(() => {
+    if (refreshTimerRef.current) {
+      clearTimeout(refreshTimerRef.current);
+    }
+
+    if (session?.expires_at) {
+      const expiresAtMs = session.expires_at * 1000;
+      const refreshAtMs = expiresAtMs - (5 * 60 * 1000); // 5 min before expiry
+      const delay = refreshAtMs - Date.now();
+
+      if (delay > 0) {
+        refreshTimerRef.current = setTimeout(async () => {
+          try {
+            const { data } = await supabase.auth.refreshSession();
+            if (data.session) {
+              setSession(data.session);
+              setUser(data.session.user);
+            }
+            // If refresh fails, don't force logout — let the next API call handle it
+          } catch (err) {
+            console.error('Background session refresh failed:', err);
+          }
+        }, delay);
+      }
+    }
+
+    return () => {
+      if (refreshTimerRef.current) {
+        clearTimeout(refreshTimerRef.current);
+      }
+    };
+  }, [session?.expires_at]);
 
   // Check if user is admin
   const checkUserRole = async (userId: string) => {
