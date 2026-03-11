@@ -1465,127 +1465,164 @@ const CrawlDetailPage: React.FC = () => {
                 </div>
 
                 {links.length > 0 ? (
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th
-                            onClick={() => handleLinkSort('source_url')}
-                            className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase cursor-pointer hover:bg-gray-100 select-none"
-                          >
-                            Source <SortIcon column="source_url" currentSort={linkSort} currentDir={linkSortDir} />
-                          </th>
-                          <th
-                            onClick={() => handleLinkSort('target_url')}
-                            className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase cursor-pointer hover:bg-gray-100 select-none"
-                          >
-                            Target <SortIcon column="target_url" currentSort={linkSort} currentDir={linkSortDir} />
-                          </th>
-                          <th
-                            onClick={() => handleLinkSort('anchor_text')}
-                            className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase cursor-pointer hover:bg-gray-100 select-none"
-                          >
-                            Anchor Text <SortIcon column="anchor_text" currentSort={linkSort} currentDir={linkSortDir} />
-                          </th>
-                          <th
-                            onClick={() => handleLinkSort('type')}
-                            className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase cursor-pointer hover:bg-gray-100 select-none"
-                          >
-                            Type <SortIcon column="type" currentSort={linkSort} currentDir={linkSortDir} />
-                          </th>
-                          <th
-                            onClick={() => handleLinkSort('status_code')}
-                            className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase cursor-pointer hover:bg-gray-100 select-none"
-                          >
-                            Status <SortIcon column="status_code" currentSort={linkSort} currentDir={linkSortDir} />
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {getSortedLinks().map((link) => {
-                          // Find the page by source_page_id (UUID reference)
-                          const sourcePage = pages.find(p => p.id === link.source_page_id);
-                          // Get the display URL - either from source_url field or from the matched page
-                          const sourceUrl = link.source_url || sourcePage?.url;
+                  (() => {
+                    const allSortedLinks = getSortedLinks();
+                    const totalFilteredCount = allSortedLinks.length;
+                    const totalPaginationPages = Math.ceil(totalFilteredCount / ITEMS_PER_PAGE);
+                    const linkStart = (currentPage.links - 1) * ITEMS_PER_PAGE;
+                    const paginatedLinks = allSortedLinks.slice(linkStart, linkStart + ITEMS_PER_PAGE);
 
-                          return (
-                            <tr key={link.id} className="hover:bg-gray-50">
-                              <td className="px-6 py-4">
-                                <div className="flex items-center gap-2">
-                                  {sourcePage ? (
-                                    <Link
-                                      to={`/crawls/${id}/pages/${sourcePage.id}`}
-                                      className="p-1.5 text-secondary-600 hover:text-secondary-700 hover:bg-secondary-50 rounded transition-colors"
-                                      title={`View source page: ${sourcePage.url}`}
-                                    >
-                                      <FileText className="w-4 h-4" />
-                                    </Link>
-                                  ) : (
-                                    <span className="p-1.5 text-gray-300" title="Source page not found in crawl data">
-                                      <FileText className="w-4 h-4" />
-                                    </span>
-                                  )}
-                                  <span className="text-sm text-gray-500 truncate max-w-[200px]" title={sourceUrl || 'Unknown'}>
-                                    {sourceUrl ? (() => {
-                                      try {
-                                        return new URL(sourceUrl).pathname || '/';
-                                      } catch {
-                                        return sourceUrl;
-                                      }
-                                    })() : (sourcePage ? sourcePage.title || 'Untitled' : 'Unknown')}
-                                  </span>
-                                </div>
-                              </td>
-                              <td className="px-6 py-4">
-                                {(() => {
-                                  const targetUrl = link.target_url || link.url || '';
-                                  return targetUrl ? (
-                                    <a
-                                      href={targetUrl}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="flex items-center gap-1.5 text-sm text-secondary-600 hover:text-secondary-700 group"
-                                      title={targetUrl}
-                                    >
-                                      <span className="truncate max-w-[250px]">{targetUrl}</span>
-                                      <ExternalLink className="w-3.5 h-3.5 flex-shrink-0 opacity-50 group-hover:opacity-100" />
-                                    </a>
-                                  ) : (
-                                    <span className="text-sm text-gray-400">No URL</span>
-                                  );
-                                })()}
-                              </td>
-                              <td className="px-6 py-4">
-                                <div className="text-sm text-gray-900 truncate max-w-xs" title={link.anchor_text}>
-                                  {link.anchor_text || 'No text'}
-                                </div>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                                  link.is_internal
-                                    ? 'bg-blue-100 text-blue-800'
-                                    : 'bg-purple-100 text-purple-800'
-                                }`}>
-                                  {link.is_internal ? 'Internal' : 'External'}
-                                </span>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                {link.is_broken ? (
-                                  <span className="inline-flex px-2 py-1 text-xs font-semibold text-red-800 bg-red-100 rounded-full">
-                                    Broken {link.status_code ? `(${link.status_code})` : ''}
-                                  </span>
-                                ) : (
-                                  <span className="inline-flex px-2 py-1 text-xs font-semibold text-green-800 bg-green-100 rounded-full">
-                                    OK {link.status_code ? `(${link.status_code})` : ''}
-                                  </span>
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+                    return (
+                      <>
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full divide-y divide-gray-200">
+                            <thead className="bg-gray-50">
+                              <tr>
+                                <th
+                                  onClick={() => handleLinkSort('source_url')}
+                                  className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase cursor-pointer hover:bg-gray-100 select-none"
+                                >
+                                  Source <SortIcon column="source_url" currentSort={linkSort} currentDir={linkSortDir} />
+                                </th>
+                                <th
+                                  onClick={() => handleLinkSort('target_url')}
+                                  className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase cursor-pointer hover:bg-gray-100 select-none"
+                                >
+                                  Target <SortIcon column="target_url" currentSort={linkSort} currentDir={linkSortDir} />
+                                </th>
+                                <th
+                                  onClick={() => handleLinkSort('anchor_text')}
+                                  className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase cursor-pointer hover:bg-gray-100 select-none"
+                                >
+                                  Anchor Text <SortIcon column="anchor_text" currentSort={linkSort} currentDir={linkSortDir} />
+                                </th>
+                                <th
+                                  onClick={() => handleLinkSort('type')}
+                                  className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase cursor-pointer hover:bg-gray-100 select-none"
+                                >
+                                  Type <SortIcon column="type" currentSort={linkSort} currentDir={linkSortDir} />
+                                </th>
+                                <th
+                                  onClick={() => handleLinkSort('status_code')}
+                                  className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase cursor-pointer hover:bg-gray-100 select-none"
+                                >
+                                  Status <SortIcon column="status_code" currentSort={linkSort} currentDir={linkSortDir} />
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                              {paginatedLinks.map((link) => {
+                                const sourcePage = pages.find(p => p.id === link.source_page_id);
+                                const sourceUrl = link.source_url || sourcePage?.url;
+
+                                return (
+                                  <tr key={link.id} className="hover:bg-gray-50">
+                                    <td className="px-6 py-4">
+                                      <div className="flex items-center gap-2">
+                                        {sourcePage ? (
+                                          <Link
+                                            to={`/crawls/${id}/pages/${sourcePage.id}`}
+                                            className="p-1.5 text-secondary-600 hover:text-secondary-700 hover:bg-secondary-50 rounded transition-colors"
+                                            title={`View source page: ${sourcePage.url}`}
+                                          >
+                                            <FileText className="w-4 h-4" />
+                                          </Link>
+                                        ) : (
+                                          <span className="p-1.5 text-gray-300" title="Source page not found in crawl data">
+                                            <FileText className="w-4 h-4" />
+                                          </span>
+                                        )}
+                                        <span className="text-sm text-gray-500 truncate max-w-[200px]" title={sourceUrl || 'Unknown'}>
+                                          {sourceUrl ? (() => {
+                                            try {
+                                              return new URL(sourceUrl).pathname || '/';
+                                            } catch {
+                                              return sourceUrl;
+                                            }
+                                          })() : (sourcePage ? sourcePage.title || 'Untitled' : 'Unknown')}
+                                        </span>
+                                      </div>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                      {(() => {
+                                        const targetUrl = link.target_url || link.url || '';
+                                        return targetUrl ? (
+                                          <a
+                                            href={targetUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex items-center gap-1.5 text-sm text-secondary-600 hover:text-secondary-700 group"
+                                            title={targetUrl}
+                                          >
+                                            <span className="truncate max-w-[250px]">{targetUrl}</span>
+                                            <ExternalLink className="w-3.5 h-3.5 flex-shrink-0 opacity-50 group-hover:opacity-100" />
+                                          </a>
+                                        ) : (
+                                          <span className="text-sm text-gray-400">No URL</span>
+                                        );
+                                      })()}
+                                    </td>
+                                    <td className="px-6 py-4">
+                                      <div className="text-sm text-gray-900 truncate max-w-xs" title={link.anchor_text}>
+                                        {link.anchor_text || 'No text'}
+                                      </div>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                        link.is_internal
+                                          ? 'bg-blue-100 text-blue-800'
+                                          : 'bg-purple-100 text-purple-800'
+                                      }`}>
+                                        {link.is_internal ? 'Internal' : 'External'}
+                                      </span>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                      {link.is_broken ? (
+                                        <span className="inline-flex px-2 py-1 text-xs font-semibold text-red-800 bg-red-100 rounded-full">
+                                          Broken {link.status_code ? `(${link.status_code})` : ''}
+                                        </span>
+                                      ) : (
+                                        <span className="inline-flex px-2 py-1 text-xs font-semibold text-green-800 bg-green-100 rounded-full">
+                                          OK {link.status_code ? `(${link.status_code})` : ''}
+                                        </span>
+                                      )}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+
+                        {totalPaginationPages > 1 && (
+                          <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200">
+                            <span className="text-sm text-gray-600">
+                              Showing {linkStart + 1}-{Math.min(linkStart + ITEMS_PER_PAGE, totalFilteredCount)} of {totalFilteredCount} links
+                            </span>
+                            <div className="flex items-center gap-3">
+                              <button
+                                onClick={() => setCurrentPage(prev => ({ ...prev, links: prev.links - 1 }))}
+                                disabled={currentPage.links <= 1}
+                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                Previous
+                              </button>
+                              <span className="text-sm text-gray-700 font-medium">
+                                Page {currentPage.links} of {totalPaginationPages}
+                              </span>
+                              <button
+                                onClick={() => setCurrentPage(prev => ({ ...prev, links: prev.links + 1 }))}
+                                disabled={currentPage.links >= totalPaginationPages}
+                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                Next
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()
                 ) : (
                   <div className="p-4 text-sm text-gray-700 bg-gray-100 rounded-md">
                     <p>No links found for this crawl.</p>
@@ -1732,8 +1769,16 @@ const CrawlDetailPage: React.FC = () => {
 
                 {/* Issue Cards - Cleaner Design */}
                 {filteredAggregatedIssues.length > 0 ? (
+                  (() => {
+                    const totalIssueCards = filteredAggregatedIssues.length;
+                    const totalIssuePaginationPages = Math.ceil(totalIssueCards / ITEMS_PER_PAGE);
+                    const issueStart = (currentPage.issues - 1) * ITEMS_PER_PAGE;
+                    const paginatedIssueCards = filteredAggregatedIssues.slice(issueStart, issueStart + ITEMS_PER_PAGE);
+
+                    return (
+                      <>
                   <div className="space-y-3">
-                    {filteredAggregatedIssues.map((group, index) => {
+                    {paginatedIssueCards.map((group, index) => {
                       // Auto-expand first critical/high issue
                       const isExpanded = expandedIssueCards.has(group.key) ||
                         (index === 0 && (group.severity === 'critical' || group.severity === 'high') && expandedIssueCards.size === 0);
@@ -1847,6 +1892,36 @@ const CrawlDetailPage: React.FC = () => {
                       );
                     })}
                   </div>
+
+                  {totalIssuePaginationPages > 1 && (
+                    <div className="flex items-center justify-between px-6 py-4 mt-4 border-t border-gray-200">
+                      <span className="text-sm text-gray-600">
+                        Showing {issueStart + 1}-{Math.min(issueStart + ITEMS_PER_PAGE, totalIssueCards)} of {totalIssueCards} issue types
+                      </span>
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => setCurrentPage(prev => ({ ...prev, issues: prev.issues - 1 }))}
+                          disabled={currentPage.issues <= 1}
+                          className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Previous
+                        </button>
+                        <span className="text-sm text-gray-700 font-medium">
+                          Page {currentPage.issues} of {totalIssuePaginationPages}
+                        </span>
+                        <button
+                          onClick={() => setCurrentPage(prev => ({ ...prev, issues: prev.issues + 1 }))}
+                          disabled={currentPage.issues >= totalIssuePaginationPages}
+                          className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Next
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                      </>
+                    );
+                  })()
                 ) : (
                   <div className="text-center py-16 bg-gradient-to-b from-green-50 to-white rounded-xl border border-green-200">
                     <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -1906,99 +1981,138 @@ const CrawlDetailPage: React.FC = () => {
                 </div>
 
                 {images.length > 0 ? (
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
-                            Image
-                          </th>
-                          <th
-                            onClick={() => handleImageSort('src')}
-                            className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase cursor-pointer hover:bg-gray-100 select-none"
-                          >
-                            Source URL <SortIcon column="src" currentSort={imageSort} currentDir={imageSortDir} />
-                          </th>
-                          <th
-                            onClick={() => handleImageSort('alt')}
-                            className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase cursor-pointer hover:bg-gray-100 select-none"
-                          >
-                            Alt Text <SortIcon column="alt" currentSort={imageSort} currentDir={imageSortDir} />
-                          </th>
-                          <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
-                            Dimensions
-                          </th>
-                          <th
-                            onClick={() => handleImageSort('status')}
-                            className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase cursor-pointer hover:bg-gray-100 select-none"
-                          >
-                            Status <SortIcon column="status" currentSort={imageSort} currentDir={imageSortDir} />
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {getSortedImages().map((image) => (
-                          <tr key={image.id} className="hover:bg-gray-50">
-                            <td className="px-6 py-4">
+                  (() => {
+                    const allSortedImages = getSortedImages();
+                    const totalFilteredCount = allSortedImages.length;
+                    const totalPaginationPages = Math.ceil(totalFilteredCount / ITEMS_PER_PAGE);
+                    const imageStart = (currentPage.images - 1) * ITEMS_PER_PAGE;
+                    const paginatedImages = allSortedImages.slice(imageStart, imageStart + ITEMS_PER_PAGE);
+
+                    return (
+                      <>
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full divide-y divide-gray-200">
+                            <thead className="bg-gray-50">
+                              <tr>
+                                <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
+                                  Image
+                                </th>
+                                <th
+                                  onClick={() => handleImageSort('src')}
+                                  className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase cursor-pointer hover:bg-gray-100 select-none"
+                                >
+                                  Source URL <SortIcon column="src" currentSort={imageSort} currentDir={imageSortDir} />
+                                </th>
+                                <th
+                                  onClick={() => handleImageSort('alt')}
+                                  className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase cursor-pointer hover:bg-gray-100 select-none"
+                                >
+                                  Alt Text <SortIcon column="alt" currentSort={imageSort} currentDir={imageSortDir} />
+                                </th>
+                                <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
+                                  Dimensions
+                                </th>
+                                <th
+                                  onClick={() => handleImageSort('status')}
+                                  className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase cursor-pointer hover:bg-gray-100 select-none"
+                                >
+                                  Status <SortIcon column="status" currentSort={imageSort} currentDir={imageSortDir} />
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                              {paginatedImages.map((image) => (
+                                <tr key={image.id} className="hover:bg-gray-50">
+                                  <td className="px-6 py-4">
+                                    <button
+                                      onClick={() => setLightboxImage(image)}
+                                      className="relative group cursor-pointer rounded overflow-hidden focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:ring-offset-2"
+                                      title="Click to view full size"
+                                    >
+                                      <img
+                                        src={image.src}
+                                        alt={image.alt || 'Image'}
+                                        className="w-16 h-16 object-cover rounded transition-transform group-hover:scale-105"
+                                        onError={(e) => {
+                                          e.currentTarget.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23ddd" width="100" height="100"/%3E%3Ctext fill="%23999" x="50%" y="50%" text-anchor="middle" dy=".3em"%3ENo Image%3C/text%3E%3C/svg%3E';
+                                        }}
+                                      />
+                                      <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all flex items-center justify-center">
+                                        <ExternalLink className="w-5 h-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                      </div>
+                                    </button>
+                                  </td>
+                                  <td className="px-6 py-4">
+                                    <a
+                                      href={image.src}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-sm text-secondary-600 hover:text-secondary-700 underline truncate max-w-xs block"
+                                      title={image.src}
+                                    >
+                                      {image.src}
+                                    </a>
+                                  </td>
+                                  <td className="px-6 py-4">
+                                    <div className="text-sm text-gray-900 max-w-xs truncate" title={image.alt}>
+                                      {image.has_alt ? (
+                                        <span>{image.alt || 'Empty'}</span>
+                                      ) : (
+                                        <span className="text-red-600">Missing</span>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap">
+                                    <div className="text-sm text-gray-500">
+                                      {image.width && image.height ? `${image.width} × ${image.height}` : 'N/A'}
+                                    </div>
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap">
+                                    {image.is_broken ? (
+                                      <span className="inline-flex px-2 py-1 text-xs font-semibold text-red-800 bg-red-100 rounded-full">
+                                        Broken {image.status_code ? `(${image.status_code})` : ''}
+                                      </span>
+                                    ) : (
+                                      <span className="inline-flex px-2 py-1 text-xs font-semibold text-green-800 bg-green-100 rounded-full">
+                                        OK {image.status_code ? `(${image.status_code})` : ''}
+                                      </span>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+
+                        {totalPaginationPages > 1 && (
+                          <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200">
+                            <span className="text-sm text-gray-600">
+                              Showing {imageStart + 1}-{Math.min(imageStart + ITEMS_PER_PAGE, totalFilteredCount)} of {totalFilteredCount} images
+                            </span>
+                            <div className="flex items-center gap-3">
                               <button
-                                onClick={() => setLightboxImage(image)}
-                                className="relative group cursor-pointer rounded overflow-hidden focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:ring-offset-2"
-                                title="Click to view full size"
+                                onClick={() => setCurrentPage(prev => ({ ...prev, images: prev.images - 1 }))}
+                                disabled={currentPage.images <= 1}
+                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                               >
-                                <img
-                                  src={image.src}
-                                  alt={image.alt || 'Image'}
-                                  className="w-16 h-16 object-cover rounded transition-transform group-hover:scale-105"
-                                  onError={(e) => {
-                                    e.currentTarget.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23ddd" width="100" height="100"/%3E%3Ctext fill="%23999" x="50%" y="50%" text-anchor="middle" dy=".3em"%3ENo Image%3C/text%3E%3C/svg%3E';
-                                  }}
-                                />
-                                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all flex items-center justify-center">
-                                  <ExternalLink className="w-5 h-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                                </div>
+                                Previous
                               </button>
-                            </td>
-                            <td className="px-6 py-4">
-                              <a
-                                href={image.src}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-sm text-secondary-600 hover:text-secondary-700 underline truncate max-w-xs block"
-                                title={image.src}
+                              <span className="text-sm text-gray-700 font-medium">
+                                Page {currentPage.images} of {totalPaginationPages}
+                              </span>
+                              <button
+                                onClick={() => setCurrentPage(prev => ({ ...prev, images: prev.images + 1 }))}
+                                disabled={currentPage.images >= totalPaginationPages}
+                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                               >
-                                {image.src}
-                              </a>
-                            </td>
-                            <td className="px-6 py-4">
-                              <div className="text-sm text-gray-900 max-w-xs truncate" title={image.alt}>
-                                {image.has_alt ? (
-                                  <span>{image.alt || 'Empty'}</span>
-                                ) : (
-                                  <span className="text-red-600">Missing</span>
-                                )}
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm text-gray-500">
-                                {image.width && image.height ? `${image.width} × ${image.height}` : 'N/A'}
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              {image.is_broken ? (
-                                <span className="inline-flex px-2 py-1 text-xs font-semibold text-red-800 bg-red-100 rounded-full">
-                                  Broken {image.status_code ? `(${image.status_code})` : ''}
-                                </span>
-                              ) : (
-                                <span className="inline-flex px-2 py-1 text-xs font-semibold text-green-800 bg-green-100 rounded-full">
-                                  OK {image.status_code ? `(${image.status_code})` : ''}
-                                </span>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                                Next
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()
                 ) : (
                   <div className="p-4 text-sm text-gray-700 bg-gray-100 rounded-md">
                     <p>No images found for this crawl.</p>
