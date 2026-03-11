@@ -1,7 +1,9 @@
 import asyncio
 import hashlib
 import httpx
+import ipaddress
 import logging
+import socket
 import time
 from bs4 import BeautifulSoup
 from datetime import datetime
@@ -35,6 +37,7 @@ class Crawler:
         self.pages_crawled = 0
         self.client = httpx.AsyncClient(
             follow_redirects=True,
+            max_redirects=10,
             timeout=30.0,
             headers=self._get_headers()
         )
@@ -683,6 +686,13 @@ class Crawler:
             status_code = response.status_code
             content_type = response.headers.get("content-type", "")
 
+            # Response size limit: skip responses > 10MB to prevent memory issues
+            MAX_RESPONSE_BYTES = 10 * 1024 * 1024
+            content_length = response.headers.get("content-length")
+            if content_length and int(content_length) > MAX_RESPONSE_BYTES:
+                logger.warning(f"Skipping {url}: response too large ({int(content_length)} bytes > {MAX_RESPONSE_BYTES} bytes)")
+                return None
+
             # Skip non-HTML content types (PDFs, images, etc.) - don't try to parse them
             if "text/html" not in content_type.lower():
                 render_time = int((time.time() - start_time) * 1000)
@@ -889,20 +899,24 @@ class Crawler:
     async def _render_with_playwright(self, url: str) -> Tuple[str, int]:
         """Render a page with Playwright for JavaScript execution."""
         start_time = time.time()
-        
+        browser = None
+        page = None
+
         async with async_playwright() as p:
-            browser = await p.chromium.launch()
-            page = await browser.new_page()
-            
             try:
+                browser = await p.chromium.launch()
+                page = await browser.new_page()
                 await page.goto(url, wait_until="domcontentloaded", timeout=30000)
                 # Wait for JS to execute and render dynamic content
                 await asyncio.sleep(3)
                 html_content = await page.content()
                 render_time = int((time.time() - start_time) * 1000)
             finally:
-                await browser.close()
-        
+                if page:
+                    await page.close()
+                if browser:
+                    await browser.close()
+
         return html_content, render_time
     
     def _extract_text_excerpt(self, soup: BeautifulSoup) -> str:
@@ -1420,24 +1434,55 @@ class Crawler:
         
         return f"{parsed.scheme}://{netloc}{path}{'?' + query if query else ''}"
     
+    def _is_private_ip(self, hostname: str) -> bool:
+        """Check if a hostname resolves to a private/reserved IP address (SSRF protection)."""
+        try:
+            addr_infos = socket.getaddrinfo(hostname, None)
+            for family, _, _, _, sockaddr in addr_infos:
+                ip_str = sockaddr[0]
+                ip = ipaddress.ip_address(ip_str)
+                if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
+                    logger.warning(f"SSRF blocked: {hostname} resolves to private/reserved IP {ip_str}")
+                    return True
+        except (socket.gaierror, ValueError) as e:
+            logger.warning(f"SSRF check: DNS resolution failed for {hostname}: {e}")
+            return True
+        return False
+
     def _should_crawl_url(self, url: str) -> bool:
         """Determine if a URL should be crawled based on rules."""
         parsed = urlparse(url)
-        
+
         # Skip non-HTTP(S) URLs
         if parsed.scheme not in ('http', 'https'):
             return False
-        
+
+        # SSRF protection: block private/reserved IP ranges
+        hostname = parsed.hostname
+        if hostname:
+            # Check if hostname is a raw IP address in a private range
+            try:
+                ip = ipaddress.ip_address(hostname)
+                if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
+                    logger.warning(f"SSRF blocked: URL targets private/reserved IP {hostname}")
+                    return False
+            except ValueError:
+                pass
+
+            # DNS rebinding protection: resolve hostname and check resolved IP
+            if self._is_private_ip(hostname):
+                return False
+
         # Check file extensions to skip
         skip_extensions = {
             '.pdf', '.doc', '.docx', '.ppt', '.pptx', '.xls', '.xlsx',
             '.zip', '.rar', '.tar', '.gz', '.jpg', '.jpeg', '.png', '.gif',
             '.mp3', '.mp4', '.avi', '.mov', '.wmv', '.flv', '.css', '.js'
         }
-        
+
         if any(parsed.path.lower().endswith(ext) for ext in skip_extensions):
             return False
-        
+
         return True
     
     def get_progress(self) -> CrawlProgress:
@@ -1900,17 +1945,18 @@ class Crawler:
 
 class RateLimiter:
     """Rate limiter to control request frequency."""
-    
+
     def __init__(self, requests_per_second: float):
         self.delay = 1.0 / requests_per_second
-        self.last_request_time = 0
-    
+        self.last_request_time = 0.0
+
     async def wait(self) -> None:
         """Wait if needed to maintain the rate limit."""
-        now = time.time()
+        now = time.monotonic()
         elapsed = now - self.last_request_time
-        
-        if elapsed < self.delay:
-            await asyncio.sleep(self.delay - elapsed)
-        
-        self.last_request_time = time.time()
+        sleep_time = self.delay - elapsed
+
+        if sleep_time > 0:
+            await asyncio.sleep(sleep_time)
+
+        self.last_request_time = time.monotonic()
