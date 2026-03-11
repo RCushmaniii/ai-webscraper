@@ -5,7 +5,7 @@
 ### Intelligent website crawling and SEO analysis with AI-powered insights
 
 [![Version](https://img.shields.io/badge/version-1.3.0-blue?style=for-the-badge)](https://github.com/RCushmaniii/ai-webscraper)
-[![License](https://img.shields.io/badge/license-MIT-green?style=for-the-badge)](LICENSE)
+[![License](https://img.shields.io/badge/license-Proprietary-red?style=for-the-badge)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
 [![Python](https://img.shields.io/badge/Python-3.11+-blue?style=for-the-badge&logo=python)](https://www.python.org/)
 
@@ -342,7 +342,7 @@ Set environment variables in Vercel dashboard.
 
 ## License
 
-This project is licensed under the MIT License - see [LICENSE](LICENSE) for details.
+(c) 2026 Robert Cushman. All rights reserved. See [LICENSE](LICENSE) for details.
 
 ---
 
@@ -356,8 +356,15 @@ This project is licensed under the MIT License - see [LICENSE](LICENSE) for deta
 
 ---
 
-<div align="center">
+## Contact
 
-**Built by [Robert Cushman](https://github.com/RCushmaniii) | [CushLabs](https://cushlabs.ai)**
+**Robert Cushman**
+Business Solution Architect & Full-Stack Developer
+Guadalajara, Mexico
 
-</div>
+info@cushlabs.ai
+[GitHub](https://github.com/RCushmaniii) | [LinkedIn](https://linkedin.com/in/robertcushman) | [Portfolio](https://cushlabs.ai)
+
+---
+
+*Last Updated: 2026-03-10*
