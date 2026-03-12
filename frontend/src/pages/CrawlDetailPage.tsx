@@ -398,7 +398,7 @@ const CrawlDetailPage: React.FC = () => {
     }
   };
 
-  const getSortedPages = () => {
+  const sortedPages = useMemo(() => {
     let filtered = [...pages];
 
     // Apply status filter
@@ -435,9 +435,9 @@ const CrawlDetailPage: React.FC = () => {
       default:
         return filtered;
     }
-  };
+  }, [pages, pageStatusFilter, pageSort, pageSortDir]);
 
-  const getSortedLinks = () => {
+  const sortedLinks = useMemo(() => {
     let filtered = linkFilter === 'all'
       ? links
       : linkFilter === 'internal'
@@ -477,9 +477,9 @@ const CrawlDetailPage: React.FC = () => {
       default:
         return sorted;
     }
-  };
+  }, [links, linkFilter, linkStatusFilter, linkSort, linkSortDir]);
 
-  const getSortedImages = () => {
+  const sortedImages = useMemo(() => {
     let filtered = [...images];
 
     // Apply alt text filter
@@ -518,9 +518,9 @@ const CrawlDetailPage: React.FC = () => {
       default:
         return sorted;
     }
-  };
+  }, [images, imageAltFilter, imageBrokenFilter, imageSort, imageSortDir]);
 
-  const getSortedIssues = () => {
+  const sortedIssues = useMemo(() => {
     let filtered = [...issues];
 
     // Apply severity filter
@@ -556,7 +556,7 @@ const CrawlDetailPage: React.FC = () => {
       default:
         return sorted;
     }
-  };
+  }, [issues, issueSeverityFilter, issueSort, issueSortDir]);
 
   const SortIcon = ({ column, currentSort, currentDir }: { column: string; currentSort: string; currentDir: 'asc' | 'desc' }) => {
     if (column !== currentSort) return null;
@@ -716,6 +716,7 @@ const CrawlDetailPage: React.FC = () => {
                   <img
                     src={img.src}
                     alt=""
+                    loading="lazy"
                     className="w-full h-full object-cover"
                     onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                   />
@@ -960,7 +961,6 @@ const CrawlDetailPage: React.FC = () => {
   };
 
   const handleExportPages = () => {
-    const sortedPages = getSortedPages();
     exportToCSV(
       sortedPages,
       `pages_${crawl?.name || 'export'}_${new Date().toISOString().split('T')[0]}.csv`,
@@ -976,7 +976,6 @@ const CrawlDetailPage: React.FC = () => {
   };
 
   const handleExportLinks = () => {
-    const sortedLinks = getSortedLinks();
     exportToCSV(
       sortedLinks,
       `links_${crawl?.name || 'export'}_${new Date().toISOString().split('T')[0]}.csv`,
@@ -991,7 +990,6 @@ const CrawlDetailPage: React.FC = () => {
   };
 
   const handleExportImages = () => {
-    const sortedImages = getSortedImages();
     exportToCSV(
       sortedImages,
       `images_${crawl?.name || 'export'}_${new Date().toISOString().split('T')[0]}.csv`,
@@ -1008,7 +1006,6 @@ const CrawlDetailPage: React.FC = () => {
   };
 
   const handleExportIssues = () => {
-    const sortedIssues = getSortedIssues();
     exportToCSV(
       sortedIssues,
       `issues_${crawl?.name || 'export'}_${new Date().toISOString().split('T')[0]}.csv`,
@@ -1285,7 +1282,7 @@ const CrawlDetailPage: React.FC = () => {
 
                 {pages.length > 0 ? (
                   (() => {
-                    const allSortedPages = getSortedPages();
+                    const allSortedPages = sortedPages;
                     const totalFilteredCount = allSortedPages.length;
                     const totalPaginationPages = Math.ceil(totalFilteredCount / ITEMS_PER_PAGE);
                     const pageStart = (currentPage.pages - 1) * ITEMS_PER_PAGE;
@@ -1470,7 +1467,7 @@ const CrawlDetailPage: React.FC = () => {
 
                 {links.length > 0 ? (
                   (() => {
-                    const allSortedLinks = getSortedLinks();
+                    const allSortedLinks = sortedLinks;
                     const totalFilteredCount = allSortedLinks.length;
                     const totalPaginationPages = Math.ceil(totalFilteredCount / ITEMS_PER_PAGE);
                     const linkStart = (currentPage.links - 1) * ITEMS_PER_PAGE;
@@ -1986,7 +1983,7 @@ const CrawlDetailPage: React.FC = () => {
 
                 {images.length > 0 ? (
                   (() => {
-                    const allSortedImages = getSortedImages();
+                    const allSortedImages = sortedImages;
                     const totalFilteredCount = allSortedImages.length;
                     const totalPaginationPages = Math.ceil(totalFilteredCount / ITEMS_PER_PAGE);
                     const imageStart = (currentPage.images - 1) * ITEMS_PER_PAGE;
@@ -2036,6 +2033,7 @@ const CrawlDetailPage: React.FC = () => {
                                       <img
                                         src={image.src}
                                         alt={image.alt || 'Image'}
+                                        loading="lazy"
                                         className="w-16 h-16 object-cover rounded transition-transform group-hover:scale-105"
                                         onError={(e) => {
                                           e.currentTarget.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23ddd" width="100" height="100"/%3E%3Ctext fill="%23999" x="50%" y="50%" text-anchor="middle" dy=".3em"%3ENo Image%3C/text%3E%3C/svg%3E';
@@ -2444,6 +2442,7 @@ const CrawlDetailPage: React.FC = () => {
               <img
                 src={lightboxImage.src}
                 alt={lightboxImage.alt || 'Full size image'}
+                loading="lazy"
                 className="max-w-[85vw] max-h-[75vh] object-contain"
                 onError={(e) => {
                   e.currentTarget.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="300"%3E%3Crect fill="%23f3f4f6" width="400" height="300"/%3E%3Ctext fill="%239ca3af" x="50%" y="50%" text-anchor="middle" dy=".3em" font-size="18"%3EImage failed to load%3C/text%3E%3C/svg%3E';

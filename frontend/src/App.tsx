@@ -1,32 +1,32 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import ErrorBoundary from './components/ErrorBoundary';
 import Layout from './components/Layout';
 
-// Page imports
-import MarketingHomePage from './pages/MarketingHomePage';
-import QuickStartPage from './pages/QuickStartPage';
-import LoginPage from './pages/LoginPage';
-import SignupPage from './pages/SignUpPage';
-import ForgotPasswordPage from './pages/ForgotPasswordPage';
-import ResetPasswordPage from './pages/ResetPasswordPage';
-import DashboardPage from './pages/DashboardPage';
-import CrawlsPage from './pages/CrawlsPage';
-import CrawlNewPage from './pages/CrawlNewPage';
-import CrawlDetailPage from './pages/CrawlDetailPage';
-import PageDetailPage from './pages/PageDetailPage';
-import UsersPage from './pages/UsersPage';
-import ProfilePage from './pages/ProfilePage';
-import PrivacyPage from './pages/PrivacyPage';
-import TermsPage from './pages/TermsPage';
-import CookiesPage from './pages/CookiesPage';
-import AboutPage from './pages/AboutPage';
-import UseCasesPage from './pages/UseCasesPage';
-import DocsPage from './pages/DocsPage';
-import NotFoundPage from './pages/NotFoundPage';
-import ImagesPage from './pages/ImagesPage';
+// Lazy-loaded page imports for code splitting
+const MarketingHomePage = lazy(() => import('./pages/MarketingHomePage'));
+const QuickStartPage = lazy(() => import('./pages/QuickStartPage'));
+const LoginPage = lazy(() => import('./pages/LoginPage'));
+const SignupPage = lazy(() => import('./pages/SignUpPage'));
+const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'));
+const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
+const DashboardPage = lazy(() => import('./pages/DashboardPage'));
+const CrawlsPage = lazy(() => import('./pages/CrawlsPage'));
+const CrawlNewPage = lazy(() => import('./pages/CrawlNewPage'));
+const CrawlDetailPage = lazy(() => import('./pages/CrawlDetailPage'));
+const PageDetailPage = lazy(() => import('./pages/PageDetailPage'));
+const UsersPage = lazy(() => import('./pages/UsersPage'));
+const ProfilePage = lazy(() => import('./pages/ProfilePage'));
+const PrivacyPage = lazy(() => import('./pages/PrivacyPage'));
+const TermsPage = lazy(() => import('./pages/TermsPage'));
+const CookiesPage = lazy(() => import('./pages/CookiesPage'));
+const AboutPage = lazy(() => import('./pages/AboutPage'));
+const UseCasesPage = lazy(() => import('./pages/UseCasesPage'));
+const DocsPage = lazy(() => import('./pages/DocsPage'));
+const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
+const ImagesPage = lazy(() => import('./pages/ImagesPage'));
 
 // Protected route component
 const ProtectedRoute: React.FC<{ element: React.ReactElement; adminOnly?: boolean }> = ({ 
@@ -52,6 +52,7 @@ const ProtectedRoute: React.FC<{ element: React.ReactElement; adminOnly?: boolea
 
 function AppRoutes() {
   return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-secondary-500"></div></div>}>
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignupPage />} />
@@ -77,6 +78,7 @@ function AppRoutes() {
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>
+    </Suspense>
   );
 }
 
