@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Book, Code, Settings, Shield, BarChart3, Layers, ChevronRight, ChevronDown } from 'lucide-react';
-import Footer from '../components/Footer';
+
 
 interface DocSection {
   id: string;
@@ -614,8 +614,6 @@ Control what data is stored:
         </div>
       </div>
 
-      {/* Footer */}
-      <Footer />
     </div>
   );
 };
