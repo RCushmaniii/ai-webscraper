@@ -635,34 +635,36 @@ const CrawlDetailPage: React.FC = () => {
     });
   }, [aggregatedIssues, issueSeverityFilter]);
 
-  // Calculate site health score (0-100) - Ahrefs-style percentage based
+  // Calculate site health score (0-100)
+  // Starts at 100, deducts per issue TYPE based on severity and % of pages affected.
+  // A site with only medium issues should still score 85+.
+  // A site with many critical broken links should drop to 50-60.
   const siteHealthScore = useMemo(() => {
     if (pages.length === 0) return 100;
     if (issues.length === 0) return 100;
 
-    // Find unique pages with issues (by URL/context)
-    const pagesWithIssues = new Set(issues.map(i => i.context).filter(Boolean));
-    const affectedPageCount = pagesWithIssues.size;
+    // Max deduction per issue TYPE at 100% page coverage
+    const severityWeight: Record<string, number> = {
+      critical: 25,
+      high: 12,
+      medium: 4,
+      low: 1,
+    };
 
-    // Base score: percentage of pages WITHOUT issues
-    // e.g., 95 clean pages out of 100 total = 95%
-    const cleanPagePercentage = ((pages.length - affectedPageCount) / pages.length) * 100;
+    let totalDeduction = 0;
 
-    // Small severity adjustment (max ±5 points)
-    // Critical/high issues slightly lower the score, but not drastically
-    const criticalCount = issues.filter(i => i.severity === 'critical').length;
-    const highCount = issues.filter(i => i.severity === 'high').length;
+    // Deduct per aggregated issue type, scaled by proportion of pages affected
+    for (const group of aggregatedIssues) {
+      const weight = severityWeight[group.severity] || 2;
+      const affectedRatio = group.pageCount / pages.length;
+      // Scale up slightly so even partial coverage has visible impact
+      const scaledRatio = Math.min(1, affectedRatio * 1.5);
+      totalDeduction += weight * scaledRatio;
+    }
 
-    // Severity penalty scales with how many critical/high vs total pages
-    // Max penalty of 5 points even with many critical issues
-    const severityRatio = (criticalCount * 2 + highCount) / pages.length;
-    const severityPenalty = Math.min(5, severityRatio * 10);
-
-    // Final score
-    const finalScore = Math.round(cleanPagePercentage - severityPenalty);
-
+    const finalScore = Math.round(100 - totalDeduction);
     return Math.max(0, Math.min(100, finalScore));
-  }, [issues, pages.length]);
+  }, [issues, pages.length, aggregatedIssues]);
 
   // Toggle expanded state for issue cards
   const toggleIssueCard = (key: string) => {
@@ -1650,14 +1652,14 @@ const CrawlDetailPage: React.FC = () => {
                           <path
                             d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                             fill="none"
-                            stroke={siteHealthScore >= 90 ? '#22c55e' : siteHealthScore >= 70 ? '#84cc16' : siteHealthScore >= 50 ? '#eab308' : '#ef4444'}
+                            stroke={siteHealthScore >= 90 ? '#22c55e' : siteHealthScore >= 75 ? '#84cc16' : siteHealthScore >= 50 ? '#eab308' : '#ef4444'}
                             strokeWidth="3.5"
                             strokeDasharray={`${siteHealthScore}, 100`}
                             strokeLinecap="round"
                           />
                         </svg>
                         <div className="absolute inset-0 flex items-center justify-center">
-                          <span className={`text-xl font-bold ${siteHealthScore >= 90 ? 'text-green-600' : siteHealthScore >= 70 ? 'text-lime-600' : siteHealthScore >= 50 ? 'text-yellow-600' : 'text-red-600'}`}>
+                          <span className={`text-xl font-bold ${siteHealthScore >= 90 ? 'text-green-600' : siteHealthScore >= 75 ? 'text-lime-600' : siteHealthScore >= 50 ? 'text-yellow-600' : 'text-red-600'}`}>
                             {siteHealthScore}
                           </span>
                         </div>
@@ -1665,14 +1667,14 @@ const CrawlDetailPage: React.FC = () => {
                       <div>
                         <h2 className="text-xl font-semibold text-gray-900">
                           {siteHealthScore >= 90 ? 'Excellent Site Health' :
-                           siteHealthScore >= 70 ? 'Good Site Health' :
+                           siteHealthScore >= 75 ? 'Good Site Health' :
                            siteHealthScore >= 50 ? 'Needs Improvement' :
                            'Attention Required'}
                         </h2>
                         <p className="text-sm text-gray-500 mt-1">
                           {aggregatedIssues.length === 0
                             ? 'No issues detected across all pages'
-                            : `${aggregatedIssues.length} issue type${aggregatedIssues.length !== 1 ? 's' : ''} found across ${pages.length} pages`}
+                            : `${issues.length} issue${issues.length !== 1 ? 's' : ''} across ${aggregatedIssues.length} categor${aggregatedIssues.length !== 1 ? 'ies' : 'y'} on ${pages.length} pages`}
                         </p>
                       </div>
                     </div>
