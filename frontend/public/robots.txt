@@ -1,0 +1,10 @@
+# AI WebScraper by CushLabs
+# This is an internal admin tool — not intended for public indexing
+
+User-agent: *
+Disallow: /
+
+# Allow specific public pages if needed in the future
+# Allow: /
+# Allow: /about
+# Allow: /docs

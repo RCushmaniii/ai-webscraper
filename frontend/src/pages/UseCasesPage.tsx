@@ -1,7 +1,9 @@
 import React from 'react';
 import { CheckCircle, ArrowRight, TrendingUp, Clock, DollarSign, Users, Zap } from 'lucide-react';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 const UseCasesPage: React.FC = () => {
+  usePageTitle('Use Cases');
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Hero Section */}

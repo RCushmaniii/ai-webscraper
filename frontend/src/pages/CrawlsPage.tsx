@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { Plus, Loader2, Trash2, Eye, Globe, Settings2, RefreshCw, Info } from 'lucide-react';
 import { apiService, Crawl } from '../services/api';
 import ConfirmationModal from '../components/ConfirmationModal';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 interface UsageInfo {
   crawl_count: number;
@@ -14,6 +15,7 @@ interface UsageInfo {
 }
 
 const CrawlsPage: React.FC = () => {
+  usePageTitle('My Crawls');
   const [crawls, setCrawls] = useState<Crawl[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCrawls, setSelectedCrawls] = useState<Set<string>>(new Set());

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { ArrowLeft, Loader2, Plus, AlertTriangle, Info } from 'lucide-react';
 import { apiService, CrawlCreate } from '../services/api';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 interface UsageInfo {
   crawl_count: number;
@@ -13,6 +14,7 @@ interface UsageInfo {
 }
 
 const CrawlNewPage: React.FC = () => {
+  usePageTitle('New Crawl');
   const navigate = useNavigate();
   const [formData, setFormData] = useState<CrawlCreate>({
     url: '',

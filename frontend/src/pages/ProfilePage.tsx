@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { apiService } from '../services/api';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 const ProfilePage: React.FC = () => {
+  usePageTitle('Profile');
   const { user, refreshSession, isAdmin } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

@@ -1,8 +1,10 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 const HomePage: React.FC = () => {
+  usePageTitle('');
   const { user } = useAuth();
   const navigate = useNavigate();
 

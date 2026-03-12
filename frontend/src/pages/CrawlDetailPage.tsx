@@ -5,6 +5,7 @@ import { RefreshCw, ChevronUp, ChevronDown, Download, ExternalLink, FileText, Al
 import { apiService, Crawl, Page, Link as CrawlLink, Issue, Image, CrawlReport } from '../services/api';
 import ConfirmationModal from '../components/ConfirmationModal';
 import SearchBar from '../components/SearchBar';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 // Issue type descriptions - educational "why" content
 const ISSUE_DESCRIPTIONS: Record<string, { description: string; impact: 'seo' | 'ux' | 'compliance' | 'performance' }> = {
@@ -55,6 +56,7 @@ const CrawlDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [crawl, setCrawl] = useState<Crawl | null>(null);
+  usePageTitle(crawl?.name || crawl?.url || 'Crawl Details');
   const [pages, setPages] = useState<Page[]>([]);
   const [links, setLinks] = useState<CrawlLink[]>([]);
   const [issues, setIssues] = useState<Issue[]>([]);

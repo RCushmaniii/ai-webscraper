@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Book, Code, Settings, Shield, BarChart3, Layers, ChevronRight, ChevronDown } from 'lucide-react';
-
+import { usePageTitle } from '../hooks/usePageTitle';
 
 interface DocSection {
   id: string;
@@ -16,6 +16,7 @@ interface DocItem {
 }
 
 const DocsPage: React.FC = () => {
+  usePageTitle('Documentation');
   const [activeSection, setActiveSection] = useState<string>('overview');  // Auto-load Platform Overview
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['introduction']));
 

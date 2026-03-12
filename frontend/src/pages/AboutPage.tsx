@@ -1,7 +1,9 @@
 import React from 'react';
 import { Sparkles, Zap, Code, Brain, Layers, TrendingUp, Users, Globe, Rocket } from 'lucide-react';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 const AboutPage: React.FC = () => {
+  usePageTitle('About');
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Hero Section */}

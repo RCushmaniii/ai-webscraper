@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { apiService, Crawl } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import { usePageTitle } from '../hooks/usePageTitle';
 import {
   Globe,
   CheckCircle,
@@ -29,6 +30,7 @@ interface DashboardStats {
 }
 
 const DashboardPage: React.FC = () => {
+  usePageTitle('Dashboard');
   const [recentCrawls, setRecentCrawls] = useState<Crawl[]>([]);
   const [stats, setStats] = useState<DashboardStats>({
     totalCrawls: 0,
