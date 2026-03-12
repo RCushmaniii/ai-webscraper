@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { RefreshCw, ChevronUp, ChevronDown, Download, ExternalLink, FileText, AlertTriangle, AlertCircle, Info, CheckCircle } from 'lucide-react';
+import { RefreshCw, ChevronUp, ChevronDown, Download, ExternalLink, FileText, AlertCircle, Info, CheckCircle } from 'lucide-react';
 import { apiService, Crawl, Page, Link as CrawlLink, Issue, Image, CrawlReport } from '../services/api';
 import ConfirmationModal from '../components/ConfirmationModal';
 import SearchBar from '../components/SearchBar';
@@ -382,21 +382,6 @@ const CrawlDetailPage: React.FC = () => {
     }
   };
 
-  const handleIssueSort = (column: string) => {
-    if (issueSort === column) {
-      // Cycle through: asc -> desc -> neutral
-      if (issueSortDir === 'asc') {
-        setIssueSortDir('desc');
-      } else {
-        // Reset to neutral (no sorting)
-        setIssueSort('');
-        setIssueSortDir('asc');
-      }
-    } else {
-      setIssueSort(column);
-      setIssueSortDir('asc');
-    }
-  };
 
   const sortedPages = useMemo(() => {
     let filtered = [...pages];

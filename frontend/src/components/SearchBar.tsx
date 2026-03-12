@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, X } from 'lucide-react';
 import { apiService, Page, Link, Image } from '../services/api';
@@ -29,7 +29,7 @@ export default function SearchBar({ crawlId, onResultsChange }: SearchBarProps) 
   const [isSearching, setIsSearching] = useState(false);
   const [showResults, setShowResults] = useState(false);
 
-  const handleSearch = async (searchQuery: string) => {
+  const handleSearch = useCallback(async (searchQuery: string) => {
     if (searchQuery.length < 2) {
       setSearchResults(null);
       setShowResults(false);
@@ -48,7 +48,7 @@ export default function SearchBar({ crawlId, onResultsChange }: SearchBarProps) 
     } finally {
       setIsSearching(false);
     }
-  };
+  }, [crawlId, onResultsChange]);
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
@@ -58,7 +58,7 @@ export default function SearchBar({ crawlId, onResultsChange }: SearchBarProps) 
     }, 300);
 
     return () => clearTimeout(delayDebounceFn);
-  }, [query]);
+  }, [query, handleSearch]);
 
   const handleClear = () => {
     setQuery('');

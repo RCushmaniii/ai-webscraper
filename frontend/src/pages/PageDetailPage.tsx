@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -68,11 +68,7 @@ const PageDetailPage: React.FC = () => {
   const exportMenuRef = useRef<HTMLDivElement>(null);
   const thumbnailScrollRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    fetchPageData();
-  }, [pageId]);
-
-  const fetchPageData = async () => {
+  const fetchPageData = useCallback(async () => {
     if (!crawlId || !pageId) return;
 
     try {
@@ -93,7 +89,11 @@ const PageDetailPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [crawlId, pageId]);
+
+  useEffect(() => {
+    fetchPageData();
+  }, [fetchPageData]);
 
   const handleCopyContent = (format: 'text' | 'markdown' | 'html' | 'json' = 'text') => {
     const content = page?.full_content || page?.content_summary;
@@ -244,9 +244,6 @@ const PageDetailPage: React.FC = () => {
     const total = links.length;
     // "Other" links would be anchors (#), mailto:, tel:, javascript:, etc.
     // Since we're working with what we have, calculate from page data if available
-    const pageInternal = page?.internal_links || internal;
-    const pageExternal = page?.external_links || external;
-    const pageTotal = pageInternal + pageExternal;
     const other = Math.max(0, total - internal - external);
 
     return { internal, external, other, total };

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Image as ImageIcon, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
@@ -30,13 +30,9 @@ const ImagesPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'missing' | 'poor'>('all');
 
-  useEffect(() => {
-    fetchImageAnalysis();
-  }, [crawlId]);
-
-  const fetchImageAnalysis = async () => {
+  const fetchImageAnalysis = useCallback(async () => {
     if (!crawlId) return;
-    
+
     try {
       setLoading(true);
       setError(null);
@@ -49,7 +45,7 @@ const ImagesPage: React.FC = () => {
       // Mock data for now
       setImages([]);
       setPages(new Map());
-      
+
     } catch (err) {
       console.error('Error fetching image analysis:', err);
       setError('Failed to load image analysis data');
@@ -57,7 +53,11 @@ const ImagesPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [crawlId]);
+
+  useEffect(() => {
+    fetchImageAnalysis();
+  }, [fetchImageAnalysis]);
 
   const getFilteredImages = () => {
     switch (filter) {
