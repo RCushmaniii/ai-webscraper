@@ -38,7 +38,8 @@ class Crawler:
         self.client = httpx.AsyncClient(
             follow_redirects=True,
             max_redirects=10,
-            timeout=30.0,
+            timeout=15.0,
+            limits=httpx.Limits(max_keepalive_connections=20, max_connections=50),
             headers=self._get_headers()
         )
         self.rate_limiter = RateLimiter(self.crawl.rate_limit)

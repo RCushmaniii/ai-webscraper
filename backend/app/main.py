@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.middleware.gzip import GZipMiddleware
 import time
 import logging
 import asyncio
@@ -70,6 +71,9 @@ app = FastAPI(
 # ============================================================================
 # MIDDLEWARE CONFIGURATION
 # ============================================================================
+
+# 0. GZip Compression - Compress responses larger than 500 bytes
+app.add_middleware(GZipMiddleware, minimum_size=500)
 
 # 1. CORS Middleware - Must be first to handle preflight requests
 app.add_middleware(

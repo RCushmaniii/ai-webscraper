@@ -227,13 +227,12 @@ async def list_crawls(
             
             # Bulk update stale crawls to failed status
             if stale_crawl_ids:
-                for crawl_id in stale_crawl_ids:
-                    auth_client.table("crawls").update({
-                        "status": "failed",
-                        "notes": "Crawl timed out (no activity for 30+ minutes)",
-                        "completed_at": now.isoformat(),  # Fixed: Database uses completed_at (not finished_at)
-                        "updated_at": now.isoformat()
-                    }).eq("id", crawl_id).execute()
+                auth_client.table("crawls").update({
+                    "status": "failed",
+                    "notes": "Crawl timed out (no activity for 30+ minutes)",
+                    "completed_at": now.isoformat(),
+                    "updated_at": now.isoformat()
+                }).in_("id", stale_crawl_ids).execute()
                 logger.info(f"Marked {len(stale_crawl_ids)} stale crawls as failed")
         
         # STEP 2: Fetch crawls with optional status filter
