@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    env_file:
+      - backend/.env
+    depends_on:
+      - redis
+    command: uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+  celery:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      - backend/.env
+    depends_on:
+      - redis
+    command: celery -A app.services.worker.celery_app worker --loglevel=info --pool=solo
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
