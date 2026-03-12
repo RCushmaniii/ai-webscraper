@@ -82,8 +82,8 @@ const CrawlDetailPage: React.FC = () => {
   const [linkSortDir, setLinkSortDir] = useState<'asc' | 'desc'>('asc');
   const [imageSort, setImageSort] = useState<string>('has_alt');
   const [imageSortDir, setImageSortDir] = useState<'asc' | 'desc'>('asc');
-  const [issueSort, setIssueSort] = useState<string>('severity');
-  const [issueSortDir, setIssueSortDir] = useState<'asc' | 'desc'>('desc');
+  const issueSort = 'severity';
+  const issueSortDir = 'desc' as const;
   const [issueSeverityFilter, setIssueSeverityFilter] = useState<'all' | 'critical' | 'high' | 'medium' | 'low'>('all');
   const [expandedIssueCards, setExpandedIssueCards] = useState<Set<string>>(new Set());
   const [lightboxImage, setLightboxImage] = useState<Image | null>(null);
