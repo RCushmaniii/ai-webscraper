@@ -9,7 +9,7 @@ import Layout from './components/Layout';
 const MarketingHomePage = lazy(() => import('./pages/MarketingHomePage'));
 const QuickStartPage = lazy(() => import('./pages/QuickStartPage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
-const SignupPage = lazy(() => import('./pages/SignUpPage'));
+const SignupPage = lazy(() => import('./pages/SignupPage'));
 const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'));
 const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
