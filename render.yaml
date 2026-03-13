@@ -2,8 +2,7 @@ services:
   - type: web
     name: ai-webscraper-api
     runtime: docker
-    dockerfilePath: ./backend/Dockerfile
-    dockerContext: ./backend
+    rootDir: ./backend
     plan: free
     region: oregon
     healthCheckPath: /api/v1/health
