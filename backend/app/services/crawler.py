@@ -755,7 +755,17 @@ class Crawler:
             # Use JS rendering if explicitly enabled OR if auto-detection determines it's needed
             if self.crawl.js_rendering or self._needs_js_rendering(response):
                 method = "js"
-                html_content, render_time = await self._render_with_playwright(url)
+                try:
+                    html_content, render_time = await self._render_with_playwright(url)
+                except Exception as pw_error:
+                    # Playwright failed (likely OOM on free tier) — fall back to plain HTTP
+                    logger.warning(f"Playwright failed for {url}: {pw_error}. Falling back to plain HTTP response.")
+                    method = "static"
+                    try:
+                        html_content = response.text
+                    except UnicodeDecodeError:
+                        html_content = response.content.decode('utf-8', errors='replace')
+                    render_time = int((time.time() - start_time) * 1000)
             else:
                 try:
                     html_content = response.text
