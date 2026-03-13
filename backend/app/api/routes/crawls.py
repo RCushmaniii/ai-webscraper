@@ -191,6 +191,66 @@ async def get_crawl_usage(current_user: User = Depends(get_current_user)):
         raise HTTPException(status_code=500, detail="Failed to get crawl usage")
 
 
+@router.get("/dashboard-stats")
+async def get_dashboard_stats(current_user: User = Depends(get_current_user)):
+    """
+    Get aggregated dashboard stats in a single call.
+    Replaces N+1 per-crawl API calls on the frontend dashboard.
+    """
+    try:
+        auth_client = get_auth_client()
+
+        # All crawls for this user (just the fields we need)
+        crawls_resp = auth_client.table("crawls").select(
+            "id, status, pages_crawled, total_links"
+        ).eq("user_id", str(current_user.id)).execute()
+        crawls = crawls_resp.data or []
+
+        total = len(crawls)
+        completed = sum(1 for c in crawls if c.get("status") == "completed")
+        failed = sum(1 for c in crawls if c.get("status") == "failed")
+        active = sum(1 for c in crawls if c.get("status") in ("running", "queued", "pending", "in_progress"))
+        total_pages = sum(c.get("pages_crawled", 0) or 0 for c in crawls)
+
+        # Aggregate broken links across all crawls
+        completed_ids = [c["id"] for c in crawls if c.get("status") == "completed"]
+        total_broken_links = 0
+        total_issues = 0
+
+        if completed_ids:
+            # Broken links count
+            try:
+                links_resp = auth_client.table("links").select(
+                    "id", count="exact"
+                ).in_("crawl_id", completed_ids).eq("is_broken", True).execute()
+                total_broken_links = links_resp.count if hasattr(links_resp, 'count') and links_resp.count else len(links_resp.data or [])
+            except Exception:
+                pass
+
+            # Issues count
+            try:
+                issues_resp = auth_client.table("issues").select(
+                    "id", count="exact"
+                ).in_("crawl_id", completed_ids).execute()
+                total_issues = issues_resp.count if hasattr(issues_resp, 'count') and issues_resp.count else len(issues_resp.data or [])
+            except Exception:
+                pass
+
+        return {
+            "total_crawls": total,
+            "completed_crawls": completed,
+            "failed_crawls": failed,
+            "active_crawls": active,
+            "total_pages": total_pages,
+            "total_broken_links": total_broken_links,
+            "total_issues": total_issues,
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting dashboard stats: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get dashboard stats")
+
+
 @router.get("/", response_model=List[CrawlResponse])
 async def list_crawls(
     skip: int = 0,

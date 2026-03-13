@@ -29,6 +29,32 @@ interface DashboardStats {
   totalIssues: number;
 }
 
+// Skeleton components for perceived performance
+const SkeletonCard: React.FC = () => (
+  <div className="bg-white rounded-lg border border-primary-100 p-6 shadow-soft animate-pulse">
+    <div className="flex items-center justify-between">
+      <div>
+        <div className="h-4 w-20 bg-gray-200 rounded mb-3" />
+        <div className="h-8 w-16 bg-gray-200 rounded" />
+      </div>
+      <div className="w-12 h-12 bg-gray-200 rounded-lg" />
+    </div>
+  </div>
+);
+
+const SkeletonCrawlRow: React.FC = () => (
+  <div className="block p-4 rounded-lg border border-gray-200 animate-pulse">
+    <div className="flex items-center justify-between">
+      <div className="flex-1 min-w-0 mr-4">
+        <div className="h-4 w-40 bg-gray-200 rounded mb-2" />
+        <div className="h-3 w-56 bg-gray-100 rounded mb-2" />
+        <div className="h-3 w-32 bg-gray-100 rounded" />
+      </div>
+      <div className="h-6 w-20 bg-gray-200 rounded-full" />
+    </div>
+  </div>
+);
+
 const DashboardPage: React.FC = () => {
   usePageTitle('Dashboard');
   const [recentCrawls, setRecentCrawls] = useState<Crawl[]>([]);
@@ -41,7 +67,8 @@ const DashboardPage: React.FC = () => {
     totalBrokenLinks: 0,
     totalIssues: 0,
   });
-  const [loading, setLoading] = useState(true);
+  const [statsLoaded, setStatsLoaded] = useState(false);
+  const [crawlsLoaded, setCrawlsLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { user, isAdmin } = useAuth();
   const navigate = useNavigate();
@@ -53,63 +80,43 @@ const DashboardPage: React.FC = () => {
   };
 
   useEffect(() => {
-    const fetchDashboardData = async () => {
+    // Fetch stats and crawls in parallel — two calls instead of 30+
+    const fetchStats = async () => {
       try {
-        setLoading(true);
+        const data = await apiService.getDashboardStats();
+        setStats({
+          totalCrawls: data.total_crawls,
+          completedCrawls: data.completed_crawls,
+          failedCrawls: data.failed_crawls,
+          activeCrawls: data.active_crawls,
+          totalPages: data.total_pages,
+          totalBrokenLinks: data.total_broken_links,
+          totalIssues: data.total_issues,
+        });
+      } catch (err) {
+        console.error('Error fetching dashboard stats:', err);
+        setError('Failed to load dashboard stats.');
+      } finally {
+        setStatsLoaded(true);
+      }
+    };
 
-        // Fetch all crawls to calculate stats
+    const fetchCrawls = async () => {
+      try {
         const crawls = await apiService.getCrawls();
-
-        // Sort by created_at descending and get top 5
         const sortedCrawls = [...crawls].sort((a, b) =>
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         );
         setRecentCrawls(sortedCrawls.slice(0, 5));
-
-        // Calculate stats
-        const completed = crawls.filter(c => c.status === 'completed').length;
-        const failed = crawls.filter(c => c.status === 'failed').length;
-        const active = crawls.filter(c => c.status === 'running' || c.status === 'queued' || c.status === 'pending' || c.status === 'in_progress').length;
-
-        // Get total pages and issues from completed crawls
-        let totalPages = 0;
-        let totalBrokenLinks = 0;
-        let totalIssues = 0;
-
-        for (const crawl of crawls.filter(c => c.status === 'completed').slice(0, 10)) {
-          try {
-            const [pages, links, issues] = await Promise.all([
-              apiService.getCrawlPages(crawl.id, { limit: 1000 }).catch(() => []),
-              apiService.getCrawlLinks(crawl.id, { is_broken: true, limit: 100 }).catch(() => []),
-              apiService.getCrawlIssues(crawl.id, { limit: 100 }).catch(() => [])
-            ]);
-            totalPages += pages.length;
-            totalBrokenLinks += links.length;
-            totalIssues += issues.length;
-          } catch (e) {
-            console.error('Error fetching data for crawl:', crawl.id, e);
-          }
-        }
-
-        setStats({
-          totalCrawls: crawls.length,
-          completedCrawls: completed,
-          failedCrawls: failed,
-          activeCrawls: active,
-          totalPages,
-          totalBrokenLinks,
-          totalIssues,
-        });
-
       } catch (err) {
-        console.error('Error fetching dashboard data:', err);
-        setError('Failed to load dashboard data. Please try again later.');
+        console.error('Error fetching crawls:', err);
       } finally {
-        setLoading(false);
+        setCrawlsLoaded(true);
       }
     };
 
-    fetchDashboardData();
+    fetchStats();
+    fetchCrawls();
   }, []);
 
   const getStatusBadge = (status: string) => {
@@ -161,17 +168,6 @@ const DashboardPage: React.FC = () => {
   // Calculate usage percentage
   const usagePercentage = Math.min((stats.totalPages / usageLimits.pages) * 100, 100);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="flex items-center gap-3">
-          <Loader2 className="w-6 h-6 text-secondary-500 animate-spin" />
-          <span className="text-lg font-medium text-gray-500">Loading dashboard...</span>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="container px-4 py-8 mx-auto max-w-7xl">
       <div className="mb-8">
@@ -187,94 +183,105 @@ const DashboardPage: React.FC = () => {
         </div>
       )}
 
-      {/* Stats Cards - Reordered with Active first when > 0 */}
+      {/* Stats Cards — skeleton while loading */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        {/* Active Crawls - Prominent when > 0 */}
-        <div className={`bg-white rounded-lg border p-6 shadow-soft transition-all ${
-          stats.activeCrawls > 0
-            ? 'border-blue-300 ring-2 ring-blue-100 animate-pulse-subtle'
-            : 'border-primary-100'
-        }`}>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-neutral-steel">Active</p>
-              <p className={`text-3xl font-bold mt-2 ${
-                stats.activeCrawls > 0 ? 'text-blue-600' : 'text-gray-400'
-              }`}>
-                {stats.activeCrawls}
-              </p>
-              {stats.activeCrawls > 0 && (
-                <p className="text-xs text-blue-600 mt-1 flex items-center gap-1">
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                  Crawling now
-                </p>
-              )}
-            </div>
-            <div className={`p-3 rounded-lg ${
-              stats.activeCrawls > 0 ? 'bg-blue-100' : 'bg-gray-100'
+        {!statsLoaded ? (
+          <>
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+          </>
+        ) : (
+          <>
+            {/* Active Crawls - Prominent when > 0 */}
+            <div className={`bg-white rounded-lg border p-6 shadow-soft transition-all ${
+              stats.activeCrawls > 0
+                ? 'border-blue-300 ring-2 ring-blue-100 animate-pulse-subtle'
+                : 'border-primary-100'
             }`}>
-              <Activity className={`w-6 h-6 ${
-                stats.activeCrawls > 0 ? 'text-blue-600' : 'text-gray-400'
-              }`} />
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-neutral-steel">Active</p>
+                  <p className={`text-3xl font-bold mt-2 ${
+                    stats.activeCrawls > 0 ? 'text-blue-600' : 'text-gray-400'
+                  }`}>
+                    {stats.activeCrawls}
+                  </p>
+                  {stats.activeCrawls > 0 && (
+                    <p className="text-xs text-blue-600 mt-1 flex items-center gap-1">
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      Crawling now
+                    </p>
+                  )}
+                </div>
+                <div className={`p-3 rounded-lg ${
+                  stats.activeCrawls > 0 ? 'bg-blue-100' : 'bg-gray-100'
+                }`}>
+                  <Activity className={`w-6 h-6 ${
+                    stats.activeCrawls > 0 ? 'text-blue-600' : 'text-gray-400'
+                  }`} />
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
 
-        {/* Total Crawls */}
-        <div className="bg-white rounded-lg border border-primary-100 p-6 shadow-soft">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-neutral-steel">Total Crawls</p>
-              <p className="text-3xl font-bold text-neutral-charcoal mt-2">{stats.totalCrawls}</p>
+            {/* Total Crawls */}
+            <div className="bg-white rounded-lg border border-primary-100 p-6 shadow-soft">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-neutral-steel">Total Crawls</p>
+                  <p className="text-3xl font-bold text-neutral-charcoal mt-2">{stats.totalCrawls}</p>
+                </div>
+                <div className="p-3 bg-secondary-100 rounded-lg">
+                  <Globe className="w-6 h-6 text-secondary-600" />
+                </div>
+              </div>
             </div>
-            <div className="p-3 bg-secondary-100 rounded-lg">
-              <Globe className="w-6 h-6 text-secondary-600" />
-            </div>
-          </div>
-        </div>
 
-        {/* Success Rate (replaces redundant "Completed") */}
-        <div className="bg-white rounded-lg border border-primary-100 p-6 shadow-soft">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-neutral-steel">Success Rate</p>
-              <p className={`text-3xl font-bold mt-2 ${
-                successRate >= 90 ? 'text-green-600' :
-                successRate >= 70 ? 'text-yellow-600' :
-                'text-red-600'
-              }`}>
-                {successRate}%
-              </p>
-              <p className="text-xs text-gray-500 mt-1">
-                {stats.completedCrawls}/{stats.totalCrawls} completed
-              </p>
+            {/* Success Rate */}
+            <div className="bg-white rounded-lg border border-primary-100 p-6 shadow-soft">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-neutral-steel">Success Rate</p>
+                  <p className={`text-3xl font-bold mt-2 ${
+                    successRate >= 90 ? 'text-green-600' :
+                    successRate >= 70 ? 'text-yellow-600' :
+                    'text-red-600'
+                  }`}>
+                    {successRate}%
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {stats.completedCrawls}/{stats.totalCrawls} completed
+                  </p>
+                </div>
+                <div className={`p-3 rounded-lg ${
+                  successRate >= 90 ? 'bg-green-100' :
+                  successRate >= 70 ? 'bg-yellow-100' :
+                  'bg-red-100'
+                }`}>
+                  <CheckCircle className={`w-6 h-6 ${
+                    successRate >= 90 ? 'text-green-600' :
+                    successRate >= 70 ? 'text-yellow-600' :
+                    'text-red-600'
+                  }`} />
+                </div>
+              </div>
             </div>
-            <div className={`p-3 rounded-lg ${
-              successRate >= 90 ? 'bg-green-100' :
-              successRate >= 70 ? 'bg-yellow-100' :
-              'bg-red-100'
-            }`}>
-              <CheckCircle className={`w-6 h-6 ${
-                successRate >= 90 ? 'text-green-600' :
-                successRate >= 70 ? 'text-yellow-600' :
-                'text-red-600'
-              }`} />
-            </div>
-          </div>
-        </div>
 
-        {/* Pages Crawled */}
-        <div className="bg-white rounded-lg border border-primary-100 p-6 shadow-soft">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-neutral-steel">Pages Crawled</p>
-              <p className="text-3xl font-bold text-secondary-600 mt-2">{stats.totalPages.toLocaleString()}</p>
+            {/* Pages Crawled */}
+            <div className="bg-white rounded-lg border border-primary-100 p-6 shadow-soft">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-neutral-steel">Pages Crawled</p>
+                  <p className="text-3xl font-bold text-secondary-600 mt-2">{stats.totalPages.toLocaleString()}</p>
+                </div>
+                <div className="p-3 bg-secondary-100 rounded-lg">
+                  <TrendingUp className="w-6 h-6 text-secondary-600" />
+                </div>
+              </div>
             </div>
-            <div className="p-3 bg-secondary-100 rounded-lg">
-              <TrendingUp className="w-6 h-6 text-secondary-600" />
-            </div>
-          </div>
-        </div>
+          </>
+        )}
       </div>
 
       {/* Main Content Grid */}
@@ -293,7 +300,13 @@ const DashboardPage: React.FC = () => {
               </Link>
             </div>
 
-            {recentCrawls.length > 0 ? (
+            {!crawlsLoaded ? (
+              <div className="space-y-2">
+                <SkeletonCrawlRow />
+                <SkeletonCrawlRow />
+                <SkeletonCrawlRow />
+              </div>
+            ) : recentCrawls.length > 0 ? (
               <div className="space-y-2">
                 {recentCrawls.map((crawl) => (
                   <Link
@@ -348,47 +361,56 @@ const DashboardPage: React.FC = () => {
                 {isAdmin ? 'Admin Plan' : 'Free Plan'}
               </span>
             </div>
-            <div className="space-y-4">
-              {/* Pages Usage */}
-              <div>
-                <div className="flex items-center justify-between text-sm mb-1">
-                  <span className="text-gray-600">Pages Crawled</span>
-                  <span className="font-medium text-gray-900">
-                    {stats.totalPages.toLocaleString()} / {usageLimits.pages.toLocaleString()}
-                  </span>
-                </div>
-                <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full rounded-full transition-all ${
-                      usagePercentage >= 90 ? 'bg-red-500' :
-                      usagePercentage >= 70 ? 'bg-yellow-500' :
-                      'bg-secondary-500'
-                    }`}
-                    style={{ width: `${usagePercentage}%` }}
-                  />
-                </div>
-                <p className="text-xs text-gray-500 mt-1">
-                  {usagePercentage >= 90
-                    ? 'Approaching limit - consider upgrading'
-                    : `${(100 - usagePercentage).toFixed(0)}% remaining`}
-                </p>
+            {!statsLoaded ? (
+              <div className="space-y-4 animate-pulse">
+                <div className="h-4 w-full bg-gray-200 rounded" />
+                <div className="h-2 w-full bg-gray-200 rounded-full" />
+                <div className="h-4 w-full bg-gray-200 rounded" />
+                <div className="h-2 w-full bg-gray-200 rounded-full" />
               </div>
-              {/* Crawls Usage */}
-              <div>
-                <div className="flex items-center justify-between text-sm mb-1">
-                  <span className="text-gray-600">Total Crawls</span>
-                  <span className="font-medium text-gray-900">
-                    {stats.totalCrawls} / {usageLimits.crawls.toLocaleString()}
-                  </span>
+            ) : (
+              <div className="space-y-4">
+                {/* Pages Usage */}
+                <div>
+                  <div className="flex items-center justify-between text-sm mb-1">
+                    <span className="text-gray-600">Pages Crawled</span>
+                    <span className="font-medium text-gray-900">
+                      {stats.totalPages.toLocaleString()} / {usageLimits.pages.toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${
+                        usagePercentage >= 90 ? 'bg-red-500' :
+                        usagePercentage >= 70 ? 'bg-yellow-500' :
+                        'bg-secondary-500'
+                      }`}
+                      style={{ width: `${usagePercentage}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {usagePercentage >= 90
+                      ? 'Approaching limit - consider upgrading'
+                      : `${(100 - usagePercentage).toFixed(0)}% remaining`}
+                  </p>
                 </div>
-                <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-secondary-500 rounded-full transition-all"
-                    style={{ width: `${Math.min((stats.totalCrawls / usageLimits.crawls) * 100, 100)}%` }}
-                  />
+                {/* Crawls Usage */}
+                <div>
+                  <div className="flex items-center justify-between text-sm mb-1">
+                    <span className="text-gray-600">Total Crawls</span>
+                    <span className="font-medium text-gray-900">
+                      {stats.totalCrawls} / {usageLimits.crawls.toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-secondary-500 rounded-full transition-all"
+                      style={{ width: `${Math.min((stats.totalCrawls / usageLimits.crawls) * 100, 100)}%` }}
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
 
@@ -448,7 +470,12 @@ const DashboardPage: React.FC = () => {
               <h2 className="text-lg font-semibold text-neutral-charcoal">Site Health</h2>
             </div>
 
-            {(stats.totalBrokenLinks > 0 || stats.totalIssues > 0 || stats.failedCrawls > 0) ? (
+            {!statsLoaded ? (
+              <div className="space-y-3 animate-pulse">
+                <div className="h-12 bg-gray-100 rounded-lg" />
+                <div className="h-12 bg-gray-100 rounded-lg" />
+              </div>
+            ) : (stats.totalBrokenLinks > 0 || stats.totalIssues > 0 || stats.failedCrawls > 0) ? (
               <div className="space-y-3">
                 {stats.totalBrokenLinks > 0 && (
                   <div className="flex items-center justify-between p-3 bg-red-50 border border-red-200 rounded-lg">

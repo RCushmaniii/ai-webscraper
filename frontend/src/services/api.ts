@@ -1,6 +1,50 @@
 import axios, { AxiosInstance } from 'axios';
 import { supabase } from '../lib/supabase';
 
+// Simple in-memory cache with TTL
+interface CacheEntry<T> {
+  data: T;
+  expiry: number;
+}
+
+class ApiCache {
+  private cache = new Map<string, CacheEntry<any>>();
+  private defaultTTL = 30_000; // 30 seconds
+
+  get<T>(key: string): T | null {
+    const entry = this.cache.get(key);
+    if (!entry) return null;
+    if (Date.now() > entry.expiry) {
+      this.cache.delete(key);
+      return null;
+    }
+    return entry.data as T;
+  }
+
+  set<T>(key: string, data: T, ttl?: number): void {
+    this.cache.set(key, {
+      data,
+      expiry: Date.now() + (ttl ?? this.defaultTTL),
+    });
+  }
+
+  invalidate(keyPrefix?: string): void {
+    if (!keyPrefix) {
+      this.cache.clear();
+      return;
+    }
+    const keysToDelete: string[] = [];
+    this.cache.forEach((_, key) => {
+      if (key.startsWith(keyPrefix)) {
+        keysToDelete.push(key);
+      }
+    });
+    keysToDelete.forEach(key => this.cache.delete(key));
+  }
+}
+
+const apiCache = new ApiCache();
+
 // Types
 export interface User {
   id: string;
@@ -37,6 +81,8 @@ export interface Crawl {
   js_rendering: boolean;
   rate_limit: number;
   user_agent?: string;
+  pages_crawled?: number;
+  total_links?: number;
   created_at: string;
   updated_at: string;
   error?: string;
@@ -280,12 +326,35 @@ class ApiService {
   
   // Crawl endpoints
   async createCrawl(crawl: CrawlCreate): Promise<Crawl> {
+    apiCache.invalidate('crawls');
+    apiCache.invalidate('dashboard-stats');
     const response = await this.api.post('/crawls', crawl);
     return response.data;
   }
-  
+
   async getCrawls(params?: { status?: string }): Promise<Crawl[]> {
+    const cacheKey = `crawls:${JSON.stringify(params || {})}`;
+    const cached = apiCache.get<Crawl[]>(cacheKey);
+    if (cached) return cached;
     const response = await this.api.get('/crawls', { params });
+    apiCache.set(cacheKey, response.data);
+    return response.data;
+  }
+
+  async getDashboardStats(): Promise<{
+    total_crawls: number;
+    completed_crawls: number;
+    failed_crawls: number;
+    active_crawls: number;
+    total_pages: number;
+    total_broken_links: number;
+    total_issues: number;
+  }> {
+    const cacheKey = 'dashboard-stats';
+    const cached = apiCache.get<any>(cacheKey);
+    if (cached) return cached;
+    const response = await this.api.get('/crawls/dashboard-stats');
+    apiCache.set(cacheKey, response.data, 60_000); // 60s TTL for stats
     return response.data;
   }
   
@@ -300,6 +369,8 @@ class ApiService {
   }
 
   async deleteCrawl(id: string): Promise<{ message: string }> {
+    apiCache.invalidate('crawls');
+    apiCache.invalidate('dashboard-stats');
     const response = await this.api.delete(`/crawls/${id}`);
     return response.data;
   }
@@ -427,7 +498,10 @@ class ApiService {
     remaining_crawls: number | null;
     limit_reached: boolean;
   }> {
+    const cached = apiCache.get<any>('usage');
+    if (cached) return cached;
     const response = await this.api.get('/crawls/usage');
+    apiCache.set('usage', response.data, 60_000);
     return response.data;
   }
 }
