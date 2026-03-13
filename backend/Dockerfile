@@ -2,17 +2,20 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# Install minimal system dependencies
+# Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     curl \
+    # Font packages that Playwright expects but are renamed in this Debian version
+    fonts-unifont \
+    fonts-ubuntu \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Let Playwright install Chromium AND its system dependencies
+# Install Playwright Chromium with system dependencies
 RUN playwright install --with-deps chromium
 
 # Copy the rest of the application
