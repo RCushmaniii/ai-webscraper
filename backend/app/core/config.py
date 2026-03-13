@@ -77,18 +77,14 @@ class Settings(BaseSettings):
     ]
 
     # Production CORS origins (strict - only actual domains)
-    # TODO: Replace with your actual production domains before deployment!
     _PROD_CORS_ORIGINS: list[str] = [
-        "https://yourdomain.com",           # Primary production domain
-        "https://www.yourdomain.com",       # www subdomain
-        "https://app.yourdomain.com",       # App subdomain (if applicable)
-        # Add more production domains as needed
+        "https://ai-webscraper-tan.vercel.app",  # Vercel frontend
+        "https://webscraper.cushlabs.ai",         # Future custom domain
     ]
 
     # Staging CORS origins
     _STAGING_CORS_ORIGINS: list[str] = [
-        "https://staging.yourdomain.com",
-        "https://dev.yourdomain.com",
+        "https://ai-webscraper-tan.vercel.app",
     ]
 
     # Get CORS origins from environment variable OR use defaults based on environment
@@ -104,8 +100,8 @@ class Settings(BaseSettings):
 
         IMPORTANT: In production, this should ONLY contain your actual frontend domains!
         """
-        # If CORS_ORIGINS env var is set, use it (comma-separated)
-        env_origins = os.getenv("CORS_ORIGINS", "").strip()
+        # If CORS_ORIGINS or BACKEND_CORS_ORIGINS env var is set, use it (comma-separated)
+        env_origins = os.getenv("BACKEND_CORS_ORIGINS", os.getenv("CORS_ORIGINS", "")).strip()
         if env_origins:
             return [origin.strip() for origin in env_origins.split(",") if origin.strip()]
 
