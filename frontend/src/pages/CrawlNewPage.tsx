@@ -291,6 +291,12 @@ const CrawlNewPage: React.FC = () => {
               <label htmlFor="respect_robots_txt" className="ml-3 text-sm text-neutral-charcoal">
                 Respect robots.txt
               </label>
+              <span className="ml-2 group relative">
+                <Info className="w-4 h-4 text-neutral-steel cursor-help" />
+                <span className="invisible group-hover:visible absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-56 px-3 py-2 text-xs text-white bg-gray-900 rounded-lg shadow-lg z-10">
+                  Obey the site's robots.txt rules, which tell crawlers which pages to skip
+                </span>
+              </span>
             </div>
 
             <div className="flex items-center">
@@ -305,6 +311,12 @@ const CrawlNewPage: React.FC = () => {
               <label htmlFor="follow_external_links" className="ml-3 text-sm text-neutral-charcoal">
                 Follow external links
               </label>
+              <span className="ml-2 group relative">
+                <Info className="w-4 h-4 text-neutral-steel cursor-help" />
+                <span className="invisible group-hover:visible absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-56 px-3 py-2 text-xs text-white bg-gray-900 rounded-lg shadow-lg z-10">
+                  Also crawl pages on other domains linked from this site
+                </span>
+              </span>
             </div>
 
             <div className="flex items-center">
@@ -319,6 +331,12 @@ const CrawlNewPage: React.FC = () => {
               <label htmlFor="js_rendering" className="ml-3 text-sm text-neutral-charcoal">
                 Enable JavaScript rendering
               </label>
+              <span className="ml-2 group relative">
+                <Info className="w-4 h-4 text-neutral-steel cursor-help" />
+                <span className="invisible group-hover:visible absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-64 px-3 py-2 text-xs text-white bg-gray-900 rounded-lg shadow-lg z-10">
+                  Use a real browser to render pages. Required for React, Next.js, Vue, and other JavaScript-heavy sites
+                </span>
+              </span>
             </div>
           </div>
 

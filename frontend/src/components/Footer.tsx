@@ -158,15 +158,16 @@ const Footer: React.FC = () => {
         <div className="pt-8 border-t border-gray-800">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="text-sm text-gray-400">
-              © {currentYear} AI WebScraper. All rights reserved. Built with ❤️ by{' '}
-              <a 
-                href="https://github.com/RCushmaniii" 
-                target="_blank" 
+              © {currentYear}{' '}
+              <a
+                href="https://cushlabs.ai"
+                target="_blank"
                 rel="noopener noreferrer"
                 className="text-secondary-400 hover:text-secondary-300 transition-colors"
               >
-                Robert Cushman
+                CushLabs.ai
               </a>
+              . All rights reserved.
             </div>
             <div className="flex gap-6 text-sm">
               <Link to="/privacy" className="hover:text-white transition-colors" onClick={() => window.scrollTo(0, 0)}>
