@@ -17,3 +17,5 @@ services:
         value: production
       - key: BACKEND_CORS_ORIGINS
         sync: false
+      - key: FIRECRAWL_API_KEY
+        sync: false

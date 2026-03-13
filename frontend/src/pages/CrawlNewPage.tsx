@@ -23,7 +23,7 @@ const CrawlNewPage: React.FC = () => {
     max_pages: 10,
     respect_robots_txt: true,
     follow_external_links: false,
-    js_rendering: false,
+    js_rendering: false,  // kept for API compat but auto-detected on backend
     rate_limit: 1,
     user_agent: 'AI WebScraper Bot'
   });
@@ -319,25 +319,7 @@ const CrawlNewPage: React.FC = () => {
               </span>
             </div>
 
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                name="js_rendering"
-                id="js_rendering"
-                checked={formData.js_rendering}
-                onChange={handleInputChange}
-                className="w-4 h-4 text-secondary-500 border-primary-300 rounded focus:ring-secondary-500"
-              />
-              <label htmlFor="js_rendering" className="ml-3 text-sm text-neutral-charcoal">
-                Enable JavaScript rendering
-              </label>
-              <span className="ml-2 group relative">
-                <Info className="w-4 h-4 text-neutral-steel cursor-help" />
-                <span className="invisible group-hover:visible absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-64 px-3 py-2 text-xs text-white bg-gray-900 rounded-lg shadow-lg z-10">
-                  Use a real browser to render pages. Required for React, Next.js, Vue, and other JavaScript-heavy sites
-                </span>
-              </span>
-            </div>
+            {/* JS rendering is now auto-detected — no checkbox needed */}
           </div>
 
           <div className="mt-8 flex items-center gap-4">

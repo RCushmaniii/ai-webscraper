@@ -10,8 +10,6 @@ from datetime import datetime
 from typing import Dict, List, Optional, Set, Tuple, Any
 from urllib.parse import urljoin, urlparse, unquote
 
-from playwright.async_api import async_playwright
-
 from app.models.models import Crawl, Page, SEOMetadata, CrawlProgress, Link, Issue
 from uuid import uuid4
 from app.db.supabase import supabase_client
@@ -751,31 +749,29 @@ class Crawler:
                 else:
                     response.encoding = 'utf-8'  # Safe default
 
-            # Check if we need to use Playwright for JavaScript rendering
-            # Use JS rendering if explicitly enabled OR if auto-detection determines it's needed
-            if self.crawl.js_rendering or self._needs_js_rendering(response):
-                method = "js"
+            # First, get the plain HTTP content
+            try:
+                html_content = response.text
+            except UnicodeDecodeError:
                 try:
-                    html_content, render_time = await self._render_with_playwright(url)
-                except Exception as pw_error:
-                    # Playwright failed (likely OOM on free tier) — fall back to plain HTTP
-                    logger.warning(f"Playwright failed for {url}: {pw_error}. Falling back to plain HTTP response.")
+                    html_content = response.content.decode('utf-8', errors='replace')
+                except Exception:
+                    logger.warning(f"Could not decode content from {url}")
+                    html_content = None
+            render_time = int((time.time() - start_time) * 1000)
+
+            # Auto-detect if the page needs JS rendering (empty body, SPA shell, etc.)
+            if html_content and self._needs_js_rendering(html_content):
+                logger.info(f"Auto-detected JS-dependent page: {url}. Re-fetching via Firecrawl.")
+                try:
+                    fc_html, fc_time = await self._render_with_firecrawl(url)
+                    if fc_html and len(fc_html) > len(html_content or ""):
+                        html_content = fc_html
+                        render_time = fc_time
+                        method = "js (firecrawl)"
+                except Exception as fc_error:
+                    logger.warning(f"Firecrawl failed for {url}: {fc_error}. Using plain HTTP content.")
                     method = "static"
-                    try:
-                        html_content = response.text
-                    except UnicodeDecodeError:
-                        html_content = response.content.decode('utf-8', errors='replace')
-                    render_time = int((time.time() - start_time) * 1000)
-            else:
-                try:
-                    html_content = response.text
-                except UnicodeDecodeError:
-                    try:
-                        html_content = response.content.decode('utf-8', errors='replace')
-                    except Exception:
-                        logger.warning(f"Could not decode content from {url}")
-                        html_content = None
-                render_time = int((time.time() - start_time) * 1000)
 
             # If content could not be decoded, treat as a failed page
             if html_content is None:
@@ -899,55 +895,64 @@ class Crawler:
             # Return None to indicate failure (main loop will skip this page)
             return None
     
-    def _needs_js_rendering(self, response: httpx.Response) -> bool:
-        """Determine if a page needs JavaScript rendering."""
-        # Check content type
-        content_type = response.headers.get("content-type", "").lower()
-        if "text/html" not in content_type:
-            return False
-        
-        # Check for empty or very small HTML
-        if len(response.text) < 1000:
+    def _needs_js_rendering(self, html_content: str) -> bool:
+        """
+        Auto-detect if a page is a JS-only shell that needs browser rendering.
+        Only triggers for truly empty pages, not just any page with a framework.
+        """
+        if not html_content or len(html_content) < 500:
             return True
-        
-        # Check for common JS frameworks
-        js_indicators = [
-            "vue", "react", "angular", "ember", "backbone", 
-            "data-reactroot", "ng-app", "v-app"
-        ]
-        
-        for indicator in js_indicators:
-            if indicator in response.text.lower():
-                return True
-        
-        # Check for minimal HTML structure
-        soup = BeautifulSoup(response.text, 'lxml')
-        if len(soup.find_all(['p', 'div', 'section', 'article'])) < 5:
+
+        soup = BeautifulSoup(html_content, 'lxml')
+        body = soup.find('body')
+        if not body:
             return True
-        
+
+        # Get visible text content (strip scripts/styles)
+        for tag in body.find_all(['script', 'style', 'noscript']):
+            tag.decompose()
+        visible_text = body.get_text(strip=True)
+
+        # If body has almost no visible text, it's likely a JS shell
+        if len(visible_text) < 100:
+            # Check for SPA indicators: empty root divs
+            root_divs = body.find_all('div', id=True)
+            for div in root_divs:
+                if div.get('id') in ('root', 'app', '__next', '__nuxt') and len(div.get_text(strip=True)) < 50:
+                    return True
+            # Very little content overall
+            return True
+
         return False
-    
-    async def _render_with_playwright(self, url: str) -> Tuple[str, int]:
-        """Render a page with Playwright for JavaScript execution."""
+
+    async def _render_with_firecrawl(self, url: str) -> Tuple[str, int]:
+        """Re-fetch a page using Firecrawl for JS rendering."""
         start_time = time.time()
-        browser = None
-        page = None
+        api_key = settings.FIRECRAWL_API_KEY
 
-        async with async_playwright() as p:
-            try:
-                browser = await p.chromium.launch()
-                page = await browser.new_page()
-                await page.goto(url, wait_until="domcontentloaded", timeout=30000)
-                # Wait for JS to execute and render dynamic content
-                await asyncio.sleep(3)
-                html_content = await page.content()
-                render_time = int((time.time() - start_time) * 1000)
-            finally:
-                if page:
-                    await page.close()
-                if browser:
-                    await browser.close()
+        if not api_key:
+            raise ValueError("FIRECRAWL_API_KEY not configured")
 
+        # Use httpx to call Firecrawl API directly (avoid sync SDK in async context)
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(
+                "https://api.firecrawl.dev/v1/scrape",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "url": url,
+                    "formats": ["html"],
+                    "waitFor": 3000
+                }
+            )
+            response.raise_for_status()
+            data = response.json()
+
+        html_content = data.get("data", {}).get("html", "")
+        render_time = int((time.time() - start_time) * 1000)
+        logger.info(f"Firecrawl rendered {url} in {render_time}ms ({len(html_content)} chars)")
         return html_content, render_time
     
     def _extract_text_excerpt(self, soup: BeautifulSoup) -> str:

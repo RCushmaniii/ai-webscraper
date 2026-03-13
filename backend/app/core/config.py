@@ -116,7 +116,10 @@ class Settings(BaseSettings):
     # Scraping settings
     DEFAULT_USER_AGENT: str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
     REQUEST_TIMEOUT: int = 30  # seconds
-    
+
+    # Firecrawl API (JS rendering fallback for SPA pages)
+    FIRECRAWL_API_KEY: str = os.getenv("FIRECRAWL_API_KEY", "")
+
     # Storage settings
     STORAGE_DIR: str = os.getenv("STORAGE_DIR", os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "storage"))
     HTML_SNAPSHOTS_DIR: str = os.path.join(STORAGE_DIR, "html_snapshots")
