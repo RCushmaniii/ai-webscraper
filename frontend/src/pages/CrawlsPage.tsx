@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Plus, Loader2, Trash2, Eye, Globe, Settings2, RefreshCw, Info } from 'lucide-react';
+import { Plus, Trash2, Eye, Globe, Settings2, RefreshCw, Info } from 'lucide-react';
 import { apiService, Crawl } from '../services/api';
 import ConfirmationModal from '../components/ConfirmationModal';
 import { usePageTitle } from '../hooks/usePageTitle';
