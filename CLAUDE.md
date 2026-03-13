@@ -268,7 +268,7 @@ import logging
 # In main.py and worker.py
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
-logging.getLogger("celery").setLevel(logging.WARNING)
+logging.getLogger("hpack").setLevel(logging.WARNING)
 ```
 
 ---
@@ -400,18 +400,55 @@ ai-webscraper/
 ├── database/                  # Database migrations
 │   └── migrations/           # SQL migration files
 │
-├── start.bat                  # Start all servers
+├── render.yaml                # Render Blueprint (backend deployment)
+├── frontend/vercel.json       # Vercel config (frontend deployment)
+├── start.bat                  # Start all servers (local dev)
 └── CLAUDE.md                 # This file
 ```
 
 ---
 
+## Deployment Architecture
+
+### Production (as of 2026-03-13)
+
+| Component | Platform | URL | Tier |
+|-----------|----------|-----|------|
+| Backend | Render (Docker) | `https://ai-webscraper-api-p7ed.onrender.com` | Free |
+| Frontend | Vercel | `https://ai-webscraper-tan.vercel.app` | Free |
+| Database | Supabase | Project: `cushlabs-site-analysis` | Free |
+
+### Key Deployment Details
+
+- **Backend Docker image**: `mcr.microsoft.com/playwright/python:v1.50.0-noble` (includes Chromium for JS rendering)
+- **Render listens on `$PORT`** (default 10000, NOT 8000)
+- **render.yaml** uses `rootDir: ./backend` for monorepo support
+- **Vercel Root Directory**: `frontend` (set in Vercel Settings > General)
+- **REACT_APP_API_URL**: Set in Vercel env vars, baked at build time — redeploy required after changes
+- **CORS**: Backend reads `BACKEND_CORS_ORIGINS` env var (comma-separated), falls back to `CORS_ORIGINS`, then environment defaults
+- **Supabase Auth**: Site URL and Redirect URLs configured to Vercel domain
+- **Auto-deploy**: Both Render and Vercel auto-deploy from `main` branch
+- **Free tier cold starts**: Render spins down after inactivity, first request takes ~30s
+
+### Background Tasks
+
+Crawl jobs run in-process using `asyncio.create_task()` (no Celery/Redis). This works for the current demo-tier workload (max 50 pages per crawl). If scaling beyond single-process, a task queue would need to be reintroduced.
+
+---
+
 ## Key Files to Know
+
+### Deployment
+
+- `render.yaml` - Render Blueprint for backend service
+- `frontend/vercel.json` - Vercel SPA routing config
+- `backend/Dockerfile` - Docker build for Render (Playwright base image)
+- `backend/app/core/config.py` - CORS origins, environment config
 
 ### Backend
 
 - `backend/app/main.py` - FastAPI app, logging config
-- `backend/app/services/worker.py` - Background crawl tasks
+- `backend/app/services/worker.py` - Background crawl tasks (async, no Celery)
 - `backend/app/services/crawler.py` - Core crawling logic
 - `backend/app/services/issue_detector.py` - SEO issue detection
 - `backend/app/core/domain_blacklist.py` - Blacklisted domains
@@ -538,5 +575,5 @@ https://deepwiki.com/RCushmaniii/ai-resume-tailor
 
 ---
 
-**Last Updated**: January 18, 2026
+**Last Updated**: March 13, 2026
 **Maintained By**: Claude (Anthropic) + CushLabs Team
