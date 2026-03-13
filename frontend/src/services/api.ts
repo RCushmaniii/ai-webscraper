@@ -200,7 +200,7 @@ class ApiService {
 
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
-          console.debug('Auth header attached');
+          // token attached
         }
       } catch (error) {
         console.error('Error in auth interceptor:', error);
