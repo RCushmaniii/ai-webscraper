@@ -57,7 +57,7 @@ class CrawlBase(BaseModel):
     url: str = Field(..., max_length=2048)
     name: Optional[str] = None
     max_depth: int = Field(default=2, ge=1, le=10)
-    max_pages: int = Field(default=100, ge=1, le=5000)
+    max_pages: int = Field(default=10, ge=1, le=5000)
     respect_robots_txt: bool = True
     follow_external_links: bool = False  # Match database column name
     max_external_links: int = 5  # Maximum number of external domains to follow

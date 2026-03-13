@@ -5,6 +5,8 @@ from uuid import UUID, uuid4
 import logging
 from datetime import datetime
 
+import asyncio
+
 from app.core.auth import get_current_user, get_auth_client
 from app.core.audit import log_audit_event
 from app.core.config import settings
@@ -17,8 +19,9 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-# Free tier crawl limit
+# Free tier limits
 FREE_CRAWL_LIMIT = 3
+FREE_MAX_PAGES = 50
 
 
 @router.post("/", response_model=CrawlResponse)
@@ -47,13 +50,18 @@ async def create_crawl(
         # Debug: Log the raw data received from frontend
         logger.info(f"Raw data from request: js_rendering={raw_data.get('js_rendering')} (type: {type(raw_data.get('js_rendering'))})")
 
+        # Enforce max_pages cap for free-tier users
+        if not current_user.is_admin:
+            if raw_data.get("max_pages", 10) > FREE_MAX_PAGES:
+                raw_data["max_pages"] = FREE_MAX_PAGES
+
         # Map model fields to ACTUAL database column names (based on existing schema)
         crawl_data = {
             "id": str(crawl_id),
             "user_id": str(current_user.id),
             "url": raw_data["url"],  # Database uses 'url' column
             "max_depth": raw_data.get("max_depth", 2),
-            "max_pages": raw_data.get("max_pages", 100),
+            "max_pages": raw_data.get("max_pages", 10),
             "respect_robots_txt": raw_data.get("respect_robots_txt", True),
             "follow_external_links": raw_data.get("follow_external_links", False),
             "js_rendering": raw_data.get("js_rendering", False),
@@ -113,9 +121,9 @@ async def create_crawl(
                     }
                 )
 
-        # Dispatch the crawl task to Celery
-        crawl_site.delay(str(crawl_id))
-        logger.info(f"Dispatched crawl task {crawl_id} to Celery.")
+        # Dispatch the crawl task as a background coroutine
+        asyncio.create_task(crawl_site(str(crawl_id)))
+        logger.info(f"Dispatched crawl task {crawl_id} as background task.")
 
         # Audit log: record crawl creation
         log_audit_event(
@@ -348,14 +356,7 @@ async def stop_crawl(
         if crawl['status'] not in ['running', 'queued', 'pending']:
             raise HTTPException(status_code=400, detail=f"Cannot stop crawl with status: {crawl['status']}")
         
-        # Revoke the Celery task if it exists
-        if crawl.get('task_id'):
-            try:
-                from app.services.worker import celery_app
-                celery_app.control.revoke(crawl['task_id'], terminate=True, signal='SIGKILL')
-                logger.info(f"Revoked Celery task {crawl['task_id']} for crawl {crawl_id}")
-            except Exception as revoke_error:
-                logger.warning(f"Error revoking Celery task: {revoke_error}")
+        # Note: In-process background tasks will check crawl status and stop gracefully
         
         # Update crawl status to stopped
         from datetime import datetime
@@ -854,14 +855,8 @@ async def start_crawl_task(crawl_id: str, start_url: str, config: Dict[str, Any]
             logger.error(f"Error updating crawl status: {update_response.error}")
             return
         
-        # Start the Celery task
-        task = crawl_site.delay(crawl_id)
-        
-        # Update crawl with task_id
-        update_response = supabase_client.table("crawls").update({"task_id": task.id}).eq("id", crawl_id).execute()
-        
-        if hasattr(update_response, "error") and update_response.error is not None:
-            logger.error(f"Error updating crawl task_id: {update_response.error}")
+        # Start the crawl as a background coroutine
+        asyncio.create_task(crawl_site(crawl_id))
         
     except Exception as e:
         logger.error(f"Error starting crawl task: {e}")

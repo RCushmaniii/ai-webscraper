@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: ai-webscraper-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    region: oregon
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+      - key: ENVIRONMENT
+        value: production
+      - key: BACKEND_CORS_ORIGINS
+        sync: false

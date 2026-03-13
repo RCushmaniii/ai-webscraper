@@ -20,7 +20,7 @@ const CrawlNewPage: React.FC = () => {
     url: '',
     name: '',
     max_depth: 2,
-    max_pages: 100,
+    max_pages: 10,
     respect_robots_txt: true,
     follow_external_links: false,
     js_rendering: false,
@@ -74,8 +74,8 @@ const CrawlNewPage: React.FC = () => {
     if (formData.max_depth < 1 || formData.max_depth > 10) {
       return 'Max depth must be between 1 and 10';
     }
-    if (formData.max_pages < 1 || formData.max_pages > 1000) {
-      return 'Max pages must be between 1 and 1000';
+    if (formData.max_pages < 1 || formData.max_pages > 50) {
+      return 'Max pages must be between 1 and 50';
     }
     if (formData.rate_limit < 0.1 || formData.rate_limit > 10) {
       return 'Rate limit must be between 0.1 and 10 requests per second';
@@ -234,13 +234,13 @@ const CrawlNewPage: React.FC = () => {
                 name="max_pages"
                 id="max_pages"
                 min="1"
-                max="1000"
+                max="50"
                 required
                 value={formData.max_pages}
                 onChange={handleInputChange}
                 className="block w-full px-4 py-3 border border-primary-200 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-secondary-500 text-sm text-neutral-charcoal"
               />
-              <p className="mt-1.5 text-xs text-neutral-steel">Maximum number of pages to crawl</p>
+              <p className="mt-1.5 text-xs text-neutral-steel">Maximum number of pages to crawl (1-50)</p>
             </div>
 
             <div>

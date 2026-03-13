@@ -22,7 +22,6 @@ logger = logging.getLogger(__name__)
 # Reduce verbosity of noisy libraries (only show warnings/errors)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
-logging.getLogger("celery").setLevel(logging.WARNING)
 
 # Background task for monitoring stale crawls
 async def monitor_stale_crawls():

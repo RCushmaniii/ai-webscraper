@@ -21,7 +21,7 @@ class TestCrawlBaseValidation:
         crawl = CrawlBase(url="https://example.com")
         assert crawl.url == "https://example.com"
         assert crawl.max_depth == 2  # default
-        assert crawl.max_pages == 100  # default
+        assert crawl.max_pages == 10  # default
 
     def test_crawl_base_valid_http(self):
         crawl = CrawlBase(url="http://example.com")
@@ -69,7 +69,7 @@ class TestCrawlBaseValidation:
 
     def test_crawl_base_max_pages_defaults(self):
         crawl = CrawlBase(url="https://example.com")
-        assert crawl.max_pages == 100
+        assert crawl.max_pages == 10
 
     def test_crawl_base_rate_limit_defaults(self):
         crawl = CrawlBase(url="https://example.com")

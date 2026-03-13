@@ -121,10 +121,6 @@ class Settings(BaseSettings):
     DEFAULT_USER_AGENT: str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
     REQUEST_TIMEOUT: int = 30  # seconds
     
-    # Celery settings for async tasks
-    CELERY_BROKER_URL: str = os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0")
-    CELERY_RESULT_BACKEND: str = os.getenv("CELERY_RESULT_BACKEND", "redis://localhost:6379/0")
-    
     # Storage settings
     STORAGE_DIR: str = os.getenv("STORAGE_DIR", os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "storage"))
     HTML_SNAPSHOTS_DIR: str = os.path.join(STORAGE_DIR, "html_snapshots")

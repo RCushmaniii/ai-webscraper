@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from typing import List, Dict, Any, Optional
 from uuid import UUID, uuid4
 import logging
+import asyncio
 from datetime import datetime
 
 from app.core.auth import get_current_user
@@ -418,14 +419,8 @@ async def start_batch_task(batch_id: str, user_id: str, site_urls: List[str], co
             logger.error(f"Error updating batch status: {update_response.error}")
             return
 
-        # Start the Celery task
-        task = batch_crawl.delay(batch_id, user_id, site_urls, config)
-        
-        # Update batch with task_id
-        update_response = supabase_client.table("batches").update({"task_id": task.id}).eq("id", batch_id).execute()
-        
-        if hasattr(update_response, "error") and update_response.error is not None:
-            logger.error(f"Error updating batch task_id: {update_response.error}")
+        # Start the batch crawl as a background coroutine
+        asyncio.create_task(batch_crawl(batch_id, user_id, site_urls, config))
         
     except Exception as e:
         logger.error(f"Error starting batch task: {e}")

@@ -21,9 +21,7 @@ echo ========================================
 echo.
 echo This script will start:
 echo - FastAPI Backend (Port 8000)
-echo - Celery Worker
 echo - React Frontend (Port 3000)
-echo - Using Upstash Redis (cloud)
 echo.
 echo Press any key to continue or Ctrl+C to cancel...
 pause >nul
@@ -35,8 +33,6 @@ taskkill /F /IM node.exe >nul 2>&1
 echo Killing Python processes...
 taskkill /F /IM python.exe >nul 2>&1
 taskkill /F /IM pythonw.exe >nul 2>&1
-echo Killing Celery processes...
-taskkill /F /FI "WINDOWTITLE eq Celery*" >nul 2>&1
 echo Waiting for processes to fully terminate...
 timeout /t 3 /nobreak >nul
 echo Cleanup complete.
@@ -73,9 +69,6 @@ start "FastAPI Backend" cmd /c "title FastAPI Backend (Port %BACKEND_PORT%) && c
 echo Waiting for backend to initialize...
 timeout /t 3 /nobreak >nul
 
-echo Starting Celery worker...
-start "Celery Worker" cmd /c "title Celery Worker && cd /d %CD% && venv\Scripts\activate && celery -A app.services.worker.celery_app worker --loglevel=info --pool=solo"
-
 echo Starting React frontend on port %FRONTEND_PORT%...
 cd ..\frontend
 if not exist node_modules (
@@ -94,7 +87,6 @@ echo Services running in separate windows:
 echo - Backend:         http://localhost:%BACKEND_PORT%
 echo - Frontend:        http://localhost:%FRONTEND_PORT%
 echo - API Docs:        http://localhost:%BACKEND_PORT%/docs
-echo - Redis:           Upstash Cloud (configured)
 echo.
 echo Waiting for frontend to start...
 timeout /t 10 >nul

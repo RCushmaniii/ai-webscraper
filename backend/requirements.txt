@@ -16,10 +16,6 @@ selenium==4.15.2
 playwright==1.40.0
 webdriver-manager==4.0.1
 
-# Task queue and async processing
-celery==5.3.4
-redis==5.0.1
-
 # Database and storage
 supabase==2.27.0
 python-dotenv==1.0.0

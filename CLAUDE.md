@@ -14,7 +14,7 @@
 - Extract and store page content for inspection
 - Detect high-signal SEO and technical issues
 - Generate AI-powered analysis reports
-- Provide tier-based access (Free: 3 crawls, Admin: unlimited)
+- Provide tier-based access (Free: 3 crawls / 50 pages max, Admin: unlimited)
 
 ### Explicit Non-Goals (v1)
 
@@ -41,7 +41,7 @@
 - **Server**: Uvicorn ASGI server
 - **Database**: Supabase (PostgreSQL)
 - **Auth**: Supabase Auth + Row Level Security (RLS)
-- **Task Queue**: Celery + Redis
+- **Background Tasks**: FastAPI BackgroundTasks (in-process, no external dependencies)
 - **Scraping**: BeautifulSoup4, Playwright (JS rendering)
 
 ---
@@ -211,11 +211,11 @@ All authenticated routes use the `ProtectedRoute` wrapper:
 
 | Tier | Crawl Limit | Access |
 |------|-------------|--------|
-| Free (`is_admin=false`) | 3 total crawls | Basic features |
+| Free (`is_admin=false`) | 3 total crawls, 50 pages max | Basic features |
 | Admin (`is_admin=true`) | Unlimited | All features + user management |
 
 **Implementation**:
-- `backend/app/api/routes/crawls.py` - `FREE_CRAWL_LIMIT = 3` constant
+- `backend/app/api/routes/crawls.py` - `FREE_CRAWL_LIMIT = 3` and `FREE_MAX_PAGES = 50` constants
 - `/crawls/usage` endpoint returns current usage info
 - Frontend shows remaining crawls in CrawlsPage and CrawlNewPage
 - Limit check happens in `create_crawl()` before creating new crawl
@@ -280,7 +280,7 @@ logging.getLogger("celery").setLevel(logging.WARNING)
 **Start servers**:
 
 ```bash
-start.bat  # Starts frontend (port 3000) + backend (port 8000) + Celery worker
+start.bat  # Starts frontend (port 3000) + backend (port 8000)
 ```
 
 **Stop servers**:
@@ -294,7 +294,7 @@ start.bat  # Starts frontend (port 3000) + backend (port 8000) + Celery worker
 
    - Edit files in `backend/app/`
    - Backend auto-reloads with Uvicorn `--reload`
-   - **Exception**: Celery worker requires restart for changes
+   - Background crawl tasks run in-process (no separate worker)
 
 2. **Frontend changes** (TypeScript/React):
 
@@ -411,7 +411,7 @@ ai-webscraper/
 ### Backend
 
 - `backend/app/main.py` - FastAPI app, logging config
-- `backend/app/services/worker.py` - Celery crawl task
+- `backend/app/services/worker.py` - Background crawl tasks
 - `backend/app/services/crawler.py` - Core crawling logic
 - `backend/app/services/issue_detector.py` - SEO issue detection
 - `backend/app/core/domain_blacklist.py` - Blacklisted domains
@@ -496,8 +496,7 @@ ai-webscraper/
 
 1. Check for Python syntax errors in recent changes
 2. Clear `__pycache__` directories
-3. Restart Redis: `redis-server`
-4. Check Supabase connection in `.env`
+3. Check Supabase connection in `.env`
 
 ### Frontend Won't Compile
 
@@ -513,7 +512,7 @@ ai-webscraper/
 
 ### Crawl Stuck/Never Completes
 
-1. Check Celery worker logs
+1. Check backend server logs for background task errors
 2. Clear Python bytecode cache
 3. Verify `completed_at` field is being set (not `finished_at`)
 4. Check for infinite loops in external link following
