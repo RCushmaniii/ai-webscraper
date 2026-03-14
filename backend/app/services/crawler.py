@@ -1108,8 +1108,10 @@ class Crawler:
         for link in links:
             href = link['href']
 
-            # Skip fragment-only and javascript links
+            # Skip fragment-only, javascript, and Cloudflare email obfuscation links
             if href.startswith('#') or href.startswith('javascript:'):
+                continue
+            if '/cdn-cgi/l/email-protection' in href:
                 continue
 
             # Convert to absolute URL
