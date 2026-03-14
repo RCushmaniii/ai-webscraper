@@ -1154,6 +1154,7 @@ class Crawler:
                 "source_page_id": str(source_page_id),
                 "target_url": absolute_url,
                 "is_internal": is_internal,
+                "is_broken": False,  # Updated after status check
                 "depth": new_depth,
                 "status_code": None,
                 "error": None,
@@ -1279,6 +1280,9 @@ class Crawler:
                     link_data['status_code'] = 0
                     link_data['error'] = str(e)[:500]  # Limit error length
                     link_data['latency_ms'] = int((time.time() - start_time) * 1000)
+
+            # Mark broken if status >= 400 or request failed entirely
+            link_data['is_broken'] = (link_data.get('status_code') or 0) >= 400 or link_data.get('status_code') == 0
 
             # Save the link with status info
             await self._save_link(link_data)

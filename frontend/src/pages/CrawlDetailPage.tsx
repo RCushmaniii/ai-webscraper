@@ -752,9 +752,9 @@ const CrawlDetailPage: React.FC = () => {
       };
     }
 
-    // Broken links → Show actual broken links
-    if (message.includes('broken') && issueGroup.type !== 'Crawl Error') {
-      const brokenLinks = links.filter(link => link.is_broken);
+    // Broken links → Show actual broken links (check is_broken OR status_code >= 400)
+    if ((message.includes('broken') || message.includes('404')) && issueGroup.type !== 'Crawl Error') {
+      const brokenLinks = links.filter(link => link.is_broken || (link.status_code && link.status_code >= 400));
       return {
         type: 'links',
         items: brokenLinks,
