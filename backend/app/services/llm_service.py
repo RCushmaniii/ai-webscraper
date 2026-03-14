@@ -647,39 +647,71 @@ Create a compelling meta description that:
     ) -> ExecutiveSummary:
         """Generate executive-level site analysis summary"""
         
-        prompt = f"""Generate an executive summary for this website analysis.
+        # Build detailed broken links section
+        broken_detail = site_data.get('broken_links_detail', [])
+        broken_section = ""
+        if broken_detail:
+            broken_lines = [f"  - {bl.get('url', '?')} (HTTP {bl.get('status_code', '?')}, anchor: \"{bl.get('anchor_text', '')}\")" for bl in broken_detail[:10]]
+            broken_section = "Broken Links Detail:\n" + "\n".join(broken_lines)
+
+        # Build problem pages section
+        problem_pages = site_data.get('pages_with_issues', [])
+        problems_section = ""
+        if problem_pages:
+            problem_lines = [f"  - {pp.get('url', '?')}: {', '.join(pp.get('problems', []))}" for pp in problem_pages[:10]]
+            problems_section = "Pages With Problems:\n" + "\n".join(problem_lines)
+
+        status_summary = site_data.get('status_code_summary', {})
+
+        prompt = f"""Generate an executive summary for this website analysis. Be SPECIFIC — reference actual URLs, page names, and concrete issues from the data below. Do NOT give generic advice.
 
 Site: {site_data.get('base_url', 'Unknown')}
 Pages Crawled: {site_data.get('total_pages', 0)}
 Issues Found: {site_data.get('total_issues', 0)}
 
+HTTP Status Breakdown:
+- 2xx (OK): {status_summary.get('2xx', 0)}
+- 3xx (Redirects): {status_summary.get('3xx', 0)}
+- 4xx (Client Errors): {status_summary.get('4xx', 0)}
+- 5xx (Server Errors): {status_summary.get('5xx', 0)}
+
 Key Metrics:
-- Average Content Quality: {site_data.get('avg_content_score', 'N/A')}
 - Broken Links: {site_data.get('broken_links', 0)}
 - Missing Meta Descriptions: {site_data.get('missing_meta', 0)}
 - Thin Content Pages: {site_data.get('thin_content_pages', 0)}
 - Orphan Pages: {site_data.get('orphan_pages', 0)}
+- Images Missing Alt Text: {site_data.get('images_missing_alt', 0)} of {site_data.get('total_images', 0)} total
+- Average Response Time: {site_data.get('avg_response_time_ms', 0)}ms
+
+{broken_section}
+
+{problems_section}
 
 Top Issues by Frequency:
 {self._format_top_issues(site_data.get('top_issues', []))}
 
-Sample Page Summaries:
+Pages Crawled:
 {self._format_page_samples(site_data.get('page_samples', []))}
 
-IMPORTANT SCORING GUIDELINES:
-- A site with mostly working pages (200 status codes) and functional content is fundamentally healthy
+CRITICAL INSTRUCTIONS:
+- Be SPECIFIC. Reference actual broken URLs, actual page names, actual issues from above.
+- Do NOT say "Add missing alt text" unless images are actually missing alt text in the data.
+- Do NOT recommend generic things like "conduct regular site audits" — that's obvious.
+- Each critical issue and recommendation must cite specific URLs or data points.
+- Quick wins should be actionable: "Fix the 404 at /pricing" not "Fix broken links."
+
+SCORING GUIDELINES:
+- A site with mostly 200s and functional content is fundamentally healthy (score 70+)
 - Minor SEO issues (missing alt text, duplicate titles) should NOT dramatically lower the score
-- Focus critical issues on truly broken things (404s, server errors, completely missing critical content)
-- A site with good core functionality should score 70+ even with SEO improvements needed
+- Focus critical issues on truly broken things (404s, server errors, missing critical content)
 - Reserve scores below 50 for sites with serious structural or content problems
-- Duplicate SEO metadata across pages is a LOW priority issue, not critical
 
 Create a comprehensive executive summary with:
-1. Overall site health score (be fair - working sites with minor issues should score 70-85)
+1. Overall site health score (be fair and data-driven)
 2. Breakdown of technical, content, UX, and trust scores
-3. Critical issues (only truly blocking problems)
-4. Quick wins for immediate impact
-5. Strategic recommendations for long-term improvement"""
+3. Critical issues citing specific URLs and problems
+4. Quick wins that reference specific pages/links to fix
+5. Strategic recommendations grounded in the actual data"""
         
         return await self._complete_structured(
             task=LLMTask.EXECUTIVE_SUMMARY,

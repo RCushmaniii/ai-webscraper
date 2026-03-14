@@ -501,6 +501,33 @@ async def generate_crawl_report(
                 {"url": p.get("url", ""), "summary": p.get("title", "")}
                 for p in pages[:10]
             ],
+            # Enriched context for better AI analysis
+            "broken_links_detail": [
+                {
+                    "url": l.get("target_url", ""),
+                    "status_code": l.get("status_code"),
+                    "anchor_text": l.get("anchor_text", ""),
+                }
+                for l in broken_links[:15]
+            ],
+            "pages_with_issues": [
+                {
+                    "url": p.get("url", ""),
+                    "title": p.get("title", ""),
+                    "problems": pp.get("problems", []),
+                }
+                for pp in problem_pages[:10]
+                for p in pages if p.get("url") == pp.get("url")
+            ][:10],
+            "status_code_summary": {
+                "2xx": len(status_2xx),
+                "3xx": len(status_3xx),
+                "4xx": len(status_4xx),
+                "5xx": len(status_5xx),
+            },
+            "images_missing_alt": len(images_missing_alt),
+            "total_images": len(images),
+            "avg_response_time_ms": avg_response_time,
         }
 
         llm_service = LLMService(crawl_id=crawl_id)
@@ -538,6 +565,17 @@ async def generate_crawl_report(
 
             # --- Executive Summary (AI-Generated) ---
             "executive_summary": executive_summary.model_dump(),
+
+            # --- Metrics (consumed by frontend Crawl Metrics widget) ---
+            "metrics": {
+                "total_pages": total_pages,
+                "total_issues": len(issues),
+                "broken_links": len(broken_links),
+                "missing_meta": len(missing_meta_desc),
+                "thin_content_pages": len(thin_content_pages),
+                "critical_issues": len(issues_by_severity["critical"]),
+                "high_issues": len(issues_by_severity["high"]),
+            },
 
             # --- Overall Health Metrics ---
             "health_metrics": {
