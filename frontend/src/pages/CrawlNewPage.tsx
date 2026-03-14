@@ -149,7 +149,7 @@ const CrawlNewPage: React.FC = () => {
                 <button
                   type="button"
                   className="mt-3 inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-secondary-500 hover:bg-secondary-hover rounded-lg transition-colors"
-                  onClick={() => toast.info('Pro upgrade coming soon!')}
+                  disabled
                 >
                   Upgrade to Pro
                 </button>

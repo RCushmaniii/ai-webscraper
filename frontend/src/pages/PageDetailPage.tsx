@@ -763,7 +763,7 @@ const PageDetailPage: React.FC = () => {
                   onClick={() => {
                     if (imageStats.missingAlt > 0) {
                       setActiveTab('images');
-                      toast.info('Showing images - filter for missing alt text');
+                      // Tab switch is self-explanatory
                     }
                   }}
                   className={`p-4 rounded-lg text-left transition-all ${

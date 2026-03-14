@@ -272,7 +272,7 @@ const ImagesPage: React.FC = () => {
                         <button
                           onClick={() => {
                             navigator.clipboard.writeText(image.suggested_alt);
-                            toast.success('Alt text copied to clipboard');
+                            // Clipboard copy — no toast needed
                           }}
                           className="px-3 py-1 text-xs font-medium text-white bg-secondary-600 rounded-md hover:bg-secondary-700"
                         >

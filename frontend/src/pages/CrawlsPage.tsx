@@ -84,13 +84,10 @@ const CrawlsPage: React.FC = () => {
 
         try {
           await apiService.deleteCrawl(id);
-          toast.success('Crawl deleted');
         } catch (err: any) {
           // 404 means already deleted - that's fine
           const is404 = err?.response?.status === 404 || err?.message?.includes('404');
-          if (is404) {
-            toast.success('Crawl deleted');
-          } else {
+          if (!is404) {
             console.error('Error deleting crawl:', err);
             toast.error('Failed to delete crawl');
             fetchCrawls(); // Refresh to restore accurate state
@@ -122,7 +119,7 @@ const CrawlsPage: React.FC = () => {
 
   const handleBulkDelete = async () => {
     if (selectedCrawls.size === 0) {
-      toast.info('No crawls selected');
+      // No crawls selected — button shouldn't be reachable, but guard anyway
       return;
     }
 
@@ -216,7 +213,7 @@ const CrawlsPage: React.FC = () => {
 
   const handleBulkRerun = async () => {
     if (selectedCrawls.size === 0) {
-      toast.info('No crawls selected');
+      // No crawls selected — button shouldn't be reachable, but guard anyway
       return;
     }
 
@@ -267,7 +264,7 @@ const CrawlsPage: React.FC = () => {
     const failedCrawlsList = crawls.filter(crawl => crawl.status === 'failed');
 
     if (failedCrawlsList.length === 0) {
-      toast.info('No failed crawls to delete');
+      // No failed crawls — guard only
       return;
     }
 
@@ -391,7 +388,7 @@ const CrawlsPage: React.FC = () => {
               )}
               {usage?.limit_reached ? (
                 <button
-                  onClick={() => toast.info('Pro upgrade coming soon!')}
+                  disabled
                   className="inline-flex items-center gap-2 px-6 py-3 text-sm font-medium text-white bg-secondary-500 hover:bg-secondary-hover rounded-lg shadow-soft transition-colors"
                 >
                   <Plus className="w-5 h-5" />
@@ -552,8 +549,8 @@ const CrawlsPage: React.FC = () => {
             </p>
             {usage?.limit_reached ? (
               <button
-                onClick={() => toast.info('Pro upgrade coming soon!')}
-                className="inline-flex items-center gap-2 px-8 py-4 text-base font-medium text-white bg-secondary-500 hover:bg-secondary-hover rounded-lg shadow-soft transition-colors"
+                disabled
+                className="inline-flex items-center gap-2 px-8 py-4 text-base font-medium text-white bg-secondary-500 hover:bg-secondary-hover rounded-lg shadow-soft transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Plus className="w-5 h-5" />
                 Upgrade to Pro
