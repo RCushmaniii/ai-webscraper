@@ -181,9 +181,22 @@ const CrawlDetailPage: React.FC = () => {
           }
           break;
         case 'issues':
-          if (issues.length === 0) {
-            const issuesData = await apiService.getCrawlIssues(id);
-            setIssues(issuesData);
+          {
+            // Issues detail panel needs links + images data to show specifics
+            const fetches: Promise<void>[] = [];
+            if (issues.length === 0) {
+              fetches.push(apiService.getCrawlIssues(id).then(d => setIssues(d)));
+            }
+            if (links.length === 0) {
+              fetches.push(apiService.getCrawlLinks(id).then(d => setLinks(d)));
+            }
+            if (images.length === 0) {
+              fetches.push(apiService.getCrawlImages(id).then(d => setImages(d)));
+            }
+            if (pages.length === 0) {
+              fetches.push(apiService.getCrawlPages(id).then(d => setPages(d)));
+            }
+            await Promise.all(fetches);
           }
           break;
         case 'images':
