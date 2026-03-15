@@ -82,15 +82,23 @@ const QuickStartPage: React.FC = () => {
       </div>
 
       <div className="text-center">
-        <button
-          onClick={handleGetStarted}
-          className="inline-flex items-center gap-2 px-8 py-4 text-lg font-semibold text-white bg-secondary-500 hover:bg-secondary-hover rounded-lg shadow-md hover:shadow-lg transition-all"
-        >
-          {user ? 'Go to Crawls' : 'Get Started'}
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-          </svg>
-        </button>
+        <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+          <button
+            onClick={handleGetStarted}
+            className="inline-flex items-center gap-2 px-8 py-4 text-lg font-semibold text-white bg-secondary-500 hover:bg-secondary-hover rounded-lg shadow-md hover:shadow-lg transition-all"
+          >
+            {user ? 'Start a Crawl' : 'Get Started'}
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+            </svg>
+          </button>
+          <Link
+            to="/docs"
+            className="inline-flex items-center gap-2 px-8 py-4 text-lg font-semibold text-neutral-charcoal bg-white hover:bg-gray-50 rounded-lg border-2 border-gray-200 hover:border-gray-300 transition-all"
+          >
+            View Documentation
+          </Link>
+        </div>
         {!user && (
           <p className="mt-4 text-sm text-neutral-steel">
             Already have an account?{' '}
