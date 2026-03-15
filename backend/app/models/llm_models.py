@@ -324,19 +324,20 @@ class ReadabilityAnalysis(BaseModel):
 
 class CriticalIssue(BaseModel):
     """A critical issue that needs immediate attention"""
-    title: str
-    description: str
+    title: str = Field(..., description="Short title, e.g. 'Meta description too long on /services'")
+    description: str = Field(..., description="Specific description citing actual URLs, current values, and recommended values")
     pages_affected: int
-    recommended_action: str
+    recommended_action: str = Field(..., description="Concrete action, e.g. 'Change title from X to Y' — not 'optimize SEO'")
     priority: Literal["critical", "high", "medium"]
+    affected_urls: List[str] = Field(default_factory=list, description="Specific URLs affected by this issue")
 
 
 class StrategicRecommendation(BaseModel):
     """A strategic recommendation for the site"""
     title: str
-    description: str
+    description: str = Field(..., description="Specific recommendation grounded in the audit data — cite URLs, numbers, current values")
     expected_impact: str
-    effort_estimate: str
+    effort_estimate: str = Field(..., description="e.g. '5 minutes', '2 hours', '1 day' — be specific")
     timeline: str
 
 
@@ -365,7 +366,7 @@ class ExecutiveSummary(BaseModel):
     # Recommendations
     quick_wins: List[str] = Field(
         default_factory=list,
-        description="Easy fixes for immediate impact",
+        description="Specific copy-paste fixes citing URLs and values, e.g. 'On /services, shorten meta from 167 to 155 chars: [suggested text]'. NOT generic like 'optimize SEO elements'.",
         max_length=5
     )
     strategic_recommendations: List[StrategicRecommendation] = Field(

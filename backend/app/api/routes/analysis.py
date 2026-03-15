@@ -487,6 +487,28 @@ async def generate_crawl_report(
         # PHASE 3: AI-POWERED ANALYSIS
         # =============================================
 
+        # Build per-page SEO audit data for the LLM
+        page_seo_audit = []
+        for page in pages:
+            page_id = page.get("id")
+            seo = seo_map.get(page_id, {})
+            page_url = page.get("url", "")
+            page_issues_list = [i for i in issues if i.get("page_id") == page_id]
+
+            audit_entry = {
+                "url": page_url,
+                "title": page.get("title", ""),
+                "title_length": seo.get("title_length", len(page.get("title", "") or "")),
+                "meta_description": seo.get("meta_description", page.get("meta_description", "")),
+                "meta_description_length": seo.get("meta_description_length", len(page.get("meta_description", "") or "")),
+                "h1": seo.get("h1", ""),
+                "word_count": page.get("word_count", 0),
+                "status_code": page.get("status_code", 0),
+                "response_time_ms": page.get("response_time", 0),
+                "issues": [i.get("message", "") for i in page_issues_list],
+            }
+            page_seo_audit.append(audit_entry)
+
         site_data = {
             "base_url": crawl.get("url", ""),
             "total_pages": total_pages,
@@ -501,6 +523,8 @@ async def generate_crawl_report(
                 {"url": p.get("url", ""), "summary": p.get("title", "")}
                 for p in pages[:10]
             ],
+            # Per-page SEO audit with actual titles, metas, and issues
+            "page_seo_audit": page_seo_audit,
             # Enriched context for better AI analysis
             "broken_links_detail": [
                 {

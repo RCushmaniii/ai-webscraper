@@ -195,6 +195,7 @@ export interface CrawlReport {
         pages_affected: number;
         recommended_action: string;
         priority: 'critical' | 'high' | 'medium';
+        affected_urls?: string[];
       }>;
       quick_wins: string[];
       strategic_recommendations: Array<{

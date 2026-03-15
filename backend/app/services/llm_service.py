@@ -646,78 +646,93 @@ Create a compelling meta description that:
         site_data: Dict[str, Any],
     ) -> ExecutiveSummary:
         """Generate executive-level site analysis summary"""
-        
+
         # Build detailed broken links section
         broken_detail = site_data.get('broken_links_detail', [])
         broken_section = ""
         if broken_detail:
             broken_lines = [f"  - {bl.get('url', '?')} (HTTP {bl.get('status_code', '?')}, anchor: \"{bl.get('anchor_text', '')}\")" for bl in broken_detail[:10]]
-            broken_section = "Broken Links Detail:\n" + "\n".join(broken_lines)
+            broken_section = "BROKEN LINKS:\n" + "\n".join(broken_lines)
 
-        # Build problem pages section
-        problem_pages = site_data.get('pages_with_issues', [])
-        problems_section = ""
-        if problem_pages:
-            problem_lines = [f"  - {pp.get('url', '?')}: {', '.join(pp.get('problems', []))}" for pp in problem_pages[:10]]
-            problems_section = "Pages With Problems:\n" + "\n".join(problem_lines)
+        # Build per-page SEO audit section — this is the key enrichment
+        page_audit = site_data.get('page_seo_audit', [])
+        page_audit_section = ""
+        if page_audit:
+            audit_lines = []
+            for pa in page_audit[:20]:
+                line = f"  URL: {pa.get('url', '?')}"
+                line += f"\n    Title: \"{pa.get('title', 'MISSING')}\" ({pa.get('title_length', 0)} chars)"
+                meta = pa.get('meta_description', '')
+                if meta:
+                    line += f"\n    Meta: \"{meta[:100]}{'...' if len(meta or '') > 100 else ''}\" ({pa.get('meta_description_length', 0)} chars)"
+                else:
+                    line += f"\n    Meta: MISSING"
+                h1 = pa.get('h1', '')
+                if h1:
+                    line += f"\n    H1: \"{h1}\""
+                line += f"\n    Word count: {pa.get('word_count', 0)} | Status: {pa.get('status_code', '?')} | Response: {pa.get('response_time_ms', 0)}ms"
+                page_issues = pa.get('issues', [])
+                if page_issues:
+                    line += f"\n    Issues: {'; '.join(page_issues[:5])}"
+                audit_lines.append(line)
+            page_audit_section = "PER-PAGE SEO AUDIT:\n" + "\n\n".join(audit_lines)
 
         status_summary = site_data.get('status_code_summary', {})
 
-        prompt = f"""Generate an executive summary for this website analysis. Be SPECIFIC — reference actual URLs, page names, and concrete issues from the data below. Do NOT give generic advice.
+        prompt = f"""You are writing a website audit report for a paying client. They want SPECIFIC, ACTIONABLE advice — not generic SEO tips they could Google.
 
-Site: {site_data.get('base_url', 'Unknown')}
-Pages Crawled: {site_data.get('total_pages', 0)}
-Issues Found: {site_data.get('total_issues', 0)}
+SITE: {site_data.get('base_url', 'Unknown')}
+PAGES CRAWLED: {site_data.get('total_pages', 0)}
+TOTAL ISSUES: {site_data.get('total_issues', 0)}
 
-HTTP Status Breakdown:
-- 2xx (OK): {status_summary.get('2xx', 0)}
-- 3xx (Redirects): {status_summary.get('3xx', 0)}
-- 4xx (Client Errors): {status_summary.get('4xx', 0)}
-- 5xx (Server Errors): {status_summary.get('5xx', 0)}
+HTTP STATUS: {status_summary.get('2xx', 0)} OK | {status_summary.get('3xx', 0)} redirects | {status_summary.get('4xx', 0)} client errors | {status_summary.get('5xx', 0)} server errors
 
-Key Metrics:
+METRICS:
 - Broken Links: {site_data.get('broken_links', 0)}
 - Missing Meta Descriptions: {site_data.get('missing_meta', 0)}
-- Thin Content Pages: {site_data.get('thin_content_pages', 0)}
-- Orphan Pages: {site_data.get('orphan_pages', 0)}
-- Images Missing Alt Text: {site_data.get('images_missing_alt', 0)} of {site_data.get('total_images', 0)} total
-- Average Response Time: {site_data.get('avg_response_time_ms', 0)}ms
+- Thin Content Pages (<300 words): {site_data.get('thin_content_pages', 0)}
+- Images Missing Alt Text: {site_data.get('images_missing_alt', 0)} of {site_data.get('total_images', 0)}
+- Avg Response Time: {site_data.get('avg_response_time_ms', 0)}ms
 
 {broken_section}
 
-{problems_section}
+{page_audit_section}
 
 Top Issues by Frequency:
 {self._format_top_issues(site_data.get('top_issues', []))}
 
-Pages Crawled:
-{self._format_page_samples(site_data.get('page_samples', []))}
+=== INSTRUCTIONS ===
 
-CRITICAL INSTRUCTIONS:
-- Be SPECIFIC. Reference actual broken URLs, actual page names, actual issues from above.
-- Do NOT say "Add missing alt text" unless images are actually missing alt text in the data.
-- Do NOT recommend generic things like "conduct regular site audits" — that's obvious.
-- Each critical issue and recommendation must cite specific URLs or data points.
-- Quick wins should be actionable: "Fix the 404 at /pricing" not "Fix broken links."
+You have the ACTUAL data for every page above. Use it. Your report must:
 
-SCORING GUIDELINES:
-- A site with mostly 200s and functional content is fundamentally healthy (score 70+)
-- Minor SEO issues (missing alt text, duplicate titles) should NOT dramatically lower the score
-- Focus critical issues on truly broken things (404s, server errors, missing critical content)
-- Reserve scores below 50 for sites with serious structural or content problems
+1. CRITICAL ISSUES: Reference specific URLs and their specific problems.
+   BAD: "SEO Optimization Required — Review and optimize SEO elements."
+   GOOD: "Title tag on /services is only 23 chars ('CushLabs Services') — too short to rank. Suggested: 'AI Consulting & Automation Services | CushLabs' (47 chars)."
 
-Create a comprehensive executive summary with:
-1. Overall site health score (be fair and data-driven)
-2. Breakdown of technical, content, UX, and trust scores
-3. Critical issues citing specific URLs and problems
-4. Quick wins that reference specific pages/links to fix
-5. Strategic recommendations grounded in the actual data"""
-        
+2. QUICK WINS: Each must be a copy-paste fix or a 5-minute task.
+   BAD: "Optimize SEO elements on all pages."
+   GOOD: "On /about, change meta description from 92 chars to ~150 chars. Current: '[actual text]'. Suggested: '[better text that includes keywords]'."
+
+3. STRATEGIC RECOMMENDATIONS: Specific to THIS site's data — what would a $500/hr consultant tell this specific client?
+   BAD: "Implement a comprehensive SEO strategy."
+   GOOD: "5 of 10 pages share the same meta description length issue (167 chars). Create unique, keyword-targeted descriptions for each page — start with /services and /about which are your highest-traffic pages."
+
+4. STRENGTHS: What is actually working well? Cite data.
+5. WEAKNESSES: What specific problems exist? Cite URLs and numbers.
+
+SCORING:
+- 90-100: No broken links, all SEO elements present, fast load times, rich content
+- 70-89: Minor SEO issues but fundamentally sound
+- 50-69: Multiple significant issues affecting discoverability
+- Below 50: Critical structural or content problems
+
+Do NOT use phrases like: "conduct regular site audits", "implement comprehensive SEO strategy", "optimize SEO elements", "enhance search visibility". These are meaningless. Be the consultant who earns their fee by being specific."""
+
         return await self._complete_structured(
             task=LLMTask.EXECUTIVE_SUMMARY,
             prompt=prompt,
             response_model=ExecutiveSummary,
-            system_prompt="You are a senior digital strategist. Create executive-level reports that drive action."
+            system_prompt="You are a senior digital strategist writing a paid audit report. Every recommendation must cite a specific URL, a specific number, or a specific piece of content from the data. Generic advice is unacceptable — the client is paying for specificity."
         )
     
     async def analyze_brand_voice(

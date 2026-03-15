@@ -2221,8 +2221,23 @@ const CrawlDetailPage: React.FC = () => {
                             <div key={index} className="border-l-4 border-red-500 pl-4 py-2">
                               <div className="font-medium text-gray-900">{issue.title}</div>
                               <div className="text-sm text-gray-600 mt-1">{issue.description}</div>
+                              {issue.affected_urls && issue.affected_urls.length > 0 && (
+                                <div className="mt-2 space-y-1">
+                                  {issue.affected_urls.map((url: string, i: number) => (
+                                    <a
+                                      key={i}
+                                      href={url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="block text-xs text-secondary-600 hover:underline truncate"
+                                    >
+                                      {url.replace(/^https?:\/\/[^/]+/, '') || '/'}
+                                    </a>
+                                  ))}
+                                </div>
+                              )}
                               <div className="text-sm text-gray-500 mt-1">
-                                <span className="font-medium">Affects:</span> {issue.pages_affected} pages
+                                <span className="font-medium">Affects:</span> {issue.pages_affected} {issue.pages_affected === 1 ? 'page' : 'pages'}
                               </div>
                               <div className="text-sm text-secondary-600 mt-1">
                                 <span className="font-medium">Action:</span> {issue.recommended_action}
