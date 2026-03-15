@@ -10,7 +10,6 @@ import {
   ArrowRight,
   BarChart3,
   Brain,
-  Globe,
   Search,
   FileText,
   Layers,
