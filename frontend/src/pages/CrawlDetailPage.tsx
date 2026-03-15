@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { RefreshCw, ChevronUp, ChevronDown, Download, ExternalLink, FileText, AlertCircle, Info, CheckCircle } from 'lucide-react';
+import { RefreshCw, ChevronUp, ChevronDown, Download, ExternalLink, FileText, AlertCircle, Info, CheckCircle, Brain } from 'lucide-react';
 import { apiService, Crawl, Page, Link as CrawlLink, Issue, Image, CrawlReport } from '../services/api';
 import ConfirmationModal from '../components/ConfirmationModal';
 import SearchBar from '../components/SearchBar';
@@ -2207,6 +2207,143 @@ const CrawlDetailPage: React.FC = () => {
                           <div className="text-sm text-gray-500">Missing Meta</div>
                         </div>
                       </div>
+                    </div>
+
+                    {/* Pass Rate Scorecard (Python-computed) */}
+                    {report.report.summary_stats && (
+                      <div className="bg-white rounded-lg border border-gray-200 p-6">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">SEO Pass Rates</h3>
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                          {[
+                            { label: 'Title Tags', rate: report.report.summary_stats.title_pass_rate, target: '30-60 chars' },
+                            { label: 'Meta Descriptions', rate: report.report.summary_stats.meta_pass_rate, target: '120-160 chars' },
+                            { label: 'H1 Tags', rate: report.report.summary_stats.h1_pass_rate, target: 'Present' },
+                            { label: 'Content Depth', rate: report.report.summary_stats.content_pass_rate, target: '300+ words' },
+                            { label: 'Response Time', rate: report.report.summary_stats.performance_pass_rate, target: '<1000ms' },
+                          ].map((item) => (
+                            <div key={item.label} className="text-center">
+                              <div className={`text-2xl font-bold ${
+                                item.rate >= 80 ? 'text-green-600' : item.rate >= 50 ? 'text-yellow-600' : 'text-red-600'
+                              }`}>
+                                {item.rate}%
+                              </div>
+                              <div className="text-sm font-medium text-gray-700">{item.label}</div>
+                              <div className="text-xs text-gray-400">{item.target}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Data-Driven Findings (Python-computed, no AI) */}
+                    {report.report.data_findings && report.report.data_findings.length > 0 && (
+                      <div className="bg-white rounded-lg border border-gray-200 p-6">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-1">Specific Findings</h3>
+                        <p className="text-sm text-gray-500 mb-4">{report.report.data_findings.length} issues found by automated analysis</p>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="border-b border-gray-200">
+                                <th className="text-left py-2 px-3 font-medium text-gray-600">Severity</th>
+                                <th className="text-left py-2 px-3 font-medium text-gray-600">Category</th>
+                                <th className="text-left py-2 px-3 font-medium text-gray-600">Finding</th>
+                                <th className="text-left py-2 px-3 font-medium text-gray-600">Current</th>
+                                <th className="text-left py-2 px-3 font-medium text-gray-600">Target</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {report.report.data_findings.slice(0, 20).map((finding: any, i: number) => (
+                                <tr key={i} className="border-b border-gray-100 hover:bg-gray-50">
+                                  <td className="py-2 px-3">
+                                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                                      finding.severity === 'high' ? 'bg-red-100 text-red-700' :
+                                      finding.severity === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                                      'bg-blue-100 text-blue-700'
+                                    }`}>
+                                      {finding.severity}
+                                    </span>
+                                  </td>
+                                  <td className="py-2 px-3 text-gray-600">{finding.category}</td>
+                                  <td className="py-2 px-3 text-gray-900">{finding.finding}</td>
+                                  <td className="py-2 px-3 text-gray-600 max-w-[200px] truncate" title={String(finding.current_value || '')}>
+                                    {finding.current_value != null ? (
+                                      typeof finding.current_value === 'string' ? `"${finding.current_value.substring(0, 40)}${finding.current_value.length > 40 ? '...' : ''}"` : String(finding.current_value)
+                                    ) : '—'}
+                                    {finding.current_length ? ` (${finding.current_length} chars)` : ''}
+                                  </td>
+                                  <td className="py-2 px-3 text-gray-500">{finding.target || '—'}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Per-Page Audit Table (Python-computed) */}
+                    {report.report.page_audits && report.report.page_audits.length > 0 && (
+                      <div className="bg-white rounded-lg border border-gray-200 p-6">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-1">Page-by-Page Audit</h3>
+                        <p className="text-sm text-gray-500 mb-4">Every page graded on SEO fundamentals</p>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="border-b border-gray-200">
+                                <th className="text-left py-2 px-3 font-medium text-gray-600">Page</th>
+                                <th className="text-center py-2 px-3 font-medium text-gray-600">Score</th>
+                                <th className="text-center py-2 px-3 font-medium text-gray-600">Title</th>
+                                <th className="text-center py-2 px-3 font-medium text-gray-600">Meta</th>
+                                <th className="text-center py-2 px-3 font-medium text-gray-600">H1</th>
+                                <th className="text-center py-2 px-3 font-medium text-gray-600">Content</th>
+                                <th className="text-center py-2 px-3 font-medium text-gray-600">Speed</th>
+                                <th className="text-right py-2 px-3 font-medium text-gray-600">Issues</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {report.report.page_audits.map((pa: any, i: number) => {
+                                const statusIcon = (status: string) => {
+                                  if (status === 'pass') return <span className="text-green-600">&#10003;</span>;
+                                  if (status === 'missing' || status === 'empty') return <span className="text-red-600">&#10007;</span>;
+                                  return <span className="text-yellow-600">&#9888;</span>;
+                                };
+                                const urlPath = pa.url.replace(/^https?:\/\/[^/]+/, '') || '/';
+                                return (
+                                  <tr key={i} className="border-b border-gray-100 hover:bg-gray-50">
+                                    <td className="py-2 px-3">
+                                      <a href={pa.url} target="_blank" rel="noopener noreferrer"
+                                        className="text-secondary-600 hover:underline truncate block max-w-[200px]" title={pa.url}>
+                                        {urlPath}
+                                      </a>
+                                    </td>
+                                    <td className="py-2 px-3 text-center">
+                                      <span className={`font-bold ${
+                                        pa.score >= 80 ? 'text-green-600' : pa.score >= 50 ? 'text-yellow-600' : 'text-red-600'
+                                      }`}>
+                                        {pa.score}
+                                      </span>
+                                    </td>
+                                    <td className="py-2 px-3 text-center">{statusIcon(pa.checks.title.status)}</td>
+                                    <td className="py-2 px-3 text-center">{statusIcon(pa.checks.meta_description.status)}</td>
+                                    <td className="py-2 px-3 text-center">{statusIcon(pa.checks.h1.status)}</td>
+                                    <td className="py-2 px-3 text-center">{statusIcon(pa.checks.content_depth.status)}</td>
+                                    <td className="py-2 px-3 text-center">{statusIcon(pa.checks.response_time.status)}</td>
+                                    <td className="py-2 px-3 text-right text-gray-600">{pa.issue_count}</td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* AI Narrative: "Behind the Numbers" */}
+                    <div className="bg-gradient-to-r from-secondary-50 to-primary-50 rounded-lg border border-secondary-200 p-6">
+                      <h3 className="text-lg font-semibold text-secondary-900 mb-1 flex items-center gap-2">
+                        <Brain className="w-5 h-5" />
+                        Behind the Numbers
+                      </h3>
+                      <p className="text-sm text-secondary-600 mb-4">AI-powered narrative analysis of your audit data</p>
                     </div>
 
                     {/* Critical Issues */}

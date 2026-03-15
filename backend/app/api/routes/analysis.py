@@ -484,74 +484,239 @@ async def generate_crawl_report(
         problem_pages = sorted(problem_pages, key=lambda x: x["problem_count"], reverse=True)[:10]
 
         # =============================================
-        # PHASE 3: AI-POWERED ANALYSIS
+        # PHASE 3: DATA-DRIVEN FINDINGS (Python computes, no LLM)
         # =============================================
 
-        # Build per-page SEO audit data for the LLM
-        page_seo_audit = []
+        # Per-page audit: grade every page on every SEO dimension
+        page_audits = []
         for page in pages:
             page_id = page.get("id")
             seo = seo_map.get(page_id, {})
             page_url = page.get("url", "")
             page_issues_list = [i for i in issues if i.get("page_id") == page_id]
+            page_broken = [l for l in broken_links if l.get("source_page_id") == page_id or l.get("page_id") == page_id]
 
-            audit_entry = {
-                "url": page_url,
-                "title": page.get("title", ""),
-                "title_length": seo.get("title_length", len(page.get("title", "") or "")),
-                "meta_description": seo.get("meta_description", page.get("meta_description", "")),
-                "meta_description_length": seo.get("meta_description_length", len(page.get("meta_description", "") or "")),
-                "h1": seo.get("h1", ""),
-                "word_count": page.get("word_count", 0),
-                "status_code": page.get("status_code", 0),
-                "response_time_ms": page.get("response_time", 0),
-                "issues": [i.get("message", "") for i in page_issues_list],
+            title = page.get("title", "") or ""
+            title_len = seo.get("title_length") or len(title)
+            meta = seo.get("meta_description") or page.get("meta_description") or ""
+            meta_len = seo.get("meta_description_length") or len(meta)
+            h1 = seo.get("h1") or ""
+            word_count = page.get("word_count") or 0
+            resp_time = page.get("response_time") or 0
+            status = page.get("status_code") or 0
+
+            # Grade each dimension
+            checks = {}
+            checks["title"] = {
+                "status": "pass" if 30 <= title_len <= 60 else ("missing" if not title else "fail"),
+                "value": title,
+                "length": title_len,
+                "detail": f'"{title}" ({title_len} chars)' if title else "MISSING",
+                "target": "30-60 chars",
             }
-            page_seo_audit.append(audit_entry)
+            checks["meta_description"] = {
+                "status": "pass" if 120 <= meta_len <= 160 else ("missing" if not meta else "fail"),
+                "value": meta[:120] + ("..." if len(meta) > 120 else ""),
+                "length": meta_len,
+                "detail": f'{meta_len} chars' if meta else "MISSING",
+                "target": "120-160 chars",
+            }
+            checks["h1"] = {
+                "status": "pass" if h1 else "missing",
+                "value": h1,
+            }
+            checks["content_depth"] = {
+                "status": "pass" if word_count >= 300 else ("thin" if word_count > 0 else "empty"),
+                "word_count": word_count,
+                "detail": f'{word_count} words' + (" (thin)" if 0 < word_count < 300 else ""),
+            }
+            checks["response_time"] = {
+                "status": "pass" if resp_time < 1000 else ("slow" if resp_time < 3000 else "critical"),
+                "ms": round(resp_time),
+            }
+            checks["status_code"] = {
+                "status": "pass" if 200 <= status < 400 else "fail",
+                "code": status,
+            }
+
+            # Calculate per-page score (0-100)
+            score = 100
+            if checks["title"]["status"] == "missing": score -= 25
+            elif checks["title"]["status"] == "fail": score -= 10
+            if checks["meta_description"]["status"] == "missing": score -= 20
+            elif checks["meta_description"]["status"] == "fail": score -= 8
+            if checks["h1"]["status"] == "missing": score -= 15
+            if checks["content_depth"]["status"] == "thin": score -= 10
+            elif checks["content_depth"]["status"] == "empty": score -= 20
+            if checks["response_time"]["status"] == "slow": score -= 5
+            elif checks["response_time"]["status"] == "critical": score -= 15
+            if checks["status_code"]["status"] == "fail": score -= 25
+
+            page_audits.append({
+                "url": page_url,
+                "title": title,
+                "score": max(0, score),
+                "checks": checks,
+                "issue_count": len(page_issues_list),
+                "issues": [i.get("message", "") for i in page_issues_list[:5]],
+            })
+
+        # Sort by score ascending (worst pages first)
+        page_audits.sort(key=lambda x: x["score"])
+
+        # Compute aggregate findings — specific, quantitative
+        data_findings = []
+
+        # Title findings
+        title_issues = [pa for pa in page_audits if pa["checks"]["title"]["status"] != "pass"]
+        if title_issues:
+            for pa in title_issues:
+                check = pa["checks"]["title"]
+                if check["status"] == "missing":
+                    data_findings.append({
+                        "category": "SEO",
+                        "severity": "high",
+                        "finding": f'Missing title tag on {pa["url"]}',
+                        "current_value": None,
+                        "target": "30-60 chars with primary keywords",
+                        "url": pa["url"],
+                    })
+                else:
+                    data_findings.append({
+                        "category": "SEO",
+                        "severity": "medium",
+                        "finding": f'Title {"too short" if check["length"] < 30 else "too long"} on {pa["url"]}: {check["detail"]}',
+                        "current_value": check["value"],
+                        "current_length": check["length"],
+                        "target": "30-60 chars",
+                        "url": pa["url"],
+                    })
+
+        # Meta description findings
+        meta_issues = [pa for pa in page_audits if pa["checks"]["meta_description"]["status"] != "pass"]
+        if meta_issues:
+            for pa in meta_issues:
+                check = pa["checks"]["meta_description"]
+                if check["status"] == "missing":
+                    data_findings.append({
+                        "category": "SEO",
+                        "severity": "high",
+                        "finding": f'Missing meta description on {pa["url"]}',
+                        "current_value": None,
+                        "target": "120-160 chars",
+                        "url": pa["url"],
+                    })
+                else:
+                    data_findings.append({
+                        "category": "SEO",
+                        "severity": "medium",
+                        "finding": f'Meta description {"too short" if check["length"] < 120 else "too long"} on {pa["url"]}: {check["length"]} chars',
+                        "current_value": check["value"],
+                        "current_length": check["length"],
+                        "target": "120-160 chars",
+                        "url": pa["url"],
+                    })
+
+        # Content depth findings
+        thin_pages = [pa for pa in page_audits if pa["checks"]["content_depth"]["status"] in ("thin", "empty")]
+        for pa in thin_pages:
+            data_findings.append({
+                "category": "Content",
+                "severity": "medium" if pa["checks"]["content_depth"]["status"] == "thin" else "high",
+                "finding": f'{"Thin" if pa["checks"]["content_depth"]["word_count"] > 0 else "Empty"} content on {pa["url"]}: {pa["checks"]["content_depth"]["word_count"]} words',
+                "current_value": pa["checks"]["content_depth"]["word_count"],
+                "target": "300+ words",
+                "url": pa["url"],
+            })
+
+        # Performance findings
+        slow_pages = [pa for pa in page_audits if pa["checks"]["response_time"]["status"] != "pass"]
+        for pa in slow_pages:
+            data_findings.append({
+                "category": "Performance",
+                "severity": "high" if pa["checks"]["response_time"]["status"] == "critical" else "medium",
+                "finding": f'Slow response on {pa["url"]}: {pa["checks"]["response_time"]["ms"]}ms',
+                "current_value": pa["checks"]["response_time"]["ms"],
+                "target": "Under 1000ms",
+                "url": pa["url"],
+            })
+
+        # Broken link findings
+        for bl in broken_links[:15]:
+            data_findings.append({
+                "category": "Links",
+                "severity": "high",
+                "finding": f'Broken link: {bl.get("target_url", "?")} (HTTP {bl.get("status_code", "?")})',
+                "current_value": bl.get("status_code"),
+                "url": bl.get("target_url", ""),
+            })
+
+        # Image alt text findings
+        if images_missing_alt:
+            data_findings.append({
+                "category": "Accessibility",
+                "severity": "medium",
+                "finding": f'{len(images_missing_alt)} of {len(images)} images missing alt text ({round(len(images_missing_alt)/len(images)*100) if images else 0}%)',
+                "current_value": len(images_missing_alt),
+                "target": "100% alt text coverage",
+            })
+
+        # Compute summary stats
+        scores = [pa["score"] for pa in page_audits]
+        summary_stats = {
+            "avg_page_score": round(mean(scores)) if scores else 0,
+            "min_page_score": min(scores) if scores else 0,
+            "max_page_score": max(scores) if scores else 0,
+            "pages_passing": len([s for s in scores if s >= 80]),
+            "pages_warning": len([s for s in scores if 50 <= s < 80]),
+            "pages_failing": len([s for s in scores if s < 50]),
+            "title_pass_rate": round(len([pa for pa in page_audits if pa["checks"]["title"]["status"] == "pass"]) / total_pages * 100) if total_pages else 0,
+            "meta_pass_rate": round(len([pa for pa in page_audits if pa["checks"]["meta_description"]["status"] == "pass"]) / total_pages * 100) if total_pages else 0,
+            "h1_pass_rate": round(len([pa for pa in page_audits if pa["checks"]["h1"]["status"] == "pass"]) / total_pages * 100) if total_pages else 0,
+            "content_pass_rate": round(len([pa for pa in page_audits if pa["checks"]["content_depth"]["status"] == "pass"]) / total_pages * 100) if total_pages else 0,
+            "performance_pass_rate": round(len([pa for pa in page_audits if pa["checks"]["response_time"]["status"] == "pass"]) / total_pages * 100) if total_pages else 0,
+            "total_findings": len(data_findings),
+            "findings_by_severity": {
+                "high": len([f for f in data_findings if f["severity"] == "high"]),
+                "medium": len([f for f in data_findings if f["severity"] == "medium"]),
+                "low": len([f for f in data_findings if f.get("severity") == "low"]),
+            },
+        }
+
+        # =============================================
+        # PHASE 4: AI NARRATIVE (narrates the data, doesn't analyze)
+        # =============================================
+
+        # Build the data analysis summary for the AI to narrate
+        findings_text = "\n".join([
+            f"- [{f['severity'].upper()}] {f['finding']}"
+            for f in data_findings[:25]
+        ])
 
         site_data = {
             "base_url": crawl.get("url", ""),
             "total_pages": total_pages,
             "total_issues": len(issues),
-            "avg_content_score": None,
+            "summary_stats": summary_stats,
+            "data_findings": findings_text,
+            "page_audits_summary": "\n".join([
+                f"  {pa['url']}: score {pa['score']}/100, {pa['issue_count']} issues"
+                + (f" — {', '.join(pa['issues'][:2])}" if pa['issues'] else "")
+                for pa in page_audits[:15]
+            ]),
             "broken_links": len(broken_links),
             "missing_meta": len(missing_meta_desc),
             "thin_content_pages": len(thin_content_pages),
-            "orphan_pages": len([i for i in issues if "Orphan" in i.get("type", "")]),
-            "top_issues": top_issues,
-            "page_samples": [
-                {"url": p.get("url", ""), "summary": p.get("title", "")}
-                for p in pages[:10]
-            ],
-            # Per-page SEO audit with actual titles, metas, and issues
-            "page_seo_audit": page_seo_audit,
-            # Enriched context for better AI analysis
-            "broken_links_detail": [
-                {
-                    "url": l.get("target_url", ""),
-                    "status_code": l.get("status_code"),
-                    "anchor_text": l.get("anchor_text", ""),
-                }
-                for l in broken_links[:15]
-            ],
-            "pages_with_issues": [
-                {
-                    "url": p.get("url", ""),
-                    "title": p.get("title", ""),
-                    "problems": pp.get("problems", []),
-                }
-                for pp in problem_pages[:10]
-                for p in pages if p.get("url") == pp.get("url")
-            ][:10],
+            "images_missing_alt": len(images_missing_alt),
+            "total_images": len(images),
+            "avg_response_time_ms": avg_response_time,
             "status_code_summary": {
                 "2xx": len(status_2xx),
                 "3xx": len(status_3xx),
                 "4xx": len(status_4xx),
                 "5xx": len(status_5xx),
             },
-            "images_missing_alt": len(images_missing_alt),
-            "total_images": len(images),
-            "avg_response_time_ms": avg_response_time,
+            "top_issues": top_issues,
         }
 
         llm_service = LLMService(crawl_id=crawl_id)
@@ -587,8 +752,13 @@ async def generate_crawl_report(
                 "max_depth_setting": crawl.get("max_depth"),
             },
 
-            # --- Executive Summary (AI-Generated) ---
+            # --- Executive Summary (AI-Generated narrative) ---
             "executive_summary": executive_summary.model_dump(),
+
+            # --- Data-Driven Findings (Python-computed, no LLM) ---
+            "data_findings": data_findings,
+            "page_audits": page_audits,
+            "summary_stats": summary_stats,
 
             # --- Metrics (consumed by frontend Crawl Metrics widget) ---
             "metrics": {

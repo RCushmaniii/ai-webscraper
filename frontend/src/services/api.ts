@@ -173,6 +173,46 @@ export interface CrawlReport {
     generated_at: string;
     site_url?: string;
     crawl_name?: string;
+    // Data-driven findings (Python-computed, no LLM)
+    data_findings?: Array<{
+      category: string;
+      severity: string;
+      finding: string;
+      current_value?: any;
+      current_length?: number;
+      target?: string;
+      url?: string;
+    }>;
+    page_audits?: Array<{
+      url: string;
+      title: string;
+      score: number;
+      checks: {
+        title: { status: string; value?: string; length?: number; detail?: string; target?: string };
+        meta_description: { status: string; value?: string; length?: number; detail?: string; target?: string };
+        h1: { status: string; value?: string };
+        content_depth: { status: string; word_count?: number; detail?: string };
+        response_time: { status: string; ms?: number };
+        status_code: { status: string; code?: number };
+      };
+      issue_count: number;
+      issues: string[];
+    }>;
+    summary_stats?: {
+      avg_page_score: number;
+      min_page_score: number;
+      max_page_score: number;
+      pages_passing: number;
+      pages_warning: number;
+      pages_failing: number;
+      title_pass_rate: number;
+      meta_pass_rate: number;
+      h1_pass_rate: number;
+      content_pass_rate: number;
+      performance_pass_rate: number;
+      total_findings: number;
+      findings_by_severity: { high: number; medium: number; low: number };
+    };
     metrics: {
       total_pages: number;
       total_issues: number;
