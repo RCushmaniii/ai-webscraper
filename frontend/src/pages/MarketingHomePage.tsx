@@ -1,20 +1,24 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { 
-  Sparkles, 
-  Target, 
-  TrendingUp, 
-  Shield, 
-  Zap, 
-  CheckCircle, 
+import {
+  Sparkles,
+  Target,
+  TrendingUp,
+  Zap,
+  CheckCircle,
   ArrowRight,
   BarChart3,
   Brain,
-  Image as ImageIcon,
-  FileSearch,
   Globe,
-  Lock
+  Search,
+  FileText,
+  Layers,
+  Clock,
+  DollarSign,
+  Users,
+  Briefcase,
+  Rocket
 } from 'lucide-react';
 
 const MarketingHomePage: React.FC = () => {
@@ -34,64 +38,69 @@ const MarketingHomePage: React.FC = () => {
       {/* Hero Section */}
       <section className="relative overflow-hidden bg-gradient-to-br from-secondary-50 via-white to-primary-50 pt-20 pb-32">
         <div className="absolute inset-0 bg-grid-slate-100 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.6))] -z-10" />
-        
+
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-secondary-100 text-secondary-700 rounded-full text-sm font-medium mb-8">
               <Sparkles className="w-4 h-4" />
-              AI-Powered Web Intelligence Platform
+              AI-Powered Site Consultant
             </div>
-            
+
             <h1 className="text-5xl md:text-7xl font-bold text-gray-900 mb-6 leading-tight">
-              Transform Websites Into
+              Your Website Auditor
               <span className="block text-transparent bg-clip-text bg-gradient-to-r from-secondary-600 to-primary-600">
-                Actionable Intelligence
+                That Actually Tells You What to Fix
               </span>
             </h1>
-            
-            <p className="text-xl md:text-2xl text-gray-600 max-w-3xl mx-auto mb-12 leading-relaxed">
-              Go beyond basic web scraping. Get AI-powered content analysis, SEO recommendations, 
-              and accessibility insights that drive real business results.
+
+            <p className="text-xl md:text-2xl text-gray-600 max-w-3xl mx-auto mb-6 leading-relaxed">
+              Most audit tools tell you what's wrong. We tell you <strong>what to do about it</strong>,{' '}
+              <strong>in what order</strong>, and <strong>how long it'll take</strong> — then show you how
+              you stack up against your competition.
             </p>
-            
+
+            <p className="text-lg text-gray-500 max-w-2xl mx-auto mb-12">
+              It's not a crawler with an AI bolt-on. It's an AI consultant with a crawler built in.
+            </p>
+
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
               <button
                 onClick={handleGetStarted}
                 className="group px-8 py-4 bg-secondary-600 hover:bg-secondary-700 text-white rounded-lg font-semibold text-lg shadow-lg hover:shadow-xl transition-all flex items-center gap-2"
               >
-                {user ? 'Go to Dashboard' : 'Start Free Trial'}
+                {user ? 'Go to Dashboard' : 'Start Free Audit'}
                 <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </button>
               <Link
                 to="/quick-start"
                 className="px-8 py-4 bg-white hover:bg-gray-50 text-gray-900 rounded-lg font-semibold text-lg border-2 border-gray-200 hover:border-gray-300 transition-all"
               >
-                View Documentation
+                See How It Works
               </Link>
             </div>
-            
+
             <p className="mt-6 text-sm text-gray-500">
-              No credit card required • 14-day free trial • Cancel anytime
+              Free to start — no credit card required
             </p>
           </div>
 
           {/* Stats */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mt-20 max-w-4xl mx-auto">
             <div className="text-center">
-              <div className="text-4xl font-bold text-gray-900">14</div>
-              <div className="text-sm text-gray-600 mt-1">AI Analysis Tasks</div>
+              <div className="text-4xl font-bold text-gray-900">3 min</div>
+              <div className="text-sm text-gray-600 mt-1">Full Site Audit</div>
             </div>
             <div className="text-center">
-              <div className="text-4xl font-bold text-gray-900">$0.001</div>
-              <div className="text-sm text-gray-600 mt-1">Cost Per Page</div>
+              <div className="text-4xl font-bold text-gray-900">50+</div>
+              <div className="text-sm text-gray-600 mt-1">Issues Detected</div>
             </div>
             <div className="text-center">
-              <div className="text-4xl font-bold text-gray-900">90%</div>
-              <div className="text-sm text-gray-600 mt-1">Accuracy Rate</div>
+              <div className="text-4xl font-bold text-gray-900">$1,500</div>
+              <div className="text-sm text-gray-600 mt-1">Consultant Cost Saved</div>
             </div>
             <div className="text-center">
-              <div className="text-4xl font-bold text-gray-900">24/7</div>
-              <div className="text-sm text-gray-600 mt-1">Automated Crawling</div>
+              <div className="text-4xl font-bold text-gray-900">5x</div>
+              <div className="text-sm text-gray-600 mt-1">Faster Than Manual</div>
             </div>
           </div>
         </div>
@@ -102,47 +111,44 @@ const MarketingHomePage: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-5xl font-bold text-gray-900 mb-6">
-              Stop Wasting Time on Manual Website Audits
+              Site Audit Tools Give You Data.<br />You Need Answers.
             </h2>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Traditional web scraping tools just dump data. You need AI-powered insights that tell you exactly what to fix.
+              You've tried the crawlers. They dump 500 rows into a spreadsheet and leave you to figure out what matters.
             </p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-8">
             <div className="p-8 bg-red-50 border border-red-100 rounded-xl hover:shadow-lg transition-shadow">
               <div className="w-12 h-12 bg-red-500 rounded-lg flex items-center justify-center mb-4">
-                <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+                <Clock className="w-6 h-6 text-white" />
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">Manual Analysis Takes Days</h3>
+              <h3 className="text-xl font-semibold text-gray-900 mb-3">"Fix Your Broken Links"</h3>
               <p className="text-gray-600">
-                Reviewing 100 pages manually? That's 40+ hours of tedious work checking SEO, content quality, and accessibility—one page at a time.
+                Great — but which ones matter? A 404 on your pricing page is urgent. A broken link to an old blog post? Not so much.
+                Other tools treat them the same.
               </p>
             </div>
 
             <div className="p-8 bg-red-50 border border-red-100 rounded-xl hover:shadow-lg transition-shadow">
               <div className="w-12 h-12 bg-red-500 rounded-lg flex items-center justify-center mb-4">
-                <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+                <DollarSign className="w-6 h-6 text-white" />
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">Expensive Agency Fees</h3>
+              <h3 className="text-xl font-semibold text-gray-900 mb-3">"Hire a Consultant"</h3>
               <p className="text-gray-600">
-                Agencies charge $2,000-5,000/month for basic audits. You're paying for manual labor when AI can do it better, faster, and cheaper.
+                A proper site audit costs $1,500-5,000. You get a PDF two weeks later. Half the recommendations are generic.
+                The other half you can't implement without another $5K.
               </p>
             </div>
 
             <div className="p-8 bg-red-50 border border-red-100 rounded-xl hover:shadow-lg transition-shadow">
               <div className="w-12 h-12 bg-red-500 rounded-lg flex items-center justify-center mb-4">
-                <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
+                <FileText className="w-6 h-6 text-white" />
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">Data Without Insights</h3>
+              <h3 className="text-xl font-semibold text-gray-900 mb-3">"Export to CSV"</h3>
               <p className="text-gray-600">
-                Basic scrapers dump spreadsheets of URLs and metrics. You still have to analyze everything and figure out what actually needs fixing.
+                A spreadsheet of URLs, status codes, and meta lengths isn't a strategy. You need someone to tell you
+                what to fix, why, and in what order. That's what we do.
               </p>
             </div>
           </div>
@@ -154,10 +160,10 @@ const MarketingHomePage: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-5xl font-bold text-gray-900 mb-6">
-              AI-Powered Features That Drive Results
+              What Your Audit Actually Includes
             </h2>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Every feature designed to save time, reduce costs, and deliver actionable insights.
+              Not just metrics. A prioritized action plan with specific fixes you can implement today.
             </p>
           </div>
 
@@ -165,129 +171,266 @@ const MarketingHomePage: React.FC = () => {
             {/* Feature 1 */}
             <div className="group p-8 bg-white rounded-xl border border-gray-200 hover:border-secondary-300 hover:shadow-lg transition-all">
               <div className="w-12 h-12 bg-secondary-100 rounded-lg flex items-center justify-center mb-4 group-hover:bg-secondary-200 transition-colors">
-                <Brain className="w-6 h-6 text-secondary-600" />
+                <Search className="w-6 h-6 text-secondary-600" />
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">AI Content Analysis</h3>
+              <h3 className="text-xl font-semibold text-gray-900 mb-3">Intelligent Crawling</h3>
               <p className="text-gray-600 mb-4">
-                GPT-4 powered summaries, categorization, and topic extraction for every page. Understand your content at scale.
+                Maps every page, link, image, and heading on your site. Auto-detects JavaScript-rendered pages
+                and re-fetches them via cloud rendering. No false positives.
               </p>
-              <div className="text-sm text-secondary-600 font-medium">$0.0005 per page</div>
+              <div className="text-sm text-secondary-600 font-medium">Configurable depth + page limits</div>
             </div>
 
             {/* Feature 2 */}
             <div className="group p-8 bg-white rounded-xl border border-gray-200 hover:border-secondary-300 hover:shadow-lg transition-all">
               <div className="w-12 h-12 bg-secondary-100 rounded-lg flex items-center justify-center mb-4 group-hover:bg-secondary-200 transition-colors">
-                <TrendingUp className="w-6 h-6 text-secondary-600" />
+                <Layers className="w-6 h-6 text-secondary-600" />
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">SEO Recommendations</h3>
+              <h3 className="text-xl font-semibold text-gray-900 mb-3">Page-by-Page Audit</h3>
               <p className="text-gray-600 mb-4">
-                Get specific, actionable SEO improvements for meta descriptions, titles, keywords, and content structure.
+                Every page gets a detailed audit card: SEO metadata, content depth, image accessibility,
+                link health, response times, and heading structure — all color-coded by severity.
               </p>
-              <div className="text-sm text-secondary-600 font-medium">AI-generated insights</div>
+              <div className="text-sm text-secondary-600 font-medium">Specific issues per page</div>
             </div>
 
             {/* Feature 3 */}
             <div className="group p-8 bg-white rounded-xl border border-gray-200 hover:border-secondary-300 hover:shadow-lg transition-all">
               <div className="w-12 h-12 bg-secondary-100 rounded-lg flex items-center justify-center mb-4 group-hover:bg-secondary-200 transition-colors">
-                <BarChart3 className="w-6 h-6 text-secondary-600" />
+                <Brain className="w-6 h-6 text-secondary-600" />
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">Content Quality Scoring</h3>
+              <h3 className="text-xl font-semibold text-gray-900 mb-3">AI Consultant Reports</h3>
               <p className="text-gray-600 mb-4">
-                Automated scoring for clarity, relevance, engagement, and structure with specific improvement recommendations.
+                The report a $500/hr strategist would write — generated in 3 minutes. Business-impact prioritization,
+                copy-paste fixes, and effort estimates for every recommendation.
               </p>
-              <div className="text-sm text-secondary-600 font-medium">0-100 quality score</div>
+              <div className="text-sm text-secondary-600 font-medium">Powered by GPT</div>
             </div>
 
             {/* Feature 4 */}
             <div className="group p-8 bg-white rounded-xl border border-gray-200 hover:border-secondary-300 hover:shadow-lg transition-all">
               <div className="w-12 h-12 bg-secondary-100 rounded-lg flex items-center justify-center mb-4 group-hover:bg-secondary-200 transition-colors">
-                <ImageIcon className="w-6 h-6 text-secondary-600" />
+                <TrendingUp className="w-6 h-6 text-secondary-600" />
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">Image Accessibility</h3>
+              <h3 className="text-xl font-semibold text-gray-900 mb-3">Brand Voice Analysis</h3>
               <p className="text-gray-600 mb-4">
-                AI-generated alt text for WCAG compliance. Automatically identify decorative vs. content images.
+                Does your homepage sound corporate while your blog sounds casual? The AI analyzes tone
+                consistency across your page titles, headings, and meta descriptions.
               </p>
-              <div className="text-sm text-secondary-600 font-medium">90% confidence rate</div>
+              <div className="text-sm text-secondary-600 font-medium">No other crawler does this</div>
             </div>
 
             {/* Feature 5 */}
             <div className="group p-8 bg-white rounded-xl border border-gray-200 hover:border-secondary-300 hover:shadow-lg transition-all">
               <div className="w-12 h-12 bg-secondary-100 rounded-lg flex items-center justify-center mb-4 group-hover:bg-secondary-200 transition-colors">
-                <FileSearch className="w-6 h-6 text-secondary-600" />
+                <Target className="w-6 h-6 text-secondary-600" />
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">Semantic Search</h3>
+              <h3 className="text-xl font-semibold text-gray-900 mb-3">Competitive Comparison</h3>
               <p className="text-gray-600 mb-4">
-                Vector embeddings enable finding similar content across your site. Identify duplicate or related pages instantly.
+                Crawl your site and your competitor's. Get a side-by-side analysis: content gaps, structural
+                differences, and a specific playbook to close the gap.
               </p>
-              <div className="text-sm text-secondary-600 font-medium">Powered by embeddings</div>
+              <div className="text-sm text-secondary-600 font-medium">Premium feature</div>
             </div>
 
             {/* Feature 6 */}
             <div className="group p-8 bg-white rounded-xl border border-gray-200 hover:border-secondary-300 hover:shadow-lg transition-all">
               <div className="w-12 h-12 bg-secondary-100 rounded-lg flex items-center justify-center mb-4 group-hover:bg-secondary-200 transition-colors">
-                <Shield className="w-6 h-6 text-secondary-600" />
+                <BarChart3 className="w-6 h-6 text-secondary-600" />
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">Cost Transparency</h3>
+              <h3 className="text-xl font-semibold text-gray-900 mb-3">Exportable Deliverables</h3>
               <p className="text-gray-600 mb-4">
-                Track every API call and cost. Set budget limits per crawl. No surprise bills, complete visibility.
+                CSV for developers, structured reports for project managers, executive summaries for
+                stakeholders. Hand it off and get to work.
               </p>
-              <div className="text-sm text-secondary-600 font-medium">Real-time tracking</div>
+              <div className="text-sm text-secondary-600 font-medium">Client-ready output</div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Benefits Section */}
+      {/* How It Works */}
+      <section className="py-20 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-5xl font-bold text-gray-900 mb-6">
+              How It Works
+            </h2>
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              Paste a URL. Get a consultant-grade report. Three steps, three minutes.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-12 max-w-5xl mx-auto">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-secondary-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <span className="text-2xl font-bold text-secondary-600">1</span>
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-3">Paste Your URL</h3>
+              <p className="text-gray-600">
+                Enter any website URL. Configure depth, page limits, and crawl settings — or just use the defaults.
+              </p>
+            </div>
+
+            <div className="text-center">
+              <div className="w-16 h-16 bg-secondary-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <span className="text-2xl font-bold text-secondary-600">2</span>
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-3">AI Analyzes Everything</h3>
+              <p className="text-gray-600">
+                The crawler maps your site. The issue detector flags problems. The AI prioritizes fixes by business impact.
+              </p>
+            </div>
+
+            <div className="text-center">
+              <div className="w-16 h-16 bg-secondary-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <span className="text-2xl font-bold text-secondary-600">3</span>
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-3">Get Your Action Plan</h3>
+              <p className="text-gray-600">
+                A prioritized report with specific fixes, effort estimates, and exportable deliverables. Hand it to your team and go.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Who It's For */}
+      <section className="py-20 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-5xl font-bold text-gray-900 mb-6">
+              Built For People Who Ship
+            </h2>
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              Whether you're managing clients, running a business, or building your own thing — this tool pays for itself on the first audit.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-8">
+            <div className="bg-white p-8 rounded-xl border border-gray-200 hover:shadow-lg transition-shadow">
+              <Users className="w-10 h-10 text-secondary-600 mb-4" />
+              <h3 className="text-xl font-semibold text-gray-900 mb-3">Marketing Agencies</h3>
+              <p className="text-gray-600 mb-4">
+                Audit 10 client sites per day instead of 2. Generate client-ready reports in minutes.
+                Use competitive comparison as an upsell that closes deals.
+              </p>
+              <ul className="space-y-2">
+                <li className="flex items-start gap-2 text-sm text-gray-700">
+                  <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
+                  <span>Client-ready deliverables, auto-generated</span>
+                </li>
+                <li className="flex items-start gap-2 text-sm text-gray-700">
+                  <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
+                  <span>5x audit throughput per analyst</span>
+                </li>
+                <li className="flex items-start gap-2 text-sm text-gray-700">
+                  <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
+                  <span>Competitive comparison for upsells</span>
+                </li>
+              </ul>
+            </div>
+
+            <div className="bg-white p-8 rounded-xl border border-gray-200 hover:shadow-lg transition-shadow">
+              <Briefcase className="w-10 h-10 text-secondary-600 mb-4" />
+              <h3 className="text-xl font-semibold text-gray-900 mb-3">Small Businesses</h3>
+              <p className="text-gray-600 mb-4">
+                No SEO team? No problem. Get plain-English recommendations with effort estimates. Know exactly
+                what's a 5-minute fix vs. what needs a developer.
+              </p>
+              <ul className="space-y-2">
+                <li className="flex items-start gap-2 text-sm text-gray-700">
+                  <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
+                  <span>Plain English, no jargon</span>
+                </li>
+                <li className="flex items-start gap-2 text-sm text-gray-700">
+                  <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
+                  <span>Effort estimates on every fix</span>
+                </li>
+                <li className="flex items-start gap-2 text-sm text-gray-700">
+                  <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
+                  <span>Fraction of consultant cost</span>
+                </li>
+              </ul>
+            </div>
+
+            <div className="bg-white p-8 rounded-xl border border-gray-200 hover:shadow-lg transition-shadow">
+              <Rocket className="w-10 h-10 text-secondary-600 mb-4" />
+              <h3 className="text-xl font-semibold text-gray-900 mb-3">Founders</h3>
+              <p className="text-gray-600 mb-4">
+                You built the site. It looks fine. But is it actually working for you? Paste your URL,
+                get a complete audit, and see how you compare to competitors.
+              </p>
+              <ul className="space-y-2">
+                <li className="flex items-start gap-2 text-sm text-gray-700">
+                  <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
+                  <span>One-click site audit</span>
+                </li>
+                <li className="flex items-start gap-2 text-sm text-gray-700">
+                  <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
+                  <span>AI prioritizes what matters most</span>
+                </li>
+                <li className="flex items-start gap-2 text-sm text-gray-700">
+                  <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
+                  <span>Competitive intelligence built in</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Differentiator Section */}
       <section className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-2 gap-16 items-center">
             <div>
-              <h2 className="text-3xl md:text-5xl font-bold text-gray-900 mb-6">
-                Built for SEO Agencies, Content Teams, and Enterprises
+              <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-6">
+                What You Won't Find in Screaming Frog
               </h2>
               <p className="text-xl text-gray-600 mb-8">
-                Whether you're auditing client sites, maintaining content quality, or ensuring accessibility compliance, 
-                our platform delivers the insights you need.
+                Traditional crawlers tell you your meta description is too long.
+                We tell you what to change it to.
               </p>
 
               <div className="space-y-6">
                 <div className="flex gap-4">
                   <div className="flex-shrink-0">
-                    <CheckCircle className="w-6 h-6 text-green-600" />
+                    <Zap className="w-6 h-6 text-secondary-600" />
                   </div>
                   <div>
-                    <h3 className="font-semibold text-gray-900 mb-1">Save 20+ Hours Per Audit</h3>
-                    <p className="text-gray-600">Automate content analysis, SEO checks, and accessibility reviews that used to take days.</p>
+                    <h3 className="font-semibold text-gray-900 mb-1">Business Impact Prioritization</h3>
+                    <p className="text-gray-600">A 404 on your pricing page isn't the same as a missing alt tag on a decorative image. The AI knows the difference and ranks accordingly.</p>
                   </div>
                 </div>
 
                 <div className="flex gap-4">
                   <div className="flex-shrink-0">
-                    <CheckCircle className="w-6 h-6 text-green-600" />
+                    <Zap className="w-6 h-6 text-secondary-600" />
                   </div>
                   <div>
-                    <h3 className="font-semibold text-gray-900 mb-1">Reduce Costs by 80%</h3>
-                    <p className="text-gray-600">Pay pennies per page instead of thousands per month for agency audits.</p>
+                    <h3 className="font-semibold text-gray-900 mb-1">Copy-Paste Fixes</h3>
+                    <p className="text-gray-600">"Change your meta description on /services from [current] to [suggested]." Hand this to your developer. Done.</p>
                   </div>
                 </div>
 
                 <div className="flex gap-4">
                   <div className="flex-shrink-0">
-                    <CheckCircle className="w-6 h-6 text-green-600" />
+                    <Zap className="w-6 h-6 text-secondary-600" />
                   </div>
                   <div>
-                    <h3 className="font-semibold text-gray-900 mb-1">Scale to Thousands of Pages</h3>
-                    <p className="text-gray-600">Analyze entire websites with hundreds or thousands of pages in minutes, not weeks.</p>
+                    <h3 className="font-semibold text-gray-900 mb-1">Brand Voice Consistency</h3>
+                    <p className="text-gray-600">No other crawl tool checks whether your site speaks with a consistent voice. We catch mismatches that erode your brand.</p>
                   </div>
                 </div>
 
                 <div className="flex gap-4">
                   <div className="flex-shrink-0">
-                    <CheckCircle className="w-6 h-6 text-green-600" />
+                    <Zap className="w-6 h-6 text-secondary-600" />
                   </div>
                   <div>
-                    <h3 className="font-semibold text-gray-900 mb-1">Actionable, Not Just Data</h3>
-                    <p className="text-gray-600">Get specific recommendations you can implement immediately, not just raw metrics.</p>
+                    <h3 className="font-semibold text-gray-900 mb-1">Effort Estimates</h3>
+                    <p className="text-gray-600">Every recommendation tagged: "Quick fix (5 min)" or "Needs developer (2 hrs)." Plan your sprint, not just your wishlist.</p>
                   </div>
                 </div>
               </div>
@@ -296,84 +439,52 @@ const MarketingHomePage: React.FC = () => {
             <div className="bg-gradient-to-br from-secondary-50 to-primary-50 rounded-2xl p-8 border border-gray-200">
               <div className="bg-white rounded-xl p-6 shadow-lg mb-6">
                 <div className="flex items-center justify-between mb-4">
-                  <span className="text-sm font-medium text-gray-500">Content Quality</span>
-                  <span className="text-2xl font-bold text-green-600">87/100</span>
+                  <span className="text-sm font-medium text-gray-500">Site Health Score</span>
+                  <span className="text-2xl font-bold text-green-600">84/100</span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div className="bg-green-600 h-2 rounded-full" style={{width: '87%'}}></div>
+                  <div className="bg-green-600 h-2 rounded-full" style={{width: '84%'}}></div>
                 </div>
               </div>
 
               <div className="bg-white rounded-xl p-6 shadow-lg mb-6">
-                <div className="flex items-center justify-between mb-4">
-                  <span className="text-sm font-medium text-gray-500">SEO Score</span>
-                  <span className="text-2xl font-bold text-blue-600">92/100</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div className="bg-blue-600 h-2 rounded-full" style={{width: '92%'}}></div>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-xl p-6 shadow-lg">
-                <div className="text-sm font-medium text-gray-500 mb-3">AI Recommendations</div>
-                <ul className="space-y-2">
-                  <li className="flex items-start gap-2 text-sm text-gray-700">
-                    <Zap className="w-4 h-4 text-yellow-500 flex-shrink-0 mt-0.5" />
-                    <span>Add target keywords to H2 headings</span>
+                <div className="text-sm font-medium text-gray-500 mb-3">Top Priority Fixes</div>
+                <ul className="space-y-3">
+                  <li className="flex items-start gap-3 text-sm">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700 flex-shrink-0 mt-0.5">Critical</span>
+                    <span className="text-gray-700">Fix 404 at /pricing — high-traffic conversion page</span>
                   </li>
-                  <li className="flex items-start gap-2 text-sm text-gray-700">
-                    <Zap className="w-4 h-4 text-yellow-500 flex-shrink-0 mt-0.5" />
-                    <span>Optimize meta description length</span>
+                  <li className="flex items-start gap-3 text-sm">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-700 flex-shrink-0 mt-0.5">Medium</span>
+                    <span className="text-gray-700">Meta description on /services is 167 chars (7 over limit)</span>
                   </li>
-                  <li className="flex items-start gap-2 text-sm text-gray-700">
-                    <Zap className="w-4 h-4 text-yellow-500 flex-shrink-0 mt-0.5" />
-                    <span>Add alt text to 12 images</span>
+                  <li className="flex items-start gap-3 text-sm">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700 flex-shrink-0 mt-0.5">Quick Win</span>
+                    <span className="text-gray-700">Add alt text to hero image on homepage</span>
                   </li>
                 </ul>
               </div>
-            </div>
-          </div>
-        </div>
-      </section>
 
-      {/* Use Cases */}
-      <section className="py-20 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-5xl font-bold text-gray-900 mb-6">
-              Trusted by Industry Leaders
-            </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              From SEO agencies to enterprise content teams, see how professionals use our platform.
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-8">
-            <div className="bg-white p-8 rounded-xl border border-gray-200">
-              <Target className="w-10 h-10 text-secondary-600 mb-4" />
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">SEO Agencies</h3>
-              <p className="text-gray-600 mb-4">
-                Audit client websites faster, deliver comprehensive reports, and identify optimization opportunities automatically.
-              </p>
-              <div className="text-sm font-medium text-secondary-600">$500-2000/mo saved per client</div>
-            </div>
-
-            <div className="bg-white p-8 rounded-xl border border-gray-200">
-              <Globe className="w-10 h-10 text-secondary-600 mb-4" />
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">Content Teams</h3>
-              <p className="text-gray-600 mb-4">
-                Maintain content quality at scale, ensure brand voice consistency, and identify content gaps across your site.
-              </p>
-              <div className="text-sm font-medium text-secondary-600">20+ hours saved per audit</div>
-            </div>
-
-            <div className="bg-white p-8 rounded-xl border border-gray-200">
-              <Lock className="w-10 h-10 text-secondary-600 mb-4" />
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">Accessibility Consultants</h3>
-              <p className="text-gray-600 mb-4">
-                Automate WCAG compliance checks, generate alt text for images, and identify accessibility issues instantly.
-              </p>
-              <div className="text-sm font-medium text-secondary-600">90% faster compliance audits</div>
+              <div className="bg-white rounded-xl p-6 shadow-lg">
+                <div className="text-sm font-medium text-gray-500 mb-3">Effort Breakdown</div>
+                <div className="grid grid-cols-3 gap-4 text-center">
+                  <div>
+                    <div className="text-2xl font-bold text-green-600">4</div>
+                    <div className="text-xs text-gray-500">Quick fixes</div>
+                    <div className="text-xs text-gray-400">~20 min total</div>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-yellow-600">2</div>
+                    <div className="text-xs text-gray-500">Dev tasks</div>
+                    <div className="text-xs text-gray-400">~3 hrs total</div>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-blue-600">1</div>
+                    <div className="text-xs text-gray-500">Strategic</div>
+                    <div className="text-xs text-gray-400">Ongoing</div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -383,27 +494,24 @@ const MarketingHomePage: React.FC = () => {
       <section className="py-20 bg-gradient-to-br from-secondary-600 to-primary-600 text-white">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-4xl md:text-5xl font-bold mb-6">
-            Ready to Transform Your Website Analysis?
+            Stop Guessing. Start Fixing.
           </h2>
-          <p className="text-xl mb-8 text-secondary-100">
-            Join hundreds of professionals who've automated their content audits with AI.
+          <p className="text-xl mb-4 text-secondary-100">
+            Paste your URL. Get a consultant-grade audit in 3 minutes.
+          </p>
+          <p className="text-lg mb-8 text-secondary-200">
+            See exactly what's wrong, what to fix first, and how long each fix takes.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <button
               onClick={handleGetStarted}
               className="px-8 py-4 bg-white text-secondary-600 rounded-lg font-semibold text-lg hover:bg-gray-100 transition-all shadow-lg"
             >
-              Start Free Trial
+              {user ? 'Go to Dashboard' : 'Start Your Free Audit'}
             </button>
-            <Link
-              to="/quick-start"
-              className="px-8 py-4 bg-secondary-700 hover:bg-secondary-800 text-white rounded-lg font-semibold text-lg border-2 border-secondary-500 transition-all"
-            >
-              View Documentation
-            </Link>
           </div>
-          <p className="mt-6 text-sm text-secondary-100">
-            14-day free trial • No credit card required • Cancel anytime
+          <p className="mt-6 text-sm text-secondary-200">
+            Free tier includes 3 full site audits — no credit card needed
           </p>
         </div>
       </section>
