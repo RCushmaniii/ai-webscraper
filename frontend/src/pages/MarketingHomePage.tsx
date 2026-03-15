@@ -46,7 +46,7 @@ const MarketingHomePage: React.FC = () => {
             </div>
 
             <h1 className="text-5xl md:text-7xl font-bold text-gray-900 mb-6 leading-tight">
-              Screaming Frog Tells You What's Broken.
+              Other Tools Tell You What's Broken.
               <span className="block text-transparent bg-clip-text bg-gradient-to-r from-secondary-600 to-primary-600">
                 I Tell You How to Fix It.
               </span>
