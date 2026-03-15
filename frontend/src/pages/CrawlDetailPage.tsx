@@ -806,49 +806,44 @@ const CrawlDetailPage: React.FC = () => {
       };
     }
 
-    // SEO issues (title, meta, h1) → Show pages with those issues
+    // SEO issues (title, meta, h1) → Show each issue with its affected page resolved
     if (message.includes('title') || message.includes('meta description') || message.includes('h1')) {
-      // Get unique page URLs from the issues in this group
-      // Context may contain comma-separated URLs, so parse them
-      const affectedPageUrls = new Set<string>();
-      issueGroup.issues.forEach(i => {
-        if (i.context) {
-          // Split by comma and clean up each URL
-          i.context.split(',').forEach(url => {
-            const cleaned = url.trim().replace('...', '');
-            if (cleaned && cleaned.startsWith('http')) {
-              affectedPageUrls.add(cleaned);
-            }
-          });
-        }
+      // Build display items from individual issues, resolving page info via page_id or context URL
+      const displayItems = issueGroup.issues.map(issue => {
+        // Try to find the page by page_id first, then by context URL
+        const page = pages.find(p => p.id === issue.page_id)
+          || pages.find(p => p.url === issue.context)
+          || pages.find(p => issue.context && (p.url.startsWith(issue.context) || issue.context.startsWith(p.url)));
+        return {
+          url: page?.url || issue.context || '',
+          title: page?.title || (issue.context ? issue.context.replace(/^https?:\/\/[^/]+/, '') || '/' : ''),
+          message: issue.message,
+        };
       });
-      const affectedPages = pages.filter(p => affectedPageUrls.has(p.url));
 
       return {
         type: 'pages',
-        items: affectedPages.length > 0 ? affectedPages : issueGroup.issues,
+        items: displayItems,
         columns: [
           {
             key: 'page',
             label: 'Affected Page',
-            render: (item) => {
-              const url = item.url || item.context || 'Unknown';
-              const title = item.title || 'Untitled';
+            render: (item: any) => {
               return (
                 <div>
-                  <div className="text-sm font-medium text-gray-900 truncate max-w-[250px]">{title}</div>
-                  {url.startsWith('http') ? (
+                  <div className="text-sm font-medium text-gray-900 truncate max-w-[250px]">{item.title}</div>
+                  {item.url.startsWith('http') ? (
                     <a
-                      href={url}
+                      href={item.url}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-xs text-secondary-600 hover:underline flex items-center gap-1"
                     >
-                      <span className="truncate max-w-[200px]">{url.replace(/^https?:\/\/[^/]+/, '') || '/'}</span>
+                      <span className="truncate max-w-[200px]">{item.url.replace(/^https?:\/\/[^/]+/, '') || '/'}</span>
                       <ExternalLink className="w-3 h-3" />
                     </a>
                   ) : (
-                    <span className="text-xs text-gray-500">{url}</span>
+                    <span className="text-xs text-gray-500">{item.url}</span>
                   )}
                 </div>
               );
@@ -857,70 +852,65 @@ const CrawlDetailPage: React.FC = () => {
           {
             key: 'issue',
             label: 'Issue',
-            render: (item) => {
-              // Find the specific issue for this page
-              const pageIssue = issueGroup.issues.find(i => i.context === (item.url || item.context));
-              return (
-                <span className="text-sm text-gray-600">
-                  {pageIssue?.message || issueGroup.message}
-                </span>
-              );
-            }
+            render: (item: any) => (
+              <span className="text-sm text-gray-600">
+                {item.message}
+              </span>
+            )
           }
         ]
       };
     }
 
-    // Generic fallback - show pages from issue context
-    // Context may contain comma-separated URLs, so parse them
-    const affectedPageUrls = new Set<string>();
-    issueGroup.issues.forEach(i => {
-      if (i.context) {
-        i.context.split(',').forEach(url => {
-          const cleaned = url.trim().replace('...', '');
-          if (cleaned && cleaned.startsWith('http')) {
-            affectedPageUrls.add(cleaned);
-          }
-        });
-      }
+    // Generic fallback - resolve page info from each issue
+    const genericItems = issueGroup.issues.map(issue => {
+      const page = pages.find(p => p.id === issue.page_id)
+        || pages.find(p => p.url === issue.context)
+        || pages.find(p => issue.context && (p.url.startsWith(issue.context) || issue.context.startsWith(p.url)));
+      const url = page?.url || issue.context || '';
+      return {
+        url,
+        title: page?.title || (url ? url.replace(/^https?:\/\/[^/]+/, '') || '/' : ''),
+        message: issue.message,
+      };
     });
-    const affectedPages = pages.filter(p => affectedPageUrls.has(p.url));
 
     return {
       type: 'generic',
-      items: affectedPages.length > 0 ? affectedPages : issueGroup.issues,
+      items: genericItems,
       columns: [
         {
           key: 'page',
           label: 'Affected Page',
-          render: (item) => {
-            const url = item.url || item.context || 'Unknown';
-            return url.startsWith('http') ? (
-              <a
-                href={url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm text-secondary-600 hover:underline flex items-center gap-1"
-              >
-                <span className="truncate max-w-[300px]">{url.replace(/^https?:\/\/[^/]+/, '') || '/'}</span>
-                <ExternalLink className="w-3 h-3" />
-              </a>
-            ) : (
-              <span className="text-sm text-gray-500">{url}</span>
+          render: (item: any) => {
+            return (
+              <div>
+                <div className="text-sm font-medium text-gray-900 truncate max-w-[250px]">{item.title}</div>
+                {item.url.startsWith('http') ? (
+                  <a
+                    href={item.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-secondary-600 hover:underline flex items-center gap-1"
+                  >
+                    <span className="truncate max-w-[200px]">{item.url.replace(/^https?:\/\/[^/]+/, '') || '/'}</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                ) : (
+                  <span className="text-xs text-gray-500">{item.url}</span>
+                )}
+              </div>
             );
           }
         },
         {
           key: 'details',
           label: 'Details',
-          render: (item) => {
-            const issue = issueGroup.issues.find(i => i.context === (item.url || item.context));
-            return (
-              <span className="text-sm text-gray-600">
-                {issue?.message || item.message || issueGroup.message}
-              </span>
-            );
-          }
+          render: (item: any) => (
+            <span className="text-sm text-gray-600">
+              {item.message || issueGroup.message}
+            </span>
+          )
         }
       ]
     };
