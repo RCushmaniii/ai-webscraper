@@ -46,9 +46,9 @@ const MarketingHomePage: React.FC = () => {
             </div>
 
             <h1 className="text-5xl md:text-7xl font-bold text-gray-900 mb-6 leading-tight">
-              Your Website Auditor
+              Screaming Frog Tells You What's Broken.
               <span className="block text-transparent bg-clip-text bg-gradient-to-r from-secondary-600 to-primary-600">
-                That Actually Tells You What to Fix
+                I Tell You How to Fix It.
               </span>
             </h1>
 
@@ -203,7 +203,7 @@ const MarketingHomePage: React.FC = () => {
                 The report a $500/hr strategist would write — generated in 3 minutes. Business-impact prioritization,
                 copy-paste fixes, and effort estimates for every recommendation.
               </p>
-              <div className="text-sm text-secondary-600 font-medium">AI-generated structured reports</div>
+              <div className="text-sm text-secondary-600 font-medium">AI-generated analysis</div>
             </div>
 
             {/* Feature 4 */}
