@@ -53,7 +53,7 @@ const MarketingHomePage: React.FC = () => {
             </h1>
 
             <p className="text-xl md:text-2xl text-gray-600 max-w-3xl mx-auto mb-6 leading-relaxed">
-              Most audit tools tell you what's wrong. We tell you <strong>what to do about it</strong>,{' '}
+              Most audit tools tell you what's wrong. I tell you <strong>what to do about it</strong>,{' '}
               <strong>in what order</strong>, and <strong>how long it'll take</strong> — then show you how
               you stack up against your competition.
             </p>
@@ -94,8 +94,8 @@ const MarketingHomePage: React.FC = () => {
               <div className="text-sm text-gray-600 mt-1">Issues Detected</div>
             </div>
             <div className="text-center">
-              <div className="text-4xl font-bold text-gray-900">$1,500</div>
-              <div className="text-sm text-gray-600 mt-1">Consultant Cost Saved</div>
+              <div className="text-4xl font-bold text-gray-900">$1,500+</div>
+              <div className="text-sm text-gray-600 mt-1">vs. Consultant Fee</div>
             </div>
             <div className="text-center">
               <div className="text-4xl font-bold text-gray-900">5x</div>
@@ -147,7 +147,7 @@ const MarketingHomePage: React.FC = () => {
               <h3 className="text-xl font-semibold text-gray-900 mb-3">"Export to CSV"</h3>
               <p className="text-gray-600">
                 A spreadsheet of URLs, status codes, and meta lengths isn't a strategy. You need someone to tell you
-                what to fix, why, and in what order. That's what we do.
+                what to fix, why, and in what order. That's what this tool does.
               </p>
             </div>
           </div>
@@ -203,7 +203,7 @@ const MarketingHomePage: React.FC = () => {
                 The report a $500/hr strategist would write — generated in 3 minutes. Business-impact prioritization,
                 copy-paste fixes, and effort estimates for every recommendation.
               </p>
-              <div className="text-sm text-secondary-600 font-medium">Powered by GPT</div>
+              <div className="text-sm text-secondary-600 font-medium">AI-generated structured reports</div>
             </div>
 
             {/* Feature 4 */}
@@ -389,7 +389,7 @@ const MarketingHomePage: React.FC = () => {
               </h2>
               <p className="text-xl text-gray-600 mb-8">
                 Traditional crawlers tell you your meta description is too long.
-                We tell you what to change it to.
+                I tell you what to change it to.
               </p>
 
               <div className="space-y-6">
@@ -419,7 +419,7 @@ const MarketingHomePage: React.FC = () => {
                   </div>
                   <div>
                     <h3 className="font-semibold text-gray-900 mb-1">Brand Voice Consistency</h3>
-                    <p className="text-gray-600">No other crawl tool checks whether your site speaks with a consistent voice. We catch mismatches that erode your brand.</p>
+                    <p className="text-gray-600">No other crawl tool checks whether your site speaks with a consistent voice. I catch mismatches that erode your brand.</p>
                   </div>
                 </div>
 
