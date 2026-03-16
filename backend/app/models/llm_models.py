@@ -323,21 +323,21 @@ class ReadabilityAnalysis(BaseModel):
 # =========================================
 
 class CriticalIssue(BaseModel):
-    """A critical issue that needs immediate attention"""
-    title: str = Field(..., description="Short title, e.g. 'Meta description too long on /services'")
-    description: str = Field(..., description="Specific description citing actual URLs, current values, and recommended values")
+    """A critical issue — must describe a PATTERN, not just a category"""
+    title: str = Field(..., description="A pattern insight, e.g. '5 meta descriptions all overshoot by 7-11 chars — likely a template issue'. NOT a category like 'Meta description issues'.")
+    description: str = Field(..., description="The consultant narrative: what's the pattern, why does it matter for the business, and what's the root cause? Cite specific URLs and numbers.")
     pages_affected: int
-    recommended_action: str = Field(..., description="Concrete action, e.g. 'Change title from X to Y' — not 'optimize SEO'")
+    recommended_action: str = Field(..., description="The specific fix: 'Trim /services meta from 166 to 155 chars, /about from 165 to 150. Consider a global max-length rule in your CMS.' NOT 'optimize meta descriptions'.")
     priority: Literal["critical", "high", "medium"]
     affected_urls: List[str] = Field(default_factory=list, description="Specific URLs affected by this issue")
 
 
 class StrategicRecommendation(BaseModel):
-    """A strategic recommendation for the site"""
-    title: str
-    description: str = Field(..., description="Specific recommendation grounded in the audit data — cite URLs, numbers, current values")
-    expected_impact: str
-    effort_estimate: str = Field(..., description="e.g. '5 minutes', '2 hours', '1 day' — be specific")
+    """A strategic recommendation — must connect multiple findings into a bigger picture"""
+    title: str = Field(..., description="A strategic insight, e.g. 'Your conversion page (/consultation) has the weakest SEO on the site'. NOT 'Improve SEO'.")
+    description: str = Field(..., description="Connect dots: which findings combine to create a bigger problem or opportunity? Reference URLs and numbers. What would a $500/hr consultant say that isn't obvious from the data alone?")
+    expected_impact: str = Field(..., description="Specific impact, e.g. 'Reclaiming SERP snippet control on 5 pages could improve CTR by 15-30%'. NOT 'improved visibility'.")
+    effort_estimate: str = Field(..., description="e.g. '30 minutes to update all 5 meta descriptions', '2 hours for title rewrite + testing'")
     timeline: str
 
 
@@ -377,15 +377,15 @@ class ExecutiveSummary(BaseModel):
     # Summary paragraphs
     strengths_summary: str = Field(
         ...,
-        description="Summary of what the site does well"
+        description="2-3 sentences citing specific data: '100% H1 coverage, all 10 pages load under 1s, zero broken links — the technical foundation is solid.' NOT 'the site has a strong foundation'."
     )
     weaknesses_summary: str = Field(
         ...,
-        description="Summary of areas needing improvement"
+        description="2-3 sentences connecting weaknesses to business impact: 'Only 30% of meta descriptions pass — search engines are writing 7 of 10 snippets for you, which means you have no control over how 70% of your pages appear in search results.' NOT 'meta descriptions need improvement'."
     )
     action_plan_summary: str = Field(
         ...,
-        description="Recommended action plan overview"
+        description="Prioritized next steps with time estimates: 'Week 1: Fix the 5 meta descriptions that are 7-11 chars over limit (30 min). Week 2: Rewrite 3 too-short titles targeting primary keywords (1 hr). Month 1: Audit /consultation page copy for conversion optimization.' NOT 'focus on improving SEO'."
     )
 
 

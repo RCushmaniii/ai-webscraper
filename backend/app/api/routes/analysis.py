@@ -516,7 +516,7 @@ async def generate_crawl_report(
             }
             checks["meta_description"] = {
                 "status": "pass" if 120 <= meta_len <= 160 else ("missing" if not meta else "fail"),
-                "value": meta[:120] + ("..." if len(meta) > 120 else ""),
+                "value": meta,
                 "length": meta_len,
                 "detail": f'{meta_len} chars' if meta else "MISSING",
                 "target": "120-160 chars",

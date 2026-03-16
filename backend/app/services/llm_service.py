@@ -686,15 +686,21 @@ PER-PAGE SCORES:
 
 The client can already see the raw numbers and per-page scores in the dashboard. Your value is the "BEHIND THE NUMBERS" narrative:
 
-1. CRITICAL ISSUES: What patterns do you see? Example: "Your meta descriptions are failing across 5 pages — but it's the SAME problem each time (167 chars, just 7 over the limit). One template fix solves all 5."
+1. CRITICAL ISSUES: Find PATTERNS across the findings. Do NOT just restate categories.
+   BAD: "Title length inconsistencies — adjust titles to be within 30-60 characters."
+   GOOD: "4 of your 10 pages have titles under 25 chars — /consultation (23), /contact (21), /portfolio (23). These are all missing descriptive keywords. Meanwhile /projects/ai-chatbot-saas has the opposite problem at 79 chars. The short titles suggest a naming convention of 'PageName | CushLabs.ai' that doesn't give search engines enough to work with."
 
-2. QUICK WINS: What should they do THIS WEEK? Reference the specific findings above. Don't repeat what the data already says — tell them WHY it matters and HOW to fix it. Example: "The /services title is only 23 chars. This page is likely your money page — a title like 'AI Consulting & Automation Services | CushLabs' would target the right keywords and fill the SERP snippet."
+2. QUICK WINS: Copy-paste fixes with the exact current and suggested values.
+   BAD: "Extend title on /consultation to recommended length."
+   GOOD: "On /consultation, change 'Free Call | CushLabs.ai' (23 chars) to 'Free AI Consultation — Talk to a CushLabs Expert' (49 chars). This targets 'AI consultation' as a keyword and fills the SERP snippet."
 
-3. STRATEGIC RECOMMENDATIONS: What's the bigger picture? Connect the dots between individual findings. Example: "Your {stats.get('meta_pass_rate', 0)}% meta pass rate means search engines are writing your snippets FOR you. That's lost control over your click-through messaging."
+3. STRATEGIC RECOMMENDATIONS: Connect dots between findings to reveal business implications.
+   BAD: "Standardize titles and meta descriptions for better SEO."
+   GOOD: "Your /consultation page — the one page where visitors convert — has both the shortest title (23 chars) and shortest meta (92 chars) on the entire site. Search engines are writing the snippet for your most important conversion page. Fix this first."
 
-4. STRENGTHS: What's genuinely working well? The client needs to know what NOT to break.
+4. STRENGTHS: Cite the actual numbers. "100% H1 coverage, 100% content depth (all pages 300+ words), and 100% sub-second response times across all 10 pages — the technical foundation and content quality are genuinely strong."
 
-5. WEAKNESSES: The honest assessment — what's costing them traffic/conversions?
+5. WEAKNESSES: Quantify the business cost. "Only {stats.get('meta_pass_rate', 0)}% of meta descriptions pass — that means search engines are writing snippets for {10 - round(stats.get('meta_pass_rate', 0) * stats.get('total_pages', 10) / 100)} of your pages. You have no control over how those pages appear in search results."
 
 BANNED PHRASES (instant credibility kill):
 - "conduct regular site audits" / "implement SEO strategy" / "optimize SEO elements"
