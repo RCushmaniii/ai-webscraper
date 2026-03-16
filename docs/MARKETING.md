@@ -73,19 +73,32 @@ Every report, audit, and analysis is exportable — CSV for developers, structur
 
 The platform doesn't send your entire website's content to an AI and hope for the best. That would be expensive, slow, and produce generic results.
 
-Instead, we use a **structured data pipeline**:
+Instead, I use a **two-stage data pipeline** — Python does the analysis, AI tells the story:
+
+**Stage 1: Python Analyzes (no AI)**
 
 1. **Crawl** — The engine visits every page and extracts quantitative signals: status codes, response times, heading structure, meta tags, link topology, image attributes, word counts.
 
-2. **Detect** — A rule-based issue detector runs first, flagging concrete problems: broken links (with URLs), missing H1 tags, thin content pages, meta description length violations, orphan pages with no internal links.
+2. **Detect** — A rule-based issue detector flags concrete problems: broken links (with URLs), missing H1 tags, thin content pages, meta description length violations, orphan pages with no internal links.
 
-3. **Enrich** — The AI receives a compact, structured summary: per-page metrics, specific broken URLs, issue counts by severity, heading text for brand voice analysis. This keeps token costs low while giving the model enough context to be specific.
+3. **Grade** — Every page gets scored on 6 SEO dimensions (title, meta, H1, content depth, speed, status code) with pass/fail/warning status. Page scores are computed from weighted penalties. Aggregate pass rates are calculated across all dimensions.
 
-4. **Generate** — The LLM produces a typed `ExecutiveSummary` object with scores, prioritized recommendations citing actual URLs, and effort estimates. This isn't free-form text — it's structured data validated against a Pydantic schema before it reaches the frontend.
+4. **Compute Findings** — Python generates specific, quantitative findings: "Title too short on /services: 'CushLabs Services' (23 chars), target 30-60 chars." Every finding has a URL, current value, and target — no ambiguity.
 
-5. **Deliver** — The report renders in a tabbed UI: Executive Summary, Page-by-Page Audit, Content & Brand, Technical Health. Each section is interactive, expandable, and exportable.
+**Stage 2: AI Narrates (the "behind the numbers")**
 
-The result: a report that says "Fix the 404 at /pricing — this is a high-traffic conversion page" instead of "You have broken links."
+5. **Pattern Recognition** — The AI receives the pre-computed findings and scores. Its job isn't to analyze data — that's already done. Its job is to find patterns humans might miss: "5 of your 10 meta descriptions are 165-171 chars — all just barely over the limit. This looks like a template issue. One config change fixes all five."
+
+6. **Business Context** — The AI explains why the numbers matter: "Your /consultation page — the one page where visitors convert — has the weakest SEO on the entire site. Search engines are writing the snippet for your most important page."
+
+7. **Structured Output** — The LLM produces a typed `ExecutiveSummary` object validated against a Pydantic schema: scores, prioritized recommendations citing actual URLs, copy-paste fixes, and effort estimates. This isn't free-form text — it's structured data.
+
+**The result:** A report with three layers:
+- **Data tables** showing exactly what's wrong on every page (Python-computed)
+- **Pass rate scorecards** giving instant visibility into SEO health (Python-computed)
+- **AI narrative** explaining what the data means for the business and what to fix first (LLM-generated)
+
+The report says "On /consultation, change 'Free Call | CushLabs.ai' (23 chars) to 'Free AI Consultation — Talk to a CushLabs Expert' (49 chars)" instead of "Optimize your SEO elements."
 
 ---
 
