@@ -366,7 +366,7 @@ class ExecutiveSummary(BaseModel):
     # Recommendations
     quick_wins: List[str] = Field(
         default_factory=list,
-        description="Specific copy-paste fixes citing URLs and values, e.g. 'On /services, shorten meta from 167 to 155 chars: [suggested text]'. NOT generic like 'optimize SEO elements'.",
+        description="Copy-paste fixes. For titles: suggest 5-8 words in format 'Keyword — Modifier | Brand'. For meta descriptions: suggest exactly TWO complete sentences (value prop + CTA). NEVER suggest a one-sentence or one-fragment meta description. Example: 'On /services, replace meta with: \"AI support assistants and document automation tailored for small businesses. See how CushLabs can cut costs and save time.\"'",
         max_length=5
     )
     strategic_recommendations: List[StrategicRecommendation] = Field(

@@ -702,12 +702,92 @@ The client can already see the raw numbers and per-page scores in the dashboard.
 
 5. WEAKNESSES: Quantify the business cost. "Only {stats.get('meta_pass_rate', 0)}% of meta descriptions pass — that means search engines are writing snippets for {10 - round(stats.get('meta_pass_rate', 0) * stats.get('total_pages', 10) / 100)} of your pages. You have no control over how those pages appear in search results."
 
+=== SEO BEST PRACTICES REFERENCE ===
+
+Use these standards when suggesting fixes. NEVER suggest a value that violates these rules.
+
+TITLE TAGS (30-60 chars):
+- Structure: "Primary Keyword — Secondary Keyword | Brand"
+- Include the page's main keyword near the front
+- Keep brand name at the end, separated by | or —
+- Each page title must be unique across the site
+- Examples of GOOD titles:
+  "Free AI Consultation — Talk to an Expert | CushLabs" (51 chars)
+  "AI Automation Services for Small Business | CushLabs" (52 chars)
+  "Our Work — AI Projects & Case Studies | CushLabs" (48 chars)
+  "Contact Us — Get Started with CushLabs AI" (41 chars)
+- Examples of BAD titles:
+  "Contact | CushLabs.ai" (21 chars — too short, no keywords)
+  "Converso AI — Bilingual AI Front Desk & Sales Assistant | My Work | CushLabs.ai" (79 chars — too long, gets truncated)
+
+META DESCRIPTIONS (120-160 chars):
+- ALWAYS two complete sentences: value proposition + call-to-action
+- Two sentences naturally hit 120-160 chars. One sentence = too short. Three = too long.
+- Include the primary keyword naturally
+- Each page's meta must be unique
+- Examples of GOOD meta descriptions (notice: always TWO sentences):
+  "Get a free 15-minute AI consultation to review your workflows and find automation wins. Book your call with CushLabs today."
+  "See real AI projects: chatbots, document automation, and voice agents built for small businesses. Explore case studies and results from CushLabs."
+  "AI-powered support assistants, document automation, and custom integrations for growing businesses. Discover how CushLabs can cut your costs and save time."
+- Examples of BAD meta descriptions:
+  "Explore Our AI Solutions at CushLabs" (one fragment — way too short, will fail)
+  "Learn About CushLabs and Our AI Expertise" (one fragment — way too short)
+  "Let's hop on a quick call" (fragment — useless as a meta description)
+
+H1 TAGS:
+- Every page needs exactly one H1
+- H1 should match the page's primary topic (can differ from title tag)
+- Don't stuff keywords — write for humans first
+
+CONTENT DEPTH:
+- Service/product pages: 500+ words recommended
+- Blog posts: 800+ words for SEO value
+- Contact/about pages: 300+ words minimum
+- Thin content (<300 words) signals low value to search engines
+
+RESPONSE TIME:
+- Under 500ms: excellent
+- 500-1000ms: acceptable
+- 1000-3000ms: needs optimization
+- Over 3000ms: critical — users bounce after 3 seconds
+
+=== QUALITY RULES FOR YOUR SUGGESTIONS ===
+
+IMPORTANT — LLMs cannot count characters accurately. Do NOT try to hit exact character counts.
+Instead, use these STRUCTURAL constraints that naturally produce the correct lengths:
+
+FOR TITLE SUGGESTIONS (target: 30-60 chars):
+- Structure: "[Primary Keyword] — [Modifier] | [Brand]"
+- Write 5-8 words total. This naturally yields 30-60 characters.
+- Examples: "Free AI Consultation — Talk to an Expert | CushLabs" or "AI Automation Services for Small Business | CushLabs"
+
+FOR META DESCRIPTION SUGGESTIONS (target: 120-160 chars):
+- ALWAYS write exactly TWO complete sentences:
+  - Sentence 1: State the specific value proposition of the page
+  - Sentence 2: End with a clear call-to-action
+- Two complete sentences naturally yield 120-160 characters. One sentence is TOO SHORT. Three is TOO LONG.
+- GOOD: "Get a free 15-minute AI consultation to review your workflows and find automation opportunities. Book your call with CushLabs today."
+- BAD: "Explore Our AI Solutions at CushLabs" (one fragment — way too short)
+- BAD: "Learn About CushLabs and Our AI Expertise" (one fragment — way too short)
+
+OTHER RULES:
+1. Don't suggest the same text for multiple pages — each must be unique and relevant to that page's topic.
+2. Suggestions should include relevant keywords for that page's actual content and purpose.
+3. For non-English pages (e.g. /es, /fr), write suggestions in that page's language. Don't suggest English text for a Spanish page.
+4. If a page's meta is already near the target range (e.g. 166 chars when target is max 160), suggest TRIMMING the existing text rather than rewriting entirely. Example: "On /services, trim the meta by removing 'than ever before' at the end — the first 155 chars already work."
+
+EDGE CASES:
+- If the site has ZERO issues (all pages score 100): Focus strengths on what they're doing right, give strategic growth recommendations instead of fixes, and note that the site is well-maintained.
+- If the site has ALL critical issues: Don't soften the health score to be polite. A failing site should score below 50. Be honest — the client is paying for truth, not comfort.
+- If a page URL suggests it's a conversion page (/pricing, /contact, /consultation, /signup, /demo, /book, /schedule, /get-started): Flag it as high-priority even if the issue is technically "medium" — broken SEO on a conversion page has outsized business impact.
+
 BANNED PHRASES (instant credibility kill):
 - "conduct regular site audits" / "implement SEO strategy" / "optimize SEO elements"
 - "enhance search visibility" / "improve overall performance" / "review and update"
+- "standardize" / "ensure consistency" / "align with best practices"
 - Any recommendation that doesn't reference a specific URL, number, or finding from above
 
-You must reference SPECIFIC data from above. If a finding says "Meta description too long on /services: 167 chars" then your recommendation must say "/services" and "167 chars" — not "some pages have long descriptions."
+You must reference SPECIFIC data from above. If a finding says "Meta description too long on /services: 166 chars" then your recommendation must say "/services" and "166 chars" — not "some pages have long descriptions."
 
 SCORING: Base the health score on the computed pass rates and page scores above, not your own assessment."""
 
