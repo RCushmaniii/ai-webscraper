@@ -314,7 +314,7 @@ async def generate_crawl_report(
         pages_response = supabase_client.table("pages").select(
             "id, url, title, meta_description, status_code, content_length, "
             "response_time, content_type, seo_score, h1_tags, h2_tags, internal_links, "
-            "external_links, images, nav_score, is_primary, depth"
+            "external_links, images, nav_score, is_primary, depth, html_storage_path"
         ).eq("crawl_id", crawl_id).execute()
         pages = pages_response.data or []
 
@@ -708,17 +708,18 @@ async def generate_crawl_report(
             strategy_candidates = strategy_candidates[:10]
 
             # Load HTML snapshots and build skeletons
+            from app.services.storage import get_file_content
+
             skeletons = []
             for page in strategy_candidates:
-                html_snapshot_path = page.get("html_snapshot_path")
-                if not html_snapshot_path:
+                html_storage_path = page.get("html_storage_path")
+                if not html_storage_path:
                     continue
 
                 try:
-                    # Load HTML from storage
-                    file_response = supabase_client.storage.from_("html-snapshots").download(html_snapshot_path)
-                    if file_response:
-                        html_content = file_response.decode("utf-8", errors="replace")
+                    file_content = await get_file_content(html_storage_path)
+                    if file_content:
+                        html_content = file_content.decode("utf-8", errors="replace")
                         skeleton = build_semantic_skeleton(page, html_content)
                         if skeleton:
                             skeletons.append(skeleton)
