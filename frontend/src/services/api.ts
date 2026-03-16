@@ -249,6 +249,39 @@ export interface CrawlReport {
       weaknesses_summary: string;
       action_plan_summary: string;
     };
+    semantic_strategy?: {
+      page_analyses: Array<{
+        url: string;
+        purpose: string;
+        language: string;
+        analysis: {
+          intent_gap: {
+            alignment_score: number;
+            assessment: string;
+            gaps: string[];
+            suggestions: string[];
+          };
+          tone_audit: {
+            tone_match_score: number;
+            detected_tone: string;
+            audience_fit: string;
+            issues: string[];
+          };
+          skim_test: {
+            skim_score: number;
+            story_assessment: string;
+            missing_beats: string[];
+            rewrite_suggestions: string[];
+          };
+          overall_strategy_score: number;
+          top_recommendation: string;
+          suggested_title?: string | null;
+          suggested_meta?: string | null;
+        };
+      }>;
+      avg_strategy_score: number | null;
+      pages_analyzed: number;
+    } | null;
     top_issues: Array<{
       type: string;
       count: number;

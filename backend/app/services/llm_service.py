@@ -49,6 +49,7 @@ from app.models.llm_models import (
     ExecutiveSummary,
     BrandVoiceAnalysis,
     ContentStrategyAnalysis,
+    PageSemanticStrategy,
     LLMUsageRecord,
 )
 
@@ -682,6 +683,9 @@ SPECIFIC FINDINGS FROM OUR ANALYSIS:
 PER-PAGE SCORES:
 {site_data.get('page_audits_summary', 'No page data.')}
 
+MESSAGING & STRATEGY ANALYSIS (from our CRO evaluation):
+{site_data.get('strategy_findings', 'No strategy analysis available for this crawl.')}
+
 === YOUR ROLE ===
 
 The client can already see the raw numbers and per-page scores in the dashboard. Your value is the "BEHIND THE NUMBERS" narrative:
@@ -868,6 +872,66 @@ Analyze:
             system_prompt="You are a content strategist. Provide data-driven content strategy recommendations."
         )
     
+    # =========================================
+    # Semantic Strategy Methods
+    # =========================================
+
+    async def analyze_page_strategy(
+        self,
+        skeleton: Dict[str, Any],
+    ) -> PageSemanticStrategy:
+        """Analyze a page's messaging, intent alignment, and persuasion structure.
+
+        The skeleton is built by semantic_builder.py — pure Python extraction
+        of H1, H2s, paragraph openers, CTA buttons, and inferred page purpose.
+        The AI evaluates whether the copy serves the page's purpose.
+        """
+        import json
+
+        skeleton_json = json.dumps(skeleton, indent=2, ensure_ascii=False)
+
+        language_note = ""
+        if skeleton.get("language", "en") != "en":
+            language_note = f"\nIMPORTANT: This page is in '{skeleton['language']}'. Analyze the copy in that language. Write your response in English, but quote copy in its original language."
+
+        prompt = f"""Analyze this page's messaging strategy. The skeleton below contains the page's structural signals — headings, paragraph openers, CTAs, and inferred purpose.
+{language_note}
+=== PAGE SKELETON ===
+{skeleton_json}
+
+=== YOUR ANALYSIS ===
+
+Evaluate THREE dimensions:
+
+1. INTENT GAP ANALYSIS: Does the messaging match the page's inferred purpose ("{skeleton.get('inferred_purpose', 'general')}")?
+   - A lead_generation page should have clear value prop + urgency + low-friction CTA
+   - An educational page should teach, build trust, then soft-sell
+   - A homepage should orient visitors and route them to key pages
+   - A services page should explain what you do, for whom, and why you're different
+   - A portfolio page should prove results with specifics, not just list projects
+
+2. TONE & PERSONA AUDIT: Does the tone fit the page's purpose and likely audience?
+   - Is it too formal for a startup? Too casual for enterprise?
+   - Does the tone shift awkwardly between sections?
+
+3. SKIM TEST: If someone only reads H1 + H2s, do they get a coherent story?
+   - Do headings tell a narrative arc (problem → solution → proof → action)?
+   - Are headings specific or generic ("Our Services" tells nothing)?
+
+Also:
+- Suggest a better title if the current one is weak (5-8 words, keyword-front-loaded)
+- Suggest a better meta description if weak (exactly TWO complete sentences)
+- Give ONE top recommendation — the single highest-impact change for this page
+
+SCORING: Be honest. A page with generic headings, no CTAs, and copy that doesn't match its purpose should score below 50. A page that nails all three dimensions scores 80+."""
+
+        return await self._complete_structured(
+            task=LLMTask.SEMANTIC_STRATEGY,
+            prompt=prompt,
+            response_model=PageSemanticStrategy,
+            system_prompt="You are a CRO (Conversion Rate Optimization) consultant. You NEVER audit technical SEO — only messaging, intent alignment, and persuasion structure. You judge whether copy is persuasive, whether headings tell a story, and whether the page's messaging serves its purpose. Be specific and cite actual copy from the skeleton.",
+        )
+
     # =========================================
     # Helper Methods
     # =========================================

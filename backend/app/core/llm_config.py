@@ -41,6 +41,9 @@ class LLMTask(str, Enum):
     META_DESCRIPTION_GENERATOR = "meta_description_generator"
     READABILITY_ANALYSIS = "readability_analysis"
     
+    # Tier 2.5: Semantic Strategy (gpt-4o-mini, well-constrained)
+    SEMANTIC_STRATEGY = "semantic_strategy"
+
     # Tier 3: Synthesis and reports (gpt-4o)
     EXECUTIVE_SUMMARY = "executive_summary"
     BRAND_VOICE_ANALYSIS = "brand_voice_analysis"
@@ -188,6 +191,21 @@ TASK_CONFIGS: Dict[LLMTask, TaskConfig] = {
         response_format="json_object",
     ),
     
+    # =========================================
+    # TIER 2.5: Semantic Strategy (compact skeleton, well-constrained)
+    # =========================================
+    LLMTask.SEMANTIC_STRATEGY: TaskConfig(
+        model="gpt-4o-mini",
+        max_tokens=600,
+        temperature=0.4,
+        tier=2,
+        description="Analyze page messaging, intent alignment, and persuasion structure",
+        cost_per_1k_input=OPENAI_PRICING["gpt-4o-mini"]["input"],
+        cost_per_1k_output=OPENAI_PRICING["gpt-4o-mini"]["output"],
+        response_format="json_object",
+        timeout_seconds=45,
+    ),
+
     # =========================================
     # TIER 3: Expensive, synthesis tasks
     # =========================================

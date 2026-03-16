@@ -12,6 +12,7 @@ import logging
 
 from app.services.llm_service import LLMService, TaskDisabledError, BudgetExceededError
 from app.services.content_analyzer import ContentAnalyzer, quick_analyze_url
+from app.services.semantic_builder import build_semantic_skeleton
 from app.core.llm_config import get_llm_settings, LLMTask, get_task_config, is_task_enabled
 from app.core.auth import get_current_user, get_auth_client
 from app.models.models import User
@@ -684,6 +685,98 @@ async def generate_crawl_report(
         }
 
         # =============================================
+        # PHASE 3.5: SEMANTIC STRATEGY ANALYSIS (CRO layer)
+        # =============================================
+        import asyncio
+
+        semantic_strategy_results = []
+        strategy_summary_text = ""
+
+        try:
+            # Select top pages for strategy analysis (primary pages or high nav_score, max 10)
+            strategy_candidates = [
+                p for p in pages
+                if p.get("is_primary") or p.get("nav_score", 0) >= 10
+            ]
+            if not strategy_candidates:
+                # Fallback: use pages with highest word count (most content to analyze)
+                strategy_candidates = sorted(
+                    [p for p in pages if p.get("word_count", 0) > 100],
+                    key=lambda x: x.get("word_count", 0),
+                    reverse=True,
+                )
+            strategy_candidates = strategy_candidates[:10]
+
+            # Load HTML snapshots and build skeletons
+            skeletons = []
+            for page in strategy_candidates:
+                html_snapshot_path = page.get("html_snapshot_path")
+                if not html_snapshot_path:
+                    continue
+
+                try:
+                    # Load HTML from storage
+                    file_response = supabase_client.storage.from_("html-snapshots").download(html_snapshot_path)
+                    if file_response:
+                        html_content = file_response.decode("utf-8", errors="replace")
+                        skeleton = build_semantic_skeleton(page, html_content)
+                        if skeleton:
+                            skeletons.append(skeleton)
+                except Exception as e:
+                    logger.debug(f"Could not load HTML snapshot for {page.get('url')}: {e}")
+                    continue
+
+            # Run LLM strategy calls in parallel
+            if skeletons:
+                llm_service = LLMService(crawl_id=crawl_id)
+                strategy_tasks = [
+                    llm_service.analyze_page_strategy(skeleton)
+                    for skeleton in skeletons
+                ]
+                raw_results = await asyncio.gather(*strategy_tasks, return_exceptions=True)
+
+                for skeleton, result in zip(skeletons, raw_results):
+                    if isinstance(result, Exception):
+                        logger.warning(f"Strategy analysis failed for {skeleton['url']}: {result}")
+                        continue
+
+                    # Validation: check suggested title/meta lengths
+                    strategy_dict = result.model_dump()
+                    if strategy_dict.get("suggested_title"):
+                        title_len = len(strategy_dict["suggested_title"])
+                        if title_len < 20 or title_len > 80:
+                            strategy_dict["suggested_title"] = None
+                    if strategy_dict.get("suggested_meta"):
+                        meta_len = len(strategy_dict["suggested_meta"])
+                        if meta_len < 100 or meta_len > 200:
+                            strategy_dict["suggested_meta"] = None
+
+                    semantic_strategy_results.append({
+                        "url": skeleton["url"],
+                        "purpose": skeleton["inferred_purpose"],
+                        "language": skeleton.get("language", "en"),
+                        "analysis": strategy_dict,
+                    })
+
+                # Build strategy summary for executive summary prompt
+                if semantic_strategy_results:
+                    strategy_lines = []
+                    scores = [r["analysis"]["overall_strategy_score"] for r in semantic_strategy_results]
+                    avg_score = round(sum(scores) / len(scores))
+                    strategy_lines.append(f"Avg strategy score: {avg_score}/100 across {len(semantic_strategy_results)} pages")
+                    for r in semantic_strategy_results[:5]:
+                        a = r["analysis"]
+                        strategy_lines.append(
+                            f"  {r['url']} ({r['purpose']}): strategy {a['overall_strategy_score']}/100 — "
+                            f"intent {a['intent_gap']['alignment_score']}, tone {a['tone_audit']['tone_match_score']}, skim {a['skim_test']['skim_score']}. "
+                            f"Top rec: {a['top_recommendation'][:100]}"
+                        )
+                    strategy_summary_text = "\n".join(strategy_lines)
+
+        except Exception as e:
+            logger.warning(f"Semantic strategy phase failed (non-fatal): {e}")
+
+        # =============================================
         # PHASE 4: AI NARRATIVE (narrates the data, doesn't analyze)
         # =============================================
 
@@ -719,7 +812,13 @@ async def generate_crawl_report(
             "top_issues": top_issues,
         }
 
-        llm_service = LLMService(crawl_id=crawl_id)
+        # Include strategy findings in executive summary context if available
+        if strategy_summary_text:
+            site_data["strategy_findings"] = strategy_summary_text
+
+        # Reuse llm_service if it was created in Phase 3.5, otherwise create new
+        if not semantic_strategy_results:
+            llm_service = LLMService(crawl_id=crawl_id)
         executive_summary = await llm_service.generate_executive_summary(site_data)
 
         # =============================================
@@ -911,6 +1010,15 @@ async def generate_crawl_report(
                 ],
                 "primary_pages_count": len(primary_pages),
             },
+
+            # --- Semantic Strategy (CRO Analysis) ---
+            "semantic_strategy": {
+                "page_analyses": semantic_strategy_results,
+                "avg_strategy_score": round(
+                    sum(r["analysis"]["overall_strategy_score"] for r in semantic_strategy_results) / len(semantic_strategy_results)
+                ) if semantic_strategy_results else None,
+                "pages_analyzed": len(semantic_strategy_results),
+            } if semantic_strategy_results else None,
 
             # --- LLM Usage ---
             "llm_usage": llm_service.get_usage_summary(),

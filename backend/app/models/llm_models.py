@@ -496,6 +496,45 @@ class ContentStrategyAnalysis(BaseModel):
 # Usage Tracking Models
 # =========================================
 
+# =========================================
+# Semantic Strategy & CRO Models
+# =========================================
+
+class IntentGapAnalysis(BaseModel):
+    """Analysis of whether page messaging aligns with the page's purpose"""
+    alignment_score: int = Field(..., ge=0, le=100, description="How well the messaging matches the page's inferred purpose (0-100)")
+    assessment: str = Field(..., description="1-2 sentence assessment of intent alignment", max_length=300)
+    gaps: List[str] = Field(default_factory=list, description="Specific gaps between page purpose and actual messaging", max_length=5)
+    suggestions: List[str] = Field(default_factory=list, description="Actionable suggestions to close intent gaps", max_length=3)
+
+
+class TonePersonaAudit(BaseModel):
+    """Analysis of whether the page's tone matches its audience and purpose"""
+    tone_match_score: int = Field(..., ge=0, le=100, description="How well the tone fits the page purpose and audience (0-100)")
+    detected_tone: str = Field(..., description="The detected tone (e.g. 'corporate formal', 'friendly casual', 'technical expert')")
+    audience_fit: str = Field(..., description="Assessment of whether tone matches target audience", max_length=200)
+    issues: List[str] = Field(default_factory=list, description="Tone-related issues found", max_length=3)
+
+
+class SkimTestAudit(BaseModel):
+    """Analysis of whether headings tell a compelling story when skimmed"""
+    skim_score: int = Field(..., ge=0, le=100, description="How well the heading hierarchy tells a story when skimmed (0-100)")
+    story_assessment: str = Field(..., description="Assessment of the narrative flow from H1 through H2s", max_length=300)
+    missing_beats: List[str] = Field(default_factory=list, description="Missing narrative beats in the heading structure", max_length=4)
+    rewrite_suggestions: List[str] = Field(default_factory=list, description="Suggested heading rewrites for better skim flow", max_length=3)
+
+
+class PageSemanticStrategy(BaseModel):
+    """Complete semantic strategy analysis for a single page"""
+    intent_gap: IntentGapAnalysis
+    tone_audit: TonePersonaAudit
+    skim_test: SkimTestAudit
+    overall_strategy_score: int = Field(..., ge=0, le=100, description="Weighted average of the three sub-scores")
+    top_recommendation: str = Field(..., description="Single most impactful recommendation for this page", max_length=300)
+    suggested_title: Optional[str] = Field(None, description="Suggested title rewrite (5-8 words, keyword-front-loaded)")
+    suggested_meta: Optional[str] = Field(None, description="Suggested meta description (two complete sentences)")
+
+
 class LLMUsageRecord(BaseModel):
     """Record of LLM API usage for cost tracking"""
     crawl_id: str
