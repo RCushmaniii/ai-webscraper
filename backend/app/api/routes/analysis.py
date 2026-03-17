@@ -12,7 +12,7 @@ import logging
 
 from app.services.llm_service import LLMService, TaskDisabledError, BudgetExceededError
 from app.services.content_analyzer import ContentAnalyzer, quick_analyze_url
-from app.services.semantic_builder import build_semantic_skeleton
+from app.services.semantic_builder import build_semantic_skeleton, build_voice_fingerprint
 from app.core.llm_config import get_llm_settings, LLMTask, get_task_config, is_task_enabled
 from app.core.auth import get_current_user, get_auth_client
 from app.models.models import User
@@ -754,9 +754,14 @@ async def generate_crawl_report(
 
             # Run LLM strategy calls in parallel
             if skeletons:
+                # Build site-wide voice fingerprint so AI scores consistency
+                # with the detected voice, not against a generic CRO template
+                voice_fp = build_voice_fingerprint(skeletons)
+                logger.info(f"Strategy: voice fingerprint — {voice_fp.get('voice_person')}, {voice_fp.get('tone_formality')}, cta_style={voice_fp.get('cta_style')}, trust_first={voice_fp.get('trust_first_positioning')}")
+
                 llm_service = LLMService(crawl_id=crawl_id)
                 strategy_tasks = [
-                    llm_service.analyze_page_strategy(skeleton)
+                    llm_service.analyze_page_strategy(skeleton, voice_fingerprint=voice_fp)
                     for skeleton in skeletons
                 ]
                 raw_results = await asyncio.gather(*strategy_tasks, return_exceptions=True)

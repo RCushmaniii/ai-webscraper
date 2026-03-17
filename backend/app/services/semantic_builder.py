@@ -191,3 +191,67 @@ def build_semantic_skeleton(
     }
 
     return skeleton
+
+
+def build_voice_fingerprint(skeletons: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Derive a site-wide voice fingerprint from all page skeletons.
+
+    Pure Python — no LLM calls. Detects patterns like first-person voice,
+    casual vs formal tone, urgency tactics, and CTA style so the AI strategy
+    evaluator can score pages against the site's *actual* voice rather than
+    a generic CRO template.
+    """
+    all_openers = []
+    all_ctas = []
+    all_h1s = []
+    all_h2s = []
+
+    for sk in skeletons:
+        all_openers.extend(sk.get("paragraph_openers", []))
+        all_ctas.extend(sk.get("cta_buttons", []))
+        all_h1s.extend(sk.get("headings", {}).get("h1", []))
+        all_h2s.extend(sk.get("headings", {}).get("h2s", []))
+
+    combined_text = " ".join(all_openers + all_ctas + all_h1s + all_h2s).lower()
+    total_sentences = len(all_openers)
+
+    # First-person detection ("I help", "I build", "my work", etc.)
+    first_person_i = len(re.findall(r"\bi\s+(help|build|work|create|design|offer|specialize|focus|use|respond)\b", combined_text))
+    first_person_my = len(re.findall(r"\b(my|me|i'm|i've|i'll)\b", combined_text))
+    first_person_we = len(re.findall(r"\b(we|our|we're|we've|we'll)\b", combined_text))
+
+    if first_person_i + first_person_my > first_person_we + 2:
+        voice_person = "first_person_singular"
+    elif first_person_we > first_person_i + first_person_my + 2:
+        voice_person = "first_person_plural"
+    else:
+        voice_person = "mixed_or_neutral"
+
+    # Urgency tactic detection
+    urgency_words = len(re.findall(r"\b(limited|hurry|act now|don't miss|exclusive|only \d|last chance|expires|deadline|urgent)\b", combined_text))
+    uses_urgency = urgency_words > 2
+
+    # Anti-hype / trust-first signals
+    trust_signals = len(re.findall(r"\b(honest|no pressure|no pitch|no hype|transparent|straightforward|real talk|plain english|no bs)\b", combined_text))
+    trust_first = trust_signals >= 2
+
+    # Contraction usage (casual indicator)
+    contractions = len(re.findall(r"\b(you're|i'm|don't|won't|it's|that's|can't|isn't|aren't|we're|i've|you'll|i'll|they're|wouldn't|couldn't|shouldn't)\b", combined_text))
+    contraction_rate = contractions / max(total_sentences, 1)
+    tone_formality = "casual" if contraction_rate > 0.3 else "formal" if contraction_rate < 0.05 else "balanced"
+
+    # CTA style analysis
+    soft_ctas = sum(1 for c in all_ctas if re.search(r"(book|talk|let's|tell me|get in touch|schedule|learn)", c.lower()))
+    hard_ctas = sum(1 for c in all_ctas if re.search(r"(buy|sign up|start|get started|try free|order|subscribe|purchase)", c.lower()))
+    cta_style = "soft_sell" if soft_ctas > hard_ctas else "hard_sell" if hard_ctas > soft_ctas else "balanced"
+
+    return {
+        "voice_person": voice_person,
+        "tone_formality": tone_formality,
+        "uses_urgency_tactics": uses_urgency,
+        "trust_first_positioning": trust_first,
+        "cta_style": cta_style,
+        "sample_ctas": list(set(all_ctas))[:6],
+        "sample_openers": all_openers[:4],
+        "pages_analyzed": len(skeletons),
+    }

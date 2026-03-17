@@ -879,12 +879,17 @@ Analyze:
     async def analyze_page_strategy(
         self,
         skeleton: Dict[str, Any],
+        voice_fingerprint: Optional[Dict[str, Any]] = None,
     ) -> PageSemanticStrategy:
         """Analyze a page's messaging, intent alignment, and persuasion structure.
 
         The skeleton is built by semantic_builder.py — pure Python extraction
         of H1, H2s, paragraph openers, CTA buttons, and inferred page purpose.
         The AI evaluates whether the copy serves the page's purpose.
+
+        If voice_fingerprint is provided (derived from all pages on the site),
+        the analysis evaluates consistency with the detected voice rather than
+        penalizing intentional stylistic choices against a generic template.
         """
         import json
 
@@ -894,8 +899,35 @@ Analyze:
         if skeleton.get("language", "en") != "en":
             language_note = f"\nIMPORTANT: This page is in '{skeleton['language']}'. Analyze the copy in that language. Write your response in English, but quote copy in its original language."
 
+        voice_context = ""
+        if voice_fingerprint:
+            fp_json = json.dumps(voice_fingerprint, indent=2, ensure_ascii=False)
+            voice_context = f"""
+=== DETECTED SITE VOICE (from {voice_fingerprint.get('pages_analyzed', 0)} pages) ===
+{fp_json}
+
+IMPORTANT — VOICE-AWARE SCORING:
+This fingerprint was derived from the entire site's copy. Use it to distinguish
+INTENTIONAL voice choices from weak copy:
+
+- If the site uses {voice_fingerprint.get('voice_person', 'unknown')} voice consistently, do NOT
+  penalize individual pages for using it. Score voice CONSISTENCY, not conformity
+  to a generic template.
+- If tone_formality is "{voice_fingerprint.get('tone_formality', 'unknown')}", casual CTAs like
+  "Tell me about your project" are a FEATURE, not a weakness — score them higher
+  than generic "Contact Us Today!" if the casual tone is consistent site-wide.
+- If trust_first_positioning is true, the site deliberately avoids urgency tactics
+  ("limited time", "act now", "don't miss out"). Do NOT penalize the absence of
+  urgency — instead evaluate whether the trust-based approach is executed well.
+- If cta_style is "{voice_fingerprint.get('cta_style', 'unknown')}", evaluate CTAs against that
+  style. A soft-sell site with "Book a Free Call" is doing it right — don't dock
+  points for missing hard-sell elements.
+- ONLY flag tone/voice issues when a page BREAKS from the site's detected pattern
+  (e.g., one page suddenly shifts to corporate "we" when the rest uses "I").
+"""
+
         prompt = f"""Analyze this page's messaging strategy. The skeleton below contains the page's structural signals — headings, paragraph openers, CTAs, and inferred purpose.
-{language_note}
+{language_note}{voice_context}
 === PAGE SKELETON ===
 {skeleton_json}
 
@@ -904,32 +936,45 @@ Analyze:
 Evaluate THREE dimensions:
 
 1. INTENT GAP ANALYSIS: Does the messaging match the page's inferred purpose ("{skeleton.get('inferred_purpose', 'general')}")?
-   - A lead_generation page should have clear value prop + urgency + low-friction CTA
+   - A lead_generation page should have a clear value prop and a low-friction CTA
    - An educational page should teach, build trust, then soft-sell
    - A homepage should orient visitors and route them to key pages
    - A services page should explain what you do, for whom, and why you're different
    - A portfolio page should prove results with specifics, not just list projects
+   NOTE: "urgency" is ONE possible tactic, not a requirement. Trust-based sites
+   convert through clarity and credibility, not pressure. Score intent alignment
+   based on whether the page SERVES its purpose, not whether it uses urgency.
 
-2. TONE & PERSONA AUDIT: Does the tone fit the page's purpose and likely audience?
-   - Is it too formal for a startup? Too casual for enterprise?
-   - Does the tone shift awkwardly between sections?
+2. TONE & PERSONA AUDIT: Does the tone fit the page's purpose and stay consistent
+   with the site's detected voice?
+   - Evaluate consistency with the site's voice fingerprint (if provided)
+   - Flag BREAKS from the detected voice, not deviations from a generic template
+   - A founder using "I" voice throughout is a coherent brand choice — score the
+     execution quality, not the choice itself
 
 3. SKIM TEST: If someone only reads H1 + H2s, do they get a coherent story?
-   - Do headings tell a narrative arc (problem → solution → proof → action)?
+   - Do headings tell a narrative arc? (The arc depends on page purpose —
+     not every page needs problem → solution → proof → action)
    - Are headings specific or generic ("Our Services" tells nothing)?
+   - Service pages: "what you do → who it's for → how it works → what's next"
+   - Portfolio pages: project specifics > generic "Our Work" labels
+   - Contact pages: value prop → what happens next → reassurance
 
 Also:
 - Suggest a better title if the current one is weak (5-8 words, keyword-front-loaded)
 - Suggest a better meta description if weak (exactly TWO complete sentences)
 - Give ONE top recommendation — the single highest-impact change for this page
 
-SCORING: Be honest. A page with generic headings, no CTAs, and copy that doesn't match its purpose should score below 50. A page that nails all three dimensions scores 80+."""
+SCORING: Be honest, but score the EXECUTION of the site's chosen voice strategy,
+not deviation from a generic CRO template. A page with generic headings, no CTAs,
+and copy that doesn't match its purpose should score below 50. A page that nails
+all three dimensions with intentional voice choices scores 80+."""
 
         return await self._complete_structured(
             task=LLMTask.SEMANTIC_STRATEGY,
             prompt=prompt,
             response_model=PageSemanticStrategy,
-            system_prompt="You are a CRO (Conversion Rate Optimization) consultant. You NEVER audit technical SEO — only messaging, intent alignment, and persuasion structure. You judge whether copy is persuasive, whether headings tell a story, and whether the page's messaging serves its purpose. Be specific and cite actual copy from the skeleton.",
+            system_prompt="You are a CRO (Conversion Rate Optimization) consultant who understands that effective conversion doesn't require a single formula. You evaluate messaging, intent alignment, and persuasion structure — but you recognize that trust-based, personality-driven, and soft-sell approaches are VALID conversion strategies when executed consistently. You NEVER audit technical SEO. You judge whether copy is persuasive WITHIN its chosen strategy, whether headings tell a story, and whether the page's messaging serves its purpose. Be specific and cite actual copy from the skeleton.",
         )
 
     # =========================================
