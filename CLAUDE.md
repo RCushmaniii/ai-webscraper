@@ -331,7 +331,20 @@ start.bat  # Starts frontend (port 3000) + backend (port 8000)
 4. Clear Python bytecode cache
 5. Restart servers
 
-### Pitfall #2: Empty Content Showing on Docs Page
+### Pitfall #2: HTML Storage Path Column Name
+
+**Symptom**: Semantic strategy analysis produces no results (section missing from report)
+
+**Cause**: Migration defines `html_storage_path`, crawler historically wrote `html_snapshot_path`. Production DB may have either or both.
+
+**Solution**: Always check BOTH column names when querying:
+```python
+path = r.get("html_storage_path") or r.get("html_snapshot_path")
+```
+
+As of March 2026, the crawler writes `html_storage_path` (correct). The report queries both for backwards compatibility.
+
+### Pitfall #3: Empty Content Showing on Docs Page
 
 **Symptom**: Docs page shows blank content area
 
@@ -451,10 +464,14 @@ Crawl jobs run in-process using `asyncio.create_task()` (no Celery/Redis). This 
 - `backend/app/services/worker.py` - Background crawl tasks (async, no Celery)
 - `backend/app/services/crawler.py` - Core crawling logic
 - `backend/app/services/issue_detector.py` - SEO issue detection
+- `backend/app/services/semantic_builder.py` - Pure Python: extract headings, CTAs, infer page purpose from URL patterns
+- `backend/app/services/llm_service.py` - LLM abstraction with `generate_executive_summary()` + `analyze_page_strategy()`
 - `backend/app/core/domain_blacklist.py` - Blacklisted domains
+- `backend/app/core/llm_config.py` - LLM task configs, model selection, cost tracking
 - `backend/app/models/models.py` - Pydantic models
+- `backend/app/models/llm_models.py` - LLM structured output models (ExecutiveSummary, PageSemanticStrategy, etc.)
 - `backend/app/api/routes/crawls.py` - Crawl API endpoints (includes usage endpoint)
-- `backend/app/api/routes/analysis.py` - AI report generation
+- `backend/app/api/routes/analysis.py` - AI report generation (Phase 1-4 pipeline)
 
 ### Frontend
 
