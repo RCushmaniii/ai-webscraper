@@ -714,16 +714,17 @@ async def generate_crawl_report(
             html_paths = {}
             if candidate_ids:
                 try:
+                    # Crawler saves as html_snapshot_path (not html_storage_path)
                     html_response = supabase_client.table("pages").select(
-                        "id, html_storage_path"
+                        "id, html_snapshot_path"
                     ).in_("id", candidate_ids).execute()
                     html_paths = {
-                        r["id"]: r.get("html_storage_path")
+                        r["id"]: r.get("html_snapshot_path")
                         for r in (html_response.data or [])
-                        if r.get("html_storage_path")
+                        if r.get("html_snapshot_path")
                     }
                 except Exception as e:
-                    logger.debug(f"Could not fetch html_storage_path: {e}")
+                    logger.debug(f"Could not fetch html_snapshot_path: {e}")
 
             skeletons = []
             for page in strategy_candidates:
