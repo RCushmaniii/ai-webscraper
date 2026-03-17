@@ -314,7 +314,7 @@ async def generate_crawl_report(
         pages_response = supabase_client.table("pages").select(
             "id, url, title, meta_description, status_code, content_length, "
             "response_time, content_type, seo_score, h1_tags, h2_tags, internal_links, "
-            "external_links, images, nav_score, is_primary, depth, html_storage_path"
+            "external_links, images, nav_score, is_primary, depth"
         ).eq("crawl_id", crawl_id).execute()
         pages = pages_response.data or []
 
@@ -707,12 +707,27 @@ async def generate_crawl_report(
                 )
             strategy_candidates = strategy_candidates[:10]
 
-            # Load HTML snapshots and build skeletons
+            # Fetch html_storage_path for candidates (separate query to avoid breaking Phase 1)
             from app.services.storage import get_file_content
+
+            candidate_ids = [p.get("id") for p in strategy_candidates if p.get("id")]
+            html_paths = {}
+            if candidate_ids:
+                try:
+                    html_response = supabase_client.table("pages").select(
+                        "id, html_storage_path"
+                    ).in_("id", candidate_ids).execute()
+                    html_paths = {
+                        r["id"]: r.get("html_storage_path")
+                        for r in (html_response.data or [])
+                        if r.get("html_storage_path")
+                    }
+                except Exception as e:
+                    logger.debug(f"Could not fetch html_storage_path: {e}")
 
             skeletons = []
             for page in strategy_candidates:
-                html_storage_path = page.get("html_storage_path")
+                html_storage_path = html_paths.get(page.get("id"))
                 if not html_storage_path:
                     continue
 
