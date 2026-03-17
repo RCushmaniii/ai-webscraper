@@ -831,11 +831,12 @@ async def get_page_html(
         
         page = page_response.data[0]
         
-        if not page.get("html_snapshot_path"):
+        html_path = page.get("html_storage_path") or page.get("html_snapshot_path")
+        if not html_path:
             raise HTTPException(status_code=404, detail="HTML snapshot not found for this page")
-        
+
         # Get the HTML content
-        html_content = await get_file_content(page["html_snapshot_path"])
+        html_content = await get_file_content(html_path)
         
         if html_content is None:
             raise HTTPException(status_code=404, detail="HTML snapshot file not found")

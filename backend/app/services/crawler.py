@@ -341,7 +341,7 @@ class Crawler:
                 "title": title,  # REAL title from SEO metadata
                 "meta_description": meta_description,  # REAL meta description
                 "content_summary": page.text_excerpt,  # 5000 char excerpt for preview
-                "html_snapshot_path": page.html_storage_path,  # Path to full HTML for content retrieval
+                "html_storage_path": page.html_storage_path,  # Path to full HTML for content retrieval
                 "status_code": page.status_code,
                 "response_time": page.render_ms,
                 "content_type": page.content_type,

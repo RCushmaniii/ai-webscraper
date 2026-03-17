@@ -707,41 +707,50 @@ async def generate_crawl_report(
                 )
             strategy_candidates = strategy_candidates[:10]
 
-            # Fetch html_storage_path for candidates (separate query to avoid breaking Phase 1)
+            # Fetch HTML paths for candidates (separate query to avoid breaking Phase 1)
+            # NOTE: Production DB may have the column as html_snapshot_path or html_storage_path
+            # (migration says html_storage_path, crawler writes html_snapshot_path) — check both
             from app.services.storage import get_file_content
 
             candidate_ids = [p.get("id") for p in strategy_candidates if p.get("id")]
             html_paths = {}
             if candidate_ids:
                 try:
-                    # Crawler saves as html_snapshot_path (not html_storage_path)
-                    html_response = supabase_client.table("pages").select(
-                        "id, html_snapshot_path"
-                    ).in_("id", candidate_ids).execute()
-                    html_paths = {
-                        r["id"]: r.get("html_snapshot_path")
-                        for r in (html_response.data or [])
-                        if r.get("html_snapshot_path")
-                    }
+                    html_response = supabase_client.table("pages").select("*").in_(
+                        "id", candidate_ids
+                    ).execute()
+                    for r in (html_response.data or []):
+                        path = r.get("html_storage_path") or r.get("html_snapshot_path")
+                        if path:
+                            html_paths[r["id"]] = path
+                    logger.info(f"Strategy: found HTML paths for {len(html_paths)}/{len(candidate_ids)} pages")
                 except Exception as e:
-                    logger.debug(f"Could not fetch html_snapshot_path: {e}")
+                    logger.warning(f"Could not fetch HTML paths for strategy: {e}")
 
             skeletons = []
             for page in strategy_candidates:
-                html_storage_path = html_paths.get(page.get("id"))
-                if not html_storage_path:
+                page_id = page.get("id")
+                html_path = html_paths.get(page_id)
+                if not html_path:
+                    logger.debug(f"Strategy: no HTML path for {page.get('url')} (id={page_id})")
                     continue
 
                 try:
-                    file_content = await get_file_content(html_storage_path)
+                    file_content = await get_file_content(html_path)
                     if file_content:
                         html_content = file_content.decode("utf-8", errors="replace")
                         skeleton = build_semantic_skeleton(page, html_content)
                         if skeleton:
                             skeletons.append(skeleton)
+                        else:
+                            logger.debug(f"Strategy: skeleton empty for {page.get('url')}")
+                    else:
+                        logger.debug(f"Strategy: file not found at {html_path} for {page.get('url')}")
                 except Exception as e:
-                    logger.debug(f"Could not load HTML snapshot for {page.get('url')}: {e}")
+                    logger.warning(f"Strategy: error loading HTML for {page.get('url')}: {e}")
                     continue
+
+            logger.info(f"Strategy: built {len(skeletons)} skeletons from {len(strategy_candidates)} candidates")
 
             # Run LLM strategy calls in parallel
             if skeletons:
