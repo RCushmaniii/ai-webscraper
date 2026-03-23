@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { Loader2, FileBarChart, RefreshCw } from 'lucide-react';
-import { CrawlReport } from '../../services/api';
+import React, { useState, useRef, useEffect } from 'react';
+import { Loader2, FileBarChart, RefreshCw, Download, FileText, Table } from 'lucide-react';
+import { toast } from 'sonner';
+import { apiService, CrawlReport } from '../../services/api';
 import ExecutiveTab from './ExecutiveTab';
 import PageAuditTab from './PageAuditTab';
 import ContentBrandTab from './ContentBrandTab';
@@ -12,6 +13,7 @@ interface ReportPanelProps {
   generatingReport: boolean;
   onGenerateReport: () => void;
   crawlStatus?: string;
+  crawlId?: string;
 }
 
 type ReportSubTab = 'executive' | 'page-audit' | 'content-brand' | 'technical';
@@ -29,8 +31,64 @@ const ReportPanel: React.FC<ReportPanelProps> = ({
   generatingReport,
   onGenerateReport,
   crawlStatus,
+  crawlId,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<ReportSubTab>('executive');
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const exportRef = useRef<HTMLDivElement>(null);
+
+  // Close export dropdown on outside click
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (exportRef.current && !exportRef.current.contains(e.target as Node)) {
+        setExportOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  const triggerDownload = (blob: Blob, filename: string) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportPdf = async () => {
+    if (!crawlId) return;
+    setExporting(true);
+    setExportOpen(false);
+    try {
+      const blob = await apiService.exportReportPdf(crawlId);
+      triggerDownload(blob, `cushlabs_report_${crawlId}.pdf`);
+      toast.success('PDF downloaded');
+    } catch (err: any) {
+      toast.error('PDF export failed: ' + (err?.message || 'Unknown error'));
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleExportCsv = async (type: 'page_audits' | 'findings') => {
+    if (!crawlId) return;
+    setExporting(true);
+    setExportOpen(false);
+    try {
+      const blob = await apiService.exportReportCsv(crawlId, type);
+      triggerDownload(blob, `cushlabs_${type}_${crawlId}.csv`);
+      toast.success('CSV downloaded');
+    } catch (err: any) {
+      toast.error('CSV export failed: ' + (err?.message || 'Unknown error'));
+    } finally {
+      setExporting(false);
+    }
+  };
 
   // Loading state
   if (reportLoading) {
@@ -80,7 +138,7 @@ const ReportPanel: React.FC<ReportPanelProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Header: Sub-tab navigation + Regenerate button */}
+      {/* Header: Sub-tab navigation + actions */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-2 flex-wrap">
           {subTabs.map((tab) => (
@@ -98,13 +156,67 @@ const ReportPanel: React.FC<ReportPanelProps> = ({
           ))}
         </div>
 
-        <button
-          onClick={onGenerateReport}
-          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-        >
-          <RefreshCw className="w-4 h-4" />
-          Regenerate
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Export dropdown */}
+          <div className="relative" ref={exportRef}>
+            <button
+              onClick={() => setExportOpen(!exportOpen)}
+              disabled={exporting}
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+            >
+              {exporting ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4" />
+              )}
+              Export
+            </button>
+
+            {exportOpen && (
+              <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20">
+                <button
+                  onClick={handleExportPdf}
+                  className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 text-left"
+                >
+                  <FileText className="w-4 h-4 text-red-500" />
+                  <div>
+                    <div className="font-medium">Export PDF</div>
+                    <div className="text-xs text-gray-400">Full branded report</div>
+                  </div>
+                </button>
+                <button
+                  onClick={() => handleExportCsv('page_audits')}
+                  className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 text-left"
+                >
+                  <Table className="w-4 h-4 text-green-500" />
+                  <div>
+                    <div className="font-medium">CSV - Page Audits</div>
+                    <div className="text-xs text-gray-400">Per-page scores and checks</div>
+                  </div>
+                </button>
+                <button
+                  onClick={() => handleExportCsv('findings')}
+                  className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 text-left"
+                >
+                  <Table className="w-4 h-4 text-blue-500" />
+                  <div>
+                    <div className="font-medium">CSV - Findings</div>
+                    <div className="text-xs text-gray-400">All issues with severity</div>
+                  </div>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Regenerate button */}
+          <button
+            onClick={onGenerateReport}
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Regenerate
+          </button>
+        </div>
       </div>
 
       {/* Active sub-tab content */}

@@ -4,11 +4,13 @@ Analysis API Routes
 Endpoints for triggering LLM-powered content analysis.
 """
 
-from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, Query
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, HttpUrl
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone
 import logging
+import io
 
 from app.services.llm_service import LLMService, TaskDisabledError, BudgetExceededError
 from app.services.content_analyzer import ContentAnalyzer, quick_analyze_url
@@ -1139,6 +1141,96 @@ async def get_crawl_report(
         raise
     except Exception as e:
         logger.error(f"Failed to fetch report: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/crawl/{crawl_id}/report/export/pdf")
+async def export_report_pdf(
+    crawl_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Export the crawl report as a branded PDF."""
+    from supabase import create_client
+    from app.core.config import settings
+    from app.services.report_export import generate_pdf_report
+
+    supabase_client = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY)
+
+    try:
+        response = supabase_client.table("crawls").select(
+            "id, name, url, user_id, ai_report, ai_report_generated_at"
+        ).eq("id", crawl_id).single().execute()
+
+        if not response.data:
+            raise HTTPException(status_code=404, detail="Crawl not found")
+
+        if str(response.data.get("user_id")) != str(current_user.id):
+            raise HTTPException(status_code=403, detail="Not authorized")
+
+        crawl = response.data
+        report_data = crawl.get("ai_report")
+        if not report_data:
+            raise HTTPException(status_code=404, detail="Report not generated yet")
+
+        pdf_bytes = generate_pdf_report(report_data, crawl)
+        site_name = crawl.get("url", "site").replace("https://", "").replace("http://", "").replace("/", "_")
+        filename = f"cushlabs_report_{site_name}.pdf"
+
+        return StreamingResponse(
+            io.BytesIO(pdf_bytes),
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"PDF export failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/crawl/{crawl_id}/report/export/csv")
+async def export_report_csv(
+    crawl_id: str,
+    export_type: str = Query("page_audits", regex="^(page_audits|findings)$"),
+    current_user: User = Depends(get_current_user)
+):
+    """Export report data as CSV (page_audits or findings)."""
+    from supabase import create_client
+    from app.core.config import settings
+    from app.services.report_export import generate_csv_export
+
+    supabase_client = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY)
+
+    try:
+        response = supabase_client.table("crawls").select(
+            "id, name, url, user_id, ai_report"
+        ).eq("id", crawl_id).single().execute()
+
+        if not response.data:
+            raise HTTPException(status_code=404, detail="Crawl not found")
+
+        if str(response.data.get("user_id")) != str(current_user.id):
+            raise HTTPException(status_code=403, detail="Not authorized")
+
+        report_data = response.data.get("ai_report")
+        if not report_data:
+            raise HTTPException(status_code=404, detail="Report not generated yet")
+
+        csv_content = generate_csv_export(report_data, export_type)
+        site_name = response.data.get("url", "site").replace("https://", "").replace("http://", "").replace("/", "_")
+        filename = f"cushlabs_{export_type}_{site_name}.csv"
+
+        return StreamingResponse(
+            io.BytesIO(csv_content.encode("utf-8")),
+            media_type="text/csv",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"CSV export failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 

@@ -520,6 +520,21 @@ class ApiService {
     return response.data;
   }
 
+  async exportReportPdf(crawlId: string): Promise<Blob> {
+    const response = await this.api.get(`/analysis/crawl/${crawlId}/report/export/pdf`, {
+      responseType: 'blob'
+    });
+    return response.data;
+  }
+
+  async exportReportCsv(crawlId: string, exportType: 'page_audits' | 'findings'): Promise<Blob> {
+    const response = await this.api.get(`/analysis/crawl/${crawlId}/report/export/csv`, {
+      params: { export_type: exportType },
+      responseType: 'blob'
+    });
+    return response.data;
+  }
+
   async getPageHtml(crawlId: string, pageId: string): Promise<{ html_content: string }> {
     const response = await this.api.get(`/crawls/${crawlId}/html/${pageId}`);
     return response.data;

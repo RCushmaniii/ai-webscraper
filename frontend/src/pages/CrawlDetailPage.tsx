@@ -2124,6 +2124,7 @@ const CrawlDetailPage: React.FC = () => {
                   generatingReport={generatingReport}
                   onGenerateReport={handleGenerateReport}
                   crawlStatus={crawl?.status}
+                  crawlId={id}
                 />
               </div>
             )}
