@@ -413,39 +413,84 @@ ai-webscraper/
 ├── database/                  # Database migrations
 │   └── migrations/           # SQL migration files
 │
-├── render.yaml                # Render Blueprint (backend deployment)
-├── frontend/vercel.json       # Vercel config (frontend deployment)
+├── docker-compose.yml         # Local dev compose (backend only)
 ├── start.bat                  # Start all servers (local dev)
 └── CLAUDE.md                 # This file
 ```
 
 ---
 
-## Deployment Architecture
+## Deployment — Hetzner VPS
 
-### Production (as of 2026-03-13)
+- **Host:** `178.156.192.117`
+- **SSH:** `ssh deploy@178.156.192.117`
+- **VPS path:** `~/apps/ai-webscraper/`
+- **Orchestration:** `~/apps/cushlabs-prod-server/docker-compose.yml`
+- **Domain:** `scraper.cushlabs.ai` (HTTPS via Caddy/Let's Encrypt)
+- **Docker service/container name:** `webscraper`
+- **Internal port:** `10000` (bound to `127.0.0.1`, set via `PORT=10000` in compose environment)
+- **Docker image:** `mcr.microsoft.com/playwright/python:v1.50.0-noble` (~3GB, builds are slow)
+- **Database:** Supabase (external, not self-hosted) — Project: `cushlabs-site-analysis`
+- **Caddy config:** `/etc/caddy/Caddyfile` on the VPS
 
-| Component | Platform | URL | Tier |
-|-----------|----------|-----|------|
-| Backend | Render (Docker) | `https://ai-webscraper-api-p7ed.onrender.com` | Free |
-| Frontend | Vercel | `https://ai-webscraper-tan.vercel.app` | Free |
-| Database | Supabase | Project: `cushlabs-site-analysis` | Free |
+### Architecture
 
-### Key Deployment Details
+- **Caddy** serves the static React build at `/` and proxies `/api/*` to the backend container
+- Caddy rewrites `/api/v1/<endpoint>` to add trailing slashes internally, preventing FastAPI 307 redirects from dropping auth headers
+- **Static frontend location:** `/home/deploy/apps/static/webscraper/`
+- **Backend** runs in Docker, listening on port 10000 (not exposed publicly)
+- **Background tasks** run in-process using `asyncio.create_task()` (no Celery/Redis)
+- **Vitals tracker** already integrated in `index.html`
 
-- **Backend Docker image**: `mcr.microsoft.com/playwright/python:v1.50.0-noble` (includes Chromium for JS rendering)
-- **Render listens on `$PORT`** (default 10000, NOT 8000)
-- **render.yaml** uses `rootDir: ./backend` for monorepo support
-- **Vercel Root Directory**: `frontend` (set in Vercel Settings > General)
-- **REACT_APP_API_URL**: Set in Vercel env vars, baked at build time — redeploy required after changes
-- **CORS**: Backend reads `BACKEND_CORS_ORIGINS` env var (comma-separated), falls back to `CORS_ORIGINS`, then environment defaults
-- **Supabase Auth**: Site URL and Redirect URLs configured to Vercel domain
-- **Auto-deploy**: Both Render and Vercel auto-deploy from `main` branch
-- **Free tier cold starts**: Render spins down after inactivity, first request takes ~30s
+### Deploy Backend
 
-### Background Tasks
+```bash
+ssh deploy@178.156.192.117 'cd ~/apps/ai-webscraper && git pull && cd ~/apps/cushlabs-prod-server && docker compose up -d --build webscraper'
+```
 
-Crawl jobs run in-process using `asyncio.create_task()` (no Celery/Redis). This works for the current demo-tier workload (max 50 pages per crawl). If scaling beyond single-process, a task queue would need to be reintroduced.
+Code changes require `--build`. Config-only changes (env vars) just need `docker compose restart webscraper`.
+
+### Deploy Frontend
+
+Build locally, then copy static files to VPS:
+
+```bash
+cd frontend
+DISABLE_ESLINT_PLUGIN=true REACT_APP_API_URL=https://scraper.cushlabs.ai/api/v1 npm run build
+scp -r build/* deploy@178.156.192.117:~/apps/static/webscraper/
+```
+
+### Health Check
+
+```bash
+curl https://scraper.cushlabs.ai/api/v1/health/
+# Trailing slash required
+```
+
+### Logs
+
+```bash
+ssh deploy@178.156.192.117 'docker logs -f webscraper'
+```
+
+### Required Env Vars (backend)
+
+See `backend/.env.example` for the full list. Key vars:
+
+| Variable | Description |
+|----------|-------------|
+| `SUPABASE_URL` | Supabase project URL |
+| `SUPABASE_KEY` | Supabase anon key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Service role key (admin ops) |
+| `OPENAI_API_KEY` | For LLM-powered analysis |
+| `CORS_ORIGINS` | Allowed origins (set to `https://scraper.cushlabs.ai`) |
+| `ENVIRONMENT` | `production` |
+| `PORT` | `10000` (set in compose, not .env) |
+
+### Resource Notes
+
+- VPS has 4GB RAM total, ~350MB used — be mindful before adding services
+- Docker network: services talk to each other via Docker service names (e.g., `redis://redis:6379`), not localhost
 
 ---
 
@@ -453,10 +498,10 @@ Crawl jobs run in-process using `asyncio.create_task()` (no Celery/Redis). This 
 
 ### Deployment
 
-- `render.yaml` - Render Blueprint for backend service
-- `frontend/vercel.json` - Vercel SPA routing config
-- `backend/Dockerfile` - Docker build for Render (Playwright base image)
+- `backend/Dockerfile` - Docker build (Playwright base image)
 - `backend/app/core/config.py` - CORS origins, environment config
+- `backend/.env.example` - Required backend environment variables
+- `frontend/.env.example` - Required frontend build-time variables
 
 ### Backend
 
@@ -592,5 +637,5 @@ https://deepwiki.com/RCushmaniii/ai-resume-tailor
 
 ---
 
-**Last Updated**: March 13, 2026
+**Last Updated**: March 28, 2026
 **Maintained By**: Claude (Anthropic) + CushLabs Team
