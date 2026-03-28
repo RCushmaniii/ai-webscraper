@@ -1,11 +1,12 @@
 import os
 import logging
+import shutil
 from pathlib import Path
 from typing import Optional
 from uuid import UUID
 import aiofiles
 import httpx
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 from app.core.config import settings
 
@@ -154,3 +155,43 @@ async def delete_crawl_data(crawl_id: UUID) -> bool:
                 success = False
     
     return success
+
+
+def cleanup_old_storage(max_age_days: int = 90) -> dict:
+    """
+    Delete storage files for crawls older than max_age_days.
+    Queries the database for old crawl IDs, then removes their storage dirs.
+    Returns summary of what was cleaned.
+    """
+    from app.core.auth import get_service_client
+
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=max_age_days)).isoformat()
+    client = get_service_client()
+
+    # Get IDs of crawls older than the cutoff
+    result = client.table("crawls").select("id").lt("created_at", cutoff).execute()
+    old_crawl_ids = [r["id"] for r in (result.data or [])]
+
+    if not old_crawl_ids:
+        logger.info(f"Storage cleanup: no crawls older than {max_age_days} days")
+        return {"crawls_cleaned": 0, "bytes_freed": 0}
+
+    bytes_freed = 0
+    dirs_removed = 0
+
+    for crawl_id in old_crawl_ids:
+        for base_dir in [settings.HTML_SNAPSHOTS_DIR, settings.SCREENSHOTS_DIR, settings.EXPORTS_DIR]:
+            crawl_dir = Path(base_dir) / str(crawl_id)
+            if crawl_dir.exists():
+                # Sum up file sizes before deleting
+                for f in crawl_dir.rglob("*"):
+                    if f.is_file():
+                        bytes_freed += f.stat().st_size
+                shutil.rmtree(crawl_dir)
+                dirs_removed += 1
+
+    logger.info(
+        f"Storage cleanup: removed {dirs_removed} dirs for {len(old_crawl_ids)} crawls "
+        f"older than {max_age_days} days, freed {bytes_freed / 1024:.1f} KB"
+    )
+    return {"crawls_cleaned": len(old_crawl_ids), "bytes_freed": bytes_freed}

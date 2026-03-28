@@ -10,6 +10,7 @@ from contextlib import asynccontextmanager
 from app.api.api import api_router
 from app.core.config import settings
 from app.services.crawl_monitor import check_and_fix_stale_crawls
+from app.services.storage import cleanup_old_storage
 from app.middleware.rate_limiter import rate_limit_middleware
 
 # Configure logging
@@ -37,6 +38,21 @@ async def monitor_stale_crawls():
         # Wait 10 minutes before next check
         await asyncio.sleep(600)
 
+
+async def daily_storage_cleanup():
+    """Background task that runs once daily to purge storage older than 90 days"""
+    while True:
+        try:
+            result = cleanup_old_storage(max_age_days=90)
+            if result["crawls_cleaned"] > 0:
+                logger.info(f"Storage cleanup freed {result['bytes_freed'] / 1024:.1f} KB")
+        except Exception as e:
+            logger.error(f"Error in storage cleanup: {e}")
+
+        # Run once every 24 hours
+        await asyncio.sleep(86400)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan context manager for startup and shutdown events"""
@@ -50,15 +66,24 @@ async def lifespan(app: FastAPI):
     # Start background monitoring task
     task = asyncio.create_task(monitor_stale_crawls())
     logger.info("Started background stale crawl monitoring (runs every 10 minutes)")
-    
+
+    # Start daily storage cleanup (runs once on startup, then every 24h)
+    cleanup_task = asyncio.create_task(daily_storage_cleanup())
+    logger.info("Started daily storage cleanup (90-day retention)")
+
     yield
-    
-    # Shutdown: Cancel background task
+
+    # Shutdown: Cancel background tasks
     task.cancel()
+    cleanup_task.cancel()
     try:
         await task
     except asyncio.CancelledError:
         logger.info("Background monitoring task cancelled")
+    try:
+        await cleanup_task
+    except asyncio.CancelledError:
+        logger.info("Storage cleanup task cancelled")
 
 # Create FastAPI app with lifespan
 app = FastAPI(
