@@ -439,7 +439,10 @@ ai-webscraper/
 - Caddy rewrites `/api/v1/<endpoint>` to add trailing slashes internally, preventing FastAPI 307 redirects from dropping auth headers
 - **Static frontend location:** `/home/deploy/apps/static/webscraper/`
 - **Backend** runs in Docker, listening on port 10000 (not exposed publicly)
-- **Background tasks** run in-process using `asyncio.create_task()` (no Celery/Redis)
+- **Background tasks** run in-process using `asyncio.create_task()` (no Celery/Redis):
+  - **Stale crawl monitor** — checks every 10 minutes for stuck crawls
+  - **Storage cleanup** — runs on startup then every 24 hours, deletes HTML snapshots/screenshots/exports for crawls older than 90 days
+- **Storage volume:** `webscraper-storage` Docker named volume mounted at `/app/storage` — persists across rebuilds
 - **Vitals tracker** already integrated in `index.html`
 
 ### Deploy Backend
@@ -491,6 +494,8 @@ See `backend/.env.example` for the full list. Key vars:
 
 - VPS has 4GB RAM total, ~350MB used — be mindful before adding services
 - Docker network: services talk to each other via Docker service names (e.g., `redis://redis:6379`), not localhost
+- HTML snapshots, screenshots, and exports persist in a Docker volume (`webscraper-storage`) — survives container rebuilds
+- Auto-cleanup purges storage for crawls older than 90 days (runs daily, near-zero overhead)
 
 ---
 
@@ -508,6 +513,7 @@ See `backend/.env.example` for the full list. Key vars:
 - `backend/app/main.py` - FastAPI app, logging config
 - `backend/app/services/worker.py` - Background crawl tasks (async, no Celery)
 - `backend/app/services/crawler.py` - Core crawling logic
+- `backend/app/services/storage.py` - File storage (HTML snapshots, screenshots, exports) + 90-day cleanup
 - `backend/app/services/issue_detector.py` - SEO issue detection
 - `backend/app/services/semantic_builder.py` - Pure Python: extract headings, CTAs, infer page purpose from URL patterns
 - `backend/app/services/llm_service.py` - LLM abstraction with `generate_executive_summary()` + `analyze_page_strategy()`
