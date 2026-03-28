@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { RefreshCw, ChevronUp, ChevronDown, Download, ExternalLink, FileText, Info, CheckCircle } from 'lucide-react';
@@ -161,6 +161,41 @@ const CrawlDetailPage: React.FC = () => {
 
     fetchCrawlData();
   }, [id]);
+
+  // Poll for updates while crawl is active
+  const ACTIVE_STATUSES = ['running', 'queued', 'in_progress', 'pending'];
+  const isActive = crawl ? ACTIVE_STATUSES.includes(crawl.status) : false;
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (isActive && id) {
+      pollRef.current = setInterval(async () => {
+        try {
+          const crawlData = await apiService.getCrawl(id);
+          setCrawl(crawlData);
+          const pagesData = await apiService.getCrawlPages(id);
+          setPages(pagesData);
+          // If crawl just finished, refresh usage and stop polling
+          if (!ACTIVE_STATUSES.includes(crawlData.status)) {
+            toast.success('Crawl completed!');
+          }
+        } catch {
+          // Silently ignore poll errors
+        }
+      }, 5000);
+    } else {
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    }
+    return () => {
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    };
+  }, [isActive, id]);
 
   const fetchTabData = async (tab: string) => {
     if (!id) return;

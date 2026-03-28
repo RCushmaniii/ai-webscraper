@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Plus, Trash2, Eye, Globe, Settings2, RefreshCw, Info } from 'lucide-react';
@@ -37,10 +37,43 @@ const CrawlsPage: React.FC = () => {
     onConfirm: () => {},
   });
 
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   useEffect(() => {
     fetchCrawls();
     fetchUsage();
+    return () => {
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+    };
   }, []);
+
+  const ACTIVE_STATUSES = ['running', 'queued', 'in_progress', 'pending'];
+  const hasActiveCrawls = crawls.some(c => ACTIVE_STATUSES.includes(c.status));
+
+  // Poll every 5s while any crawl is active
+  useEffect(() => {
+    if (hasActiveCrawls) {
+      pollIntervalRef.current = setInterval(async () => {
+        try {
+          const data = await apiService.getCrawls();
+          setCrawls(data);
+        } catch (err) {
+          // Silently ignore poll errors
+        }
+      }, 5000);
+    } else {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+    }
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+    };
+  }, [hasActiveCrawls]);
 
   const fetchCrawls = async () => {
     try {
