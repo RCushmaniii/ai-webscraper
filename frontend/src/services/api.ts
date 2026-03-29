@@ -282,6 +282,17 @@ export interface CrawlReport {
       avg_strategy_score: number | null;
       pages_analyzed: number;
     } | null;
+    internal_linking?: {
+      linking_score: number;
+      total_internal_links: number;
+      orphan_pages: Array<{ url: string; title: string; depth: number }>;
+      orphan_count: number;
+      dead_end_count: number;
+      most_linked: Array<{ url: string; title: string; inbound: number; outbound: number; depth: number }>;
+      least_linked: Array<{ url: string; title: string; inbound: number; outbound: number; depth: number }>;
+      depth_distribution: Record<string, number>;
+      page_details: Array<{ url: string; title: string; inbound: number; outbound: number; depth: number }>;
+    };
     top_issues: Array<{
       type: string;
       count: number;

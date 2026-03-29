@@ -331,7 +331,7 @@ async def generate_crawl_report(
         # 4. Fetch links data for comprehensive link analysis
         # Note: Using actual column names (is_internal instead of link_type)
         links_response = supabase_client.table("links").select(
-            "id, target_url, is_internal, is_broken, status_code, anchor_text, nav_score, is_navigation"
+            "id, source_page_id, target_url, is_internal, is_broken, status_code, anchor_text, nav_score, is_navigation"
         ).eq("crawl_id", crawl_id).execute()
         links = links_response.data or []
 
@@ -462,6 +462,108 @@ async def generate_crawl_report(
 
         # Primary/important pages
         primary_pages = [p for p in pages if p.get("is_primary") or p.get("nav_score", 0) >= 10]
+
+        # --- Internal Linking Analysis ---
+        from urllib.parse import urlparse
+
+        # Build URL → page mapping (normalize trailing slashes)
+        def normalize_url(url: str) -> str:
+            return url.rstrip("/") if url else ""
+
+        page_url_map = {}  # normalized URL → page dict
+        page_id_map = {}   # page_id → page dict
+        for p in pages:
+            page_url_map[normalize_url(p.get("url", ""))] = p
+            page_id_map[p.get("id")] = p
+
+        # Determine root URL
+        crawl_url = crawl.get("url", "")
+        root_normalized = normalize_url(crawl_url)
+
+        # Build inbound/outbound counts from actual link data
+        inbound_counts = {normalize_url(p.get("url", "")): 0 for p in pages}
+        outbound_counts = {normalize_url(p.get("url", "")): 0 for p in pages}
+
+        for link in internal_links:
+            target_norm = normalize_url(link.get("target_url", ""))
+            source_page = page_id_map.get(link.get("source_page_id"))
+            source_norm = normalize_url(source_page.get("url", "")) if source_page else None
+
+            if target_norm in inbound_counts:
+                inbound_counts[target_norm] += 1
+            if source_norm and source_norm in outbound_counts:
+                outbound_counts[source_norm] += 1
+
+        # Identify orphan pages (0 inbound internal links, excluding root)
+        orphan_pages_list = []
+        for page in pages:
+            page_norm = normalize_url(page.get("url", ""))
+            if page_norm == root_normalized:
+                continue
+            if inbound_counts.get(page_norm, 0) == 0:
+                orphan_pages_list.append({
+                    "url": page.get("url"),
+                    "title": page.get("title", "Untitled"),
+                    "depth": page.get("depth", 0),
+                })
+
+        # Depth distribution
+        depth_dist = {}
+        for page in pages:
+            d = page.get("depth", 0)
+            key = str(d) if d < 3 else "3+"
+            depth_dist[key] = depth_dist.get(key, 0) + 1
+
+        # Page linking details (sorted by inbound descending)
+        linking_details = []
+        for page in pages:
+            page_norm = normalize_url(page.get("url", ""))
+            linking_details.append({
+                "url": page.get("url"),
+                "title": page.get("title", "Untitled"),
+                "inbound": inbound_counts.get(page_norm, 0),
+                "outbound": outbound_counts.get(page_norm, 0),
+                "depth": page.get("depth", 0),
+            })
+        linking_details.sort(key=lambda x: x["inbound"], reverse=True)
+
+        # Most/least linked (top 5 each)
+        most_linked_internal = linking_details[:5]
+        least_linked_internal = sorted(
+            [d for d in linking_details if normalize_url(d["url"]) != root_normalized],
+            key=lambda x: x["inbound"]
+        )[:5]
+
+        # Calculate linking score (0-100)
+        linking_score = 100
+        if total_pages > 1:
+            # Penalize orphan pages: -15 per orphan, max -40
+            orphan_penalty = min(40, len(orphan_pages_list) * 15)
+            linking_score -= orphan_penalty
+
+            # Penalize deep pages (3+ clicks): -5 per page, max -20
+            deep_pages = [p for p in pages if (p.get("depth", 0) or 0) >= 3]
+            deep_penalty = min(20, len(deep_pages) * 5)
+            linking_score -= deep_penalty
+
+            # Penalize concentration: if top page (excl. root) gets >50% of all inbound
+            non_root_inbound = {k: v for k, v in inbound_counts.items() if k != root_normalized}
+            total_non_root_inbound = sum(non_root_inbound.values())
+            if total_non_root_inbound > 0 and non_root_inbound:
+                max_inbound = max(non_root_inbound.values())
+                concentration_ratio = max_inbound / total_non_root_inbound
+                if concentration_ratio > 0.5:
+                    linking_score -= min(20, int((concentration_ratio - 0.5) * 40))
+
+            # Penalize pages with 0 outbound internal links (dead ends), excl non-HTML
+            dead_end_pages = [
+                d for d in linking_details
+                if d["outbound"] == 0 and normalize_url(d["url"]) != root_normalized
+            ]
+            dead_end_penalty = min(20, len(dead_end_pages) * 5)
+            linking_score -= dead_end_penalty
+
+        linking_score = max(0, linking_score)
 
         # --- Problem Pages ---
         problem_pages = []
@@ -652,6 +754,37 @@ async def generate_crawl_report(
                 "finding": f'Broken link: {bl.get("target_url", "?")} (HTTP {bl.get("status_code", "?")})',
                 "current_value": bl.get("status_code"),
                 "url": bl.get("target_url", ""),
+            })
+
+        # Internal linking findings
+        for orphan in orphan_pages_list:
+            data_findings.append({
+                "category": "Links",
+                "severity": "high",
+                "finding": f'Orphan page (no internal links point to it): {orphan["url"]}',
+                "current_value": 0,
+                "target": "At least 1 inbound internal link",
+                "url": orphan["url"],
+            })
+
+        if deep_pages:
+            deep_urls = [p.get("url") for p in deep_pages[:5]]
+            data_findings.append({
+                "category": "Links",
+                "severity": "medium",
+                "finding": f'{len(deep_pages)} page(s) are 3+ clicks from homepage',
+                "current_value": len(deep_pages),
+                "target": "All important pages within 2 clicks",
+                "url": deep_urls[0] if deep_urls else None,
+            })
+
+        if dead_end_pages:
+            data_findings.append({
+                "category": "Links",
+                "severity": "medium",
+                "finding": f'{len(dead_end_pages)} page(s) have no outbound internal links (dead ends)',
+                "current_value": len(dead_end_pages),
+                "target": "Every page should link to related content",
             })
 
         # Image alt text findings
@@ -999,6 +1132,19 @@ async def generate_crawl_report(
                     }
                     for l in broken_links[:20]
                 ],
+            },
+
+            # --- Internal Linking Analysis ---
+            "internal_linking": {
+                "linking_score": linking_score,
+                "total_internal_links": len(internal_links),
+                "orphan_pages": orphan_pages_list,
+                "orphan_count": len(orphan_pages_list),
+                "dead_end_count": len(dead_end_pages),
+                "most_linked": most_linked_internal,
+                "least_linked": least_linked_internal,
+                "depth_distribution": depth_dist,
+                "page_details": linking_details,
             },
 
             # --- Image Analysis ---
