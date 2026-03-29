@@ -53,6 +53,8 @@ const ISSUE_MESSAGE_DESCRIPTIONS: Record<string, string> = {
   'Large page size': 'Large pages take longer to load, hurting both user experience and search rankings.'
 };
 
+const ACTIVE_STATUSES = ['running', 'queued', 'in_progress', 'pending'];
+
 const CrawlDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -163,7 +165,6 @@ const CrawlDetailPage: React.FC = () => {
   }, [id]);
 
   // Poll for updates while crawl is active
-  const ACTIVE_STATUSES = ['running', 'queued', 'in_progress', 'pending'];
   const isActive = crawl ? ACTIVE_STATUSES.includes(crawl.status) : false;
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
