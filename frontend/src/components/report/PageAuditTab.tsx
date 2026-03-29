@@ -12,12 +12,29 @@ const ITEMS_PER_PAGE = 25;
 
 const PageAuditTab: React.FC<PageAuditTabProps> = ({ report }) => {
   const r = report.report;
-  if (!r) return null;
 
   const [sortField, setSortField] = useState<SortField>('score');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [currentPage, setCurrentPage] = useState(1);
   const [findingSeverityFilter, setFindingSeverityFilter] = useState<'all' | 'high' | 'medium' | 'low'>('all');
+
+  const sortedAudits = useMemo(() => {
+    if (!r?.page_audits) return [];
+    return [...r.page_audits].sort((a, b) => {
+      const dir = sortDir === 'asc' ? 1 : -1;
+      if (sortField === 'url') return a.url.localeCompare(b.url) * dir;
+      if (sortField === 'score') return (a.score - b.score) * dir;
+      return (a.issue_count - b.issue_count) * dir;
+    });
+  }, [r?.page_audits, sortField, sortDir]);
+
+  const filteredFindings = useMemo(() => {
+    if (!r?.data_findings) return [];
+    if (findingSeverityFilter === 'all') return r.data_findings;
+    return r.data_findings.filter(f => f.severity === findingSeverityFilter);
+  }, [r?.data_findings, findingSeverityFilter]);
+
+  if (!r) return null;
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -36,27 +53,11 @@ const PageAuditTab: React.FC<PageAuditTabProps> = ({ report }) => {
       : <ChevronDown className="w-3 h-3 text-secondary-600" />;
   };
 
-  const sortedAudits = useMemo(() => {
-    if (!r.page_audits) return [];
-    return [...r.page_audits].sort((a, b) => {
-      const dir = sortDir === 'asc' ? 1 : -1;
-      if (sortField === 'url') return a.url.localeCompare(b.url) * dir;
-      if (sortField === 'score') return (a.score - b.score) * dir;
-      return (a.issue_count - b.issue_count) * dir;
-    });
-  }, [r.page_audits, sortField, sortDir]);
-
   const totalPages = Math.ceil(sortedAudits.length / ITEMS_PER_PAGE);
   const paginatedAudits = sortedAudits.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE
   );
-
-  const filteredFindings = useMemo(() => {
-    if (!r.data_findings) return [];
-    if (findingSeverityFilter === 'all') return r.data_findings;
-    return r.data_findings.filter(f => f.severity === findingSeverityFilter);
-  }, [r.data_findings, findingSeverityFilter]);
 
   const statusIcon = (status: string) => {
     if (status === 'pass') return <span className="text-green-600">&#10003;</span>;
