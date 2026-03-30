@@ -7,11 +7,12 @@ interface TechnicalTabProps {
 }
 
 const TechnicalTab: React.FC<TechnicalTabProps> = ({ report }) => {
+  const [showAllPages, setShowAllPages] = useState(false);
+
   const r = report.report;
   if (!r) return null;
 
   const il = r.internal_linking;
-  const [showAllPages, setShowAllPages] = useState(false);
 
   const scoreColor = (score: number) => {
     if (score >= 80) return 'text-green-600';
