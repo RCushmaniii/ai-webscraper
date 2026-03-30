@@ -7,11 +7,10 @@ import ConfirmationModal from '../components/ConfirmationModal';
 import { usePageTitle } from '../hooks/usePageTitle';
 
 interface UsageInfo {
-  crawl_count: number;
-  crawl_limit: number | null;
-  is_admin: boolean;
-  remaining_crawls: number | null;
-  limit_reached: boolean;
+  current_count: number;
+  limit: number | null;
+  is_unlimited: boolean;
+  remaining: number | null;
 }
 
 const CrawlsPage: React.FC = () => {
@@ -411,15 +410,15 @@ const CrawlsPage: React.FC = () => {
                 </button>
               )}
               {/* Usage indicator for non-admin users */}
-              {usage && !usage.is_admin && (
+              {usage && !usage.is_unlimited && (
                 <div className="flex items-center gap-2 px-4 py-2 bg-secondary-50 border border-secondary-200 rounded-lg">
                   <Info className="w-4 h-4 text-secondary-600" />
                   <span className="text-sm text-secondary-700 font-medium">
-                    {usage.remaining_crawls} / {usage.crawl_limit} crawls left
+                    {usage.remaining} / {usage.limit} crawls left
                   </span>
                 </div>
               )}
-              {usage?.limit_reached ? (
+              {usage && !usage.is_unlimited && usage.remaining === 0 ? (
                 <button
                   disabled
                   className="inline-flex items-center gap-2 px-6 py-3 text-sm font-medium text-white bg-secondary-500 hover:bg-secondary-hover rounded-lg shadow-soft transition-colors"
@@ -580,7 +579,7 @@ const CrawlsPage: React.FC = () => {
             <p className="text-base text-neutral-steel mb-8 leading-comfortable">
               Start your first site analysis to begin crawling and inspecting web pages
             </p>
-            {usage?.limit_reached ? (
+            {usage && !usage.is_unlimited && usage.remaining === 0 ? (
               <button
                 disabled
                 className="inline-flex items-center gap-2 px-8 py-4 text-base font-medium text-white bg-secondary-500 hover:bg-secondary-hover rounded-lg shadow-soft transition-colors disabled:opacity-50 disabled:cursor-not-allowed"

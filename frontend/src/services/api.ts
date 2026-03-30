@@ -592,11 +592,10 @@ class ApiService {
   }
 
   async getUsage(): Promise<{
-    crawl_count: number;
-    crawl_limit: number | null;
-    is_admin: boolean;
-    remaining_crawls: number | null;
-    limit_reached: boolean;
+    current_count: number;
+    limit: number | null;
+    is_unlimited: boolean;
+    remaining: number | null;
   }> {
     const cached = apiCache.get<any>('usage');
     if (cached) return cached;
