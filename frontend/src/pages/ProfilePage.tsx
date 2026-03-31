@@ -11,12 +11,7 @@ const ProfilePage: React.FC = () => {
   const [success, setSuccess] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  
-  // TODO: API Key Management Feature - Future implementation
-  // Will allow users to generate and manage API keys for programmatic access
-  // Feature includes: create new keys, view existing keys, revoke keys, set expiration dates
-  // const [apiKeys, setApiKeys] = useState<{ id: string; name: string; key: string; created_at: string }[]>([]);
-  
+
   const [notificationSettings, setNotificationSettings] = useState({
     emailOnCrawlComplete: true,
     emailMarketing: false,

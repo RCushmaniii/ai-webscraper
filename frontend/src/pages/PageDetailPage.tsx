@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { apiService, Link as CrawlLink, Image } from '../services/api';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 interface PageData {
   id: string;
@@ -54,6 +55,8 @@ interface PageData {
 }
 
 const PageDetailPage: React.FC = () => {
+  usePageTitle('Page Details');
+
   const { crawlId, pageId } = useParams<{ crawlId: string; pageId: string }>();
   const [page, setPage] = useState<PageData | null>(null);
   const [links, setLinks] = useState<CrawlLink[]>([]);
@@ -828,6 +831,9 @@ const PageDetailPage: React.FC = () => {
                           <img
                             src={img.src}
                             alt={img.alt || `Image ${idx + 1}`}
+                            loading="lazy"
+                            width={80}
+                            height={80}
                             className="w-full h-full object-cover"
                             onError={(e) => {
                               e.currentTarget.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="80" height="80"%3E%3Crect fill="%23f3f4f6" width="80" height="80"/%3E%3Ctext fill="%239ca3af" x="50%" y="50%" text-anchor="middle" dy=".3em" font-size="10"%3EError%3C/text%3E%3C/svg%3E';
@@ -926,7 +932,7 @@ const PageDetailPage: React.FC = () => {
                         sandbox="allow-same-origin"
                         loading="lazy"
                         onError={() => {
-                          console.log('iframe failed to load');
+                          // iframe load failure is expected for cross-origin pages
                         }}
                       />
                     )}
@@ -1111,6 +1117,9 @@ const PageDetailPage: React.FC = () => {
                       <img
                         src={image.src}
                         alt={image.alt || 'Image'}
+                        loading="lazy"
+                        width={200}
+                        height={150}
                         className="max-w-full max-h-full object-contain"
                         onError={(e) => {
                           e.currentTarget.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23f3f4f6" width="100" height="100"/%3E%3Ctext fill="%239ca3af" x="50%" y="50%" text-anchor="middle" dy=".3em" font-size="12"%3EFailed to load%3C/text%3E%3C/svg%3E';

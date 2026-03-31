@@ -250,7 +250,7 @@ const CrawlDetailPage: React.FC = () => {
               setReport(reportData);
             } catch (err) {
               // Report not generated yet - that's OK
-              console.log('Report not available yet');
+              // Report not generated yet — silent fail is expected
             } finally {
               setReportLoading(false);
             }
@@ -754,6 +754,8 @@ const CrawlDetailPage: React.FC = () => {
                     src={img.src}
                     alt=""
                     loading="lazy"
+                    width={48}
+                    height={48}
                     className="w-full h-full object-cover"
                     onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                   />
@@ -1283,8 +1285,9 @@ const CrawlDetailPage: React.FC = () => {
                   <h2 className="text-xl font-semibold text-gray-800">Crawled Pages</h2>
                   <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2">
-                      <label className="text-sm text-gray-600">Filter:</label>
+                      <label htmlFor="page-status-filter" className="text-sm text-gray-600">Filter:</label>
                       <select
+                        id="page-status-filter"
                         value={pageStatusFilter}
                         onChange={(e) => setPageStatusFilter(e.target.value as any)}
                         className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -1471,8 +1474,9 @@ const CrawlDetailPage: React.FC = () => {
                       </button>
                     </div>
                     <div className="flex items-center gap-2">
-                      <label className="text-sm text-gray-600">Status:</label>
+                      <label htmlFor="link-status-filter" className="text-sm text-gray-600">Status:</label>
                       <select
+                        id="link-status-filter"
                         value={linkStatusFilter}
                         onChange={(e) => setLinkStatusFilter(e.target.value as any)}
                         className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -1975,8 +1979,9 @@ const CrawlDetailPage: React.FC = () => {
                   <h2 className="text-xl font-semibold text-gray-800">Images</h2>
                   <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2">
-                      <label className="text-sm text-gray-600">Alt Text:</label>
+                      <label htmlFor="image-alt-filter" className="text-sm text-gray-600">Alt Text:</label>
                       <select
+                        id="image-alt-filter"
                         value={imageAltFilter}
                         onChange={(e) => setImageAltFilter(e.target.value as any)}
                         className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -1987,8 +1992,9 @@ const CrawlDetailPage: React.FC = () => {
                       </select>
                     </div>
                     <div className="flex items-center gap-2">
-                      <label className="text-sm text-gray-600">Status:</label>
+                      <label htmlFor="image-status-filter" className="text-sm text-gray-600">Status:</label>
                       <select
+                        id="image-status-filter"
                         value={imageBrokenFilter}
                         onChange={(e) => setImageBrokenFilter(e.target.value as any)}
                         className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -2061,6 +2067,8 @@ const CrawlDetailPage: React.FC = () => {
                                         src={image.src}
                                         alt={image.alt || 'Image'}
                                         loading="lazy"
+                                        width={64}
+                                        height={64}
                                         className="w-16 h-16 object-cover rounded transition-transform group-hover:scale-105"
                                         onError={(e) => {
                                           e.currentTarget.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23ddd" width="100" height="100"/%3E%3Ctext fill="%23999" x="50%" y="50%" text-anchor="middle" dy=".3em"%3ENo Image%3C/text%3E%3C/svg%3E';
@@ -2263,6 +2271,8 @@ const CrawlDetailPage: React.FC = () => {
                 src={lightboxImage.src}
                 alt={lightboxImage.alt || 'Full size image'}
                 loading="lazy"
+                width={800}
+                height={600}
                 className="max-w-[85vw] max-h-[75vh] object-contain"
                 onError={(e) => {
                   e.currentTarget.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="300"%3E%3Crect fill="%23f3f4f6" width="400" height="300"/%3E%3Ctext fill="%239ca3af" x="50%" y="50%" text-anchor="middle" dy=".3em" font-size="18"%3EImage failed to load%3C/text%3E%3C/svg%3E';
