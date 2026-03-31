@@ -1,7 +1,10 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 const NotFoundPage: React.FC = () => {
+  usePageTitle('Page Not Found');
+
   return (
     <div className="max-w-md mx-auto text-center py-12">
       <h1 className="text-6xl font-bold text-primary-600 mb-4">404</h1>

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Image as ImageIcon, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 interface ImageAnalysis {
   id: string;
@@ -23,6 +24,8 @@ interface PageInfo {
 }
 
 const ImagesPage: React.FC = () => {
+  usePageTitle('Images');
+
   const { crawlId } = useParams<{ crawlId: string }>();
   const [images, setImages] = useState<ImageAnalysis[]>([]);
   const [pages, setPages] = useState<Map<string, PageInfo>>(new Map());
@@ -207,6 +210,9 @@ const ImagesPage: React.FC = () => {
                       <img
                         src={image.image_url}
                         alt={image.current_alt || 'Image preview'}
+                        loading="lazy"
+                        width={128}
+                        height={128}
                         className="object-cover w-full h-full"
                         onError={(e) => {
                           (e.target as HTMLImageElement).src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="128" height="128"%3E%3Crect fill="%23f3f4f6" width="128" height="128"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" fill="%239ca3af" font-size="14"%3ENo Image%3C/text%3E%3C/svg%3E';

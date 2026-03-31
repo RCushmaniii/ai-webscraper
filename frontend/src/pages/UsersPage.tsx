@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { apiService, User, UserCreate } from '../services/api';
 import ConfirmationModal from '../components/ConfirmationModal';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 const UsersPage: React.FC = () => {
+  usePageTitle('Users');
+
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

@@ -171,6 +171,9 @@ export default function SearchBar({ crawlId, onResultsChange }: SearchBarProps) 
                           <img
                             src={image.src}
                             alt={image.alt || 'No alt text'}
+                            loading="lazy"
+                            width={48}
+                            height={48}
                             className="w-12 h-12 object-cover rounded"
                             onError={(e) => {
                               (e.target as HTMLImageElement).src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23ddd" width="100" height="100"/%3E%3C/svg%3E';

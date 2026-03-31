@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { Sparkles, Zap, Code, Brain, Layers, TrendingUp, Users, Globe, Rocket } from 'lucide-react';
 import { usePageTitle } from '../hooks/usePageTitle';
 
@@ -43,7 +44,7 @@ const AboutPage: React.FC = () => {
             <div className="border-l-4 border-red-500 pl-6">
               <h3 className="text-xl font-semibold text-gray-900 mb-2">SEO Audits Cost Thousands</h3>
               <p className="text-gray-700 leading-relaxed">
-                Agencies charge $2,000-5,000 per month for what amounts to manual labor: someone clicking through your site, 
+                Professional audits can run thousands per engagement for what amounts to manual labor: someone clicking through your site,
                 checking meta tags, reading content, and writing up recommendations. It's slow, expensive, and doesn't scale.
               </p>
             </div>
@@ -104,8 +105,8 @@ const AboutPage: React.FC = () => {
                 <div>
                   <h3 className="text-xl font-semibold text-gray-900 mb-2">Scale That Was Impossible Before</h3>
                   <p className="text-gray-700 leading-relaxed">
-                    Analyze 1,000 pages in minutes, not weeks. Generate alt text for 5,000 images in an hour, not months. 
-                    Get content quality scores for an entire website before lunch. The combination of automated crawling and 
+                    Analyze hundreds of pages in minutes, not weeks. Surface accessibility issues across your entire site instantly.
+                    Get actionable recommendations for every page before lunch. The combination of automated crawling and
                     AI analysis makes this possible.
                   </p>
                 </div>
@@ -131,7 +132,7 @@ const AboutPage: React.FC = () => {
                 they can't get anywhere else. Scale your services without hiring more analysts.
               </p>
               <div className="text-sm text-secondary-600 font-medium">
-                Save 20+ hours per audit • Serve more clients • Deliver better insights
+                Dramatically reduce audit time • Serve more clients • Deliver better insights
               </div>
             </div>
 
@@ -142,7 +143,7 @@ const AboutPage: React.FC = () => {
                 opportunities automatically. Get specific recommendations for improvement.
               </p>
               <div className="text-sm text-secondary-600 font-medium">
-                Quality scoring • Brand voice consistency • Content gap analysis
+                Issue detection • Brand voice consistency • SEO analysis
               </div>
             </div>
 
@@ -153,7 +154,7 @@ const AboutPage: React.FC = () => {
                 accessibility issues at scale and provide specific remediation steps.
               </p>
               <div className="text-sm text-secondary-600 font-medium">
-                90% faster audits • AI-generated alt text • WCAG compliance tracking
+                Faster audits • Accessibility issue detection • WCAG compliance insights
               </div>
             </div>
 
@@ -164,7 +165,7 @@ const AboutPage: React.FC = () => {
                 brand consistency and SEO best practices at scale.
               </p>
               <div className="text-sm text-secondary-600 font-medium">
-                Multi-site monitoring • Competitive analysis • Executive reporting
+                Large-scale auditing • Site-wide analysis • Executive reporting
               </div>
             </div>
 
@@ -262,8 +263,8 @@ const AboutPage: React.FC = () => {
 
           <div className="bg-gradient-to-br from-secondary-50 to-primary-50 rounded-xl p-8 border border-gray-200">
             <p className="text-gray-700 leading-relaxed mb-4">
-              We're just scratching the surface. As LLMs improve, so does our ability to understand and analyze content. 
-              Future capabilities include:
+              This is just the beginning. As LLMs improve, so does the ability to understand and analyze content.
+              Future capabilities on the roadmap include:
             </p>
             <ul className="space-y-2 text-gray-700">
               <li className="flex items-start gap-2">
@@ -288,8 +289,8 @@ const AboutPage: React.FC = () => {
               </li>
             </ul>
             <p className="text-gray-700 leading-relaxed mt-4">
-              The convergence of web scraping, AI, and modern infrastructure isn't slowing down—it's accelerating. 
-              What we're building today will seem primitive in a year. That's the point.
+              The convergence of web intelligence, AI, and modern infrastructure isn't slowing down — it's accelerating.
+              What's possible today will seem primitive in a year. That's the point.
             </p>
           </div>
         </div>
@@ -303,18 +304,18 @@ const AboutPage: React.FC = () => {
             See how AI-powered web intelligence can transform your workflow.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <a
-              href="/signup"
+            <Link
+              to="/signup"
               className="px-8 py-4 bg-white text-secondary-600 rounded-lg font-semibold text-lg hover:bg-gray-100 transition-all shadow-lg"
             >
-              Start Free Trial
-            </a>
-            <a
-              href="/quick-start"
+              Start Free Audit
+            </Link>
+            <Link
+              to="/docs"
               className="px-8 py-4 bg-secondary-700 hover:bg-secondary-800 text-white rounded-lg font-semibold text-lg border-2 border-secondary-500 transition-all"
             >
               View Documentation
-            </a>
+            </Link>
           </div>
         </div>
       </section>

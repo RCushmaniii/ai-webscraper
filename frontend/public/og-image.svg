@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1E293B"/>
+      <stop offset="100%" style="stop-color:#0F172A"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#F97316"/>
+      <stop offset="100%" style="stop-color:#FB923C"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect x="0" y="590" width="1200" height="40" fill="url(#accent)" opacity="0.9"/>
+  <rect x="60" y="60" width="80" height="80" rx="16" fill="#F97316"/>
+  <text x="100" y="115" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-weight="700" font-size="40" fill="#1E293B">AI</text>
+  <text x="160" y="112" font-family="system-ui,-apple-system,sans-serif" font-weight="700" font-size="28" fill="#F8FAFC">WebScraper</text>
+  <text x="60" y="240" font-family="system-ui,-apple-system,sans-serif" font-weight="800" font-size="56" fill="#F8FAFC">AI-Powered Site Audits</text>
+  <text x="60" y="310" font-family="system-ui,-apple-system,sans-serif" font-weight="800" font-size="56" fill="#F97316">&amp; SEO Analysis</text>
+  <text x="60" y="380" font-family="system-ui,-apple-system,sans-serif" font-weight="400" font-size="24" fill="#94A3B8">Crawl your site. Detect issues. Get AI-powered recommendations</text>
+  <text x="60" y="420" font-family="system-ui,-apple-system,sans-serif" font-weight="400" font-size="24" fill="#94A3B8">you can act on immediately.</text>
+  <text x="60" y="560" font-family="system-ui,-apple-system,sans-serif" font-weight="600" font-size="20" fill="#CBD5E1">scraper.cushlabs.ai</text>
+  <text x="1140" y="560" text-anchor="end" font-family="system-ui,-apple-system,sans-serif" font-weight="500" font-size="18" fill="#64748B">by CushLabs.ai</text>
+</svg>
