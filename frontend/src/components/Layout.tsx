@@ -42,7 +42,7 @@ const Layout: React.FC = () => {
     <div className="min-h-screen flex flex-col bg-neutral-cloud">
       {/* Navigation Bar - 80px height, Deep Slate background */}
       <header className="bg-primary-800 text-white shadow-soft-lg">
-        <div className="max-w-7xl mx-auto px-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center" style={{ height: '80px' }}>
             {/* Logo & Branding */}
             <Link to="/" className="flex items-center space-x-2">

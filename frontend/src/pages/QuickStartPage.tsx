@@ -1,8 +1,11 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 const QuickStartPage: React.FC = () => {
+  usePageTitle('Quick Start');
+
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -15,9 +18,9 @@ const QuickStartPage: React.FC = () => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto pt-12 pb-16">
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-16">
       <div className="text-center mb-16">
-        <h1 className="text-5xl font-bold text-neutral-charcoal mb-6">
+        <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-neutral-charcoal mb-6">
           Quick Start Guide
         </h1>
         <p className="text-xl text-neutral-steel leading-relaxed max-w-2xl mx-auto">
@@ -26,28 +29,28 @@ const QuickStartPage: React.FC = () => {
       </div>
 
       <div className="grid md:grid-cols-2 gap-8 mb-16">
-        <div className="bg-white rounded-lg border border-primary-100 p-8 shadow-soft hover:shadow-md transition-shadow">
+        <div className="bg-white rounded-lg border border-primary-100 p-6 sm:p-8 shadow-soft hover:shadow-md transition-shadow">
           <div className="flex items-center mb-4">
             <div className="bg-secondary-100 p-3 rounded-lg mr-4">
               <svg className="h-6 w-6 text-secondary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             </div>
-            <h2 className="text-2xl font-semibold text-neutral-charcoal">Simple & Fast</h2>
+            <h2 className="text-xl sm:text-2xl font-semibold text-neutral-charcoal">Simple & Fast</h2>
           </div>
           <p className="text-neutral-steel leading-relaxed">
             Enter a URL and let AI crawl your entire site automatically. Get results in minutes, not hours.
           </p>
         </div>
 
-        <div className="bg-white rounded-lg border border-primary-100 p-8 shadow-soft hover:shadow-md transition-shadow">
+        <div className="bg-white rounded-lg border border-primary-100 p-6 sm:p-8 shadow-soft hover:shadow-md transition-shadow">
           <div className="flex items-center mb-4">
             <div className="bg-secondary-100 p-3 rounded-lg mr-4">
               <svg className="h-6 w-6 text-secondary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
             </div>
-            <h2 className="text-2xl font-semibold text-neutral-charcoal">Deep Insights</h2>
+            <h2 className="text-xl sm:text-2xl font-semibold text-neutral-charcoal">Deep Insights</h2>
           </div>
           <p className="text-neutral-steel leading-relaxed">
             Extract full page content, analyze SEO metadata, detect broken links, and identify technical issues.
@@ -56,7 +59,7 @@ const QuickStartPage: React.FC = () => {
       </div>
 
       <div className="grid md:grid-cols-3 gap-8 mb-16">
-        <div className="bg-gray-50 rounded-lg p-8 text-center">
+        <div className="bg-gray-50 rounded-lg p-6 sm:p-8 text-center">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-secondary-500 text-white rounded-full text-2xl font-bold mb-4">1</div>
           <h3 className="text-xl font-semibold text-neutral-charcoal mb-3">Enter URL</h3>
           <p className="text-neutral-steel leading-relaxed">
@@ -64,7 +67,7 @@ const QuickStartPage: React.FC = () => {
           </p>
         </div>
 
-        <div className="bg-gray-50 rounded-lg p-8 text-center">
+        <div className="bg-gray-50 rounded-lg p-6 sm:p-8 text-center">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-secondary-500 text-white rounded-full text-2xl font-bold mb-4">2</div>
           <h3 className="text-xl font-semibold text-neutral-charcoal mb-3">AI Crawls Site</h3>
           <p className="text-neutral-steel leading-relaxed">
@@ -72,7 +75,7 @@ const QuickStartPage: React.FC = () => {
           </p>
         </div>
 
-        <div className="bg-gray-50 rounded-lg p-8 text-center">
+        <div className="bg-gray-50 rounded-lg p-6 sm:p-8 text-center">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-secondary-500 text-white rounded-full text-2xl font-bold mb-4">3</div>
           <h3 className="text-xl font-semibold text-neutral-charcoal mb-3">Review & Export</h3>
           <p className="text-neutral-steel leading-relaxed">

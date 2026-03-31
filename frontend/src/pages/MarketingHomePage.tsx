@@ -19,8 +19,11 @@ import {
   Briefcase,
   Rocket
 } from 'lucide-react';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 const MarketingHomePage: React.FC = () => {
+  usePageTitle('AI-Powered Site Audits');
+
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -35,7 +38,7 @@ const MarketingHomePage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-b from-white to-gray-50">
       {/* Hero Section */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-secondary-50 via-white to-primary-50 pt-20 pb-32">
+      <section className="relative overflow-hidden bg-gradient-to-br from-secondary-50 via-white to-primary-50 pt-12 pb-16 sm:pt-20 sm:pb-32">
         <div className="absolute inset-0 bg-grid-slate-100 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.6))] -z-10" />
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -45,14 +48,14 @@ const MarketingHomePage: React.FC = () => {
               AI-Powered Site Consultant
             </div>
 
-            <h1 className="text-5xl md:text-7xl font-bold text-gray-900 mb-6 leading-tight">
+            <h1 className="text-3xl sm:text-5xl md:text-7xl font-bold text-gray-900 mb-6 leading-tight">
               Other Tools Tell You What's Broken.
               <span className="block text-transparent bg-clip-text bg-gradient-to-r from-secondary-600 to-primary-600">
                 I Tell You How to Fix It.
               </span>
             </h1>
 
-            <p className="text-xl md:text-2xl text-gray-600 max-w-3xl mx-auto mb-6 leading-relaxed">
+            <p className="text-lg sm:text-xl md:text-2xl text-gray-600 max-w-3xl mx-auto mb-6 leading-relaxed">
               Most audit tools tell you what's wrong. I tell you <strong>what to do about it</strong>,{' '}
               <strong>in what order</strong>, and <strong>how long it'll take</strong> — then show you how
               you stack up against your competition.
@@ -86,20 +89,20 @@ const MarketingHomePage: React.FC = () => {
           {/* Stats */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mt-20 max-w-4xl mx-auto">
             <div className="text-center">
-              <div className="text-4xl font-bold text-gray-900">3 min</div>
-              <div className="text-sm text-gray-600 mt-1">Full Site Audit</div>
+              <div className="text-2xl sm:text-4xl font-bold text-gray-900">3 min</div>
+              <div className="text-xs sm:text-sm text-gray-600 mt-1">Full Site Audit</div>
             </div>
             <div className="text-center">
-              <div className="text-4xl font-bold text-gray-900">50+</div>
-              <div className="text-sm text-gray-600 mt-1">Issues Detected</div>
+              <div className="text-2xl sm:text-4xl font-bold text-gray-900">50+</div>
+              <div className="text-xs sm:text-sm text-gray-600 mt-1">Issues Detected</div>
             </div>
             <div className="text-center">
-              <div className="text-4xl font-bold text-gray-900">$1,500+</div>
-              <div className="text-sm text-gray-600 mt-1">vs. Consultant Fee</div>
+              <div className="text-2xl sm:text-4xl font-bold text-gray-900">$$$</div>
+              <div className="text-xs sm:text-sm text-gray-600 mt-1">vs. Consultant Fees</div>
             </div>
             <div className="text-center">
-              <div className="text-4xl font-bold text-gray-900">5x</div>
-              <div className="text-sm text-gray-600 mt-1">Faster Than Manual</div>
+              <div className="text-2xl sm:text-4xl font-bold text-gray-900">5x</div>
+              <div className="text-xs sm:text-sm text-gray-600 mt-1">Faster Than Manual</div>
             </div>
           </div>
         </div>
@@ -125,7 +128,7 @@ const MarketingHomePage: React.FC = () => {
               <h3 className="text-xl font-semibold text-gray-900 mb-3">"Fix Your Broken Links"</h3>
               <p className="text-gray-600">
                 Great — but which ones matter? A 404 on your pricing page is urgent. A broken link to an old blog post? Not so much.
-                Other tools treat them the same.
+                Most tools treat them the same.
               </p>
             </div>
 
@@ -135,8 +138,8 @@ const MarketingHomePage: React.FC = () => {
               </div>
               <h3 className="text-xl font-semibold text-gray-900 mb-3">"Hire a Consultant"</h3>
               <p className="text-gray-600">
-                A proper site audit costs $1,500-5,000. You get a PDF two weeks later. Half the recommendations are generic.
-                The other half you can't implement without another $5K.
+                A proper site audit can cost thousands. You get a PDF weeks later. Many recommendations are generic.
+                The rest you can't implement without paying even more.
               </p>
             </div>
 
@@ -200,8 +203,8 @@ const MarketingHomePage: React.FC = () => {
               </div>
               <h3 className="text-xl font-semibold text-gray-900 mb-3">AI Consultant Reports</h3>
               <p className="text-gray-600 mb-4">
-                The report a $500/hr strategist would write — generated in 3 minutes. Business-impact prioritization,
-                copy-paste fixes, and effort estimates for every recommendation.
+                The kind of report you'd expect from a seasoned strategist — generated in minutes. Business-impact prioritization,
+                specific fixes, and effort estimates for every recommendation.
               </p>
               <div className="text-sm text-secondary-600 font-medium">AI-generated analysis</div>
             </div>
@@ -226,8 +229,8 @@ const MarketingHomePage: React.FC = () => {
               </div>
               <h3 className="text-xl font-semibold text-gray-900 mb-3">Competitive Comparison</h3>
               <p className="text-gray-600 mb-4">
-                Crawl your site and your competitor's. Get a side-by-side analysis: content gaps, structural
-                differences, and a specific playbook to close the gap.
+                Crawl your site and a competitor's. Compare structural patterns, content depth, and SEO signals
+                to understand where you stand and where to improve.
               </p>
               <div className="text-sm text-secondary-600 font-medium">Premium feature</div>
             </div>
@@ -385,7 +388,7 @@ const MarketingHomePage: React.FC = () => {
           <div className="grid lg:grid-cols-2 gap-16 items-center">
             <div>
               <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-6">
-                What You Won't Find in Screaming Frog
+                What Traditional Crawlers Can't Do
               </h2>
               <p className="text-xl text-gray-600 mb-8">
                 Traditional crawlers tell you your meta description is too long.
@@ -492,7 +495,7 @@ const MarketingHomePage: React.FC = () => {
       {/* CTA Section */}
       <section className="py-20 bg-gradient-to-br from-secondary-600 to-primary-600 text-white">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-4xl md:text-5xl font-bold mb-6">
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-6">
             Stop Guessing. Start Fixing.
           </h2>
           <p className="text-xl mb-4 text-secondary-100">
