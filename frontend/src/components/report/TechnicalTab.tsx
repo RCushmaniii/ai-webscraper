@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AlertCircle, CheckCircle, Link2, AlertTriangle, ArrowDown, ArrowUp } from 'lucide-react';
+import { AlertCircle, CheckCircle, Link2, AlertTriangle, ArrowDown, ArrowUp, Type, Network, ChevronDown, ChevronRight, ArrowRight } from 'lucide-react';
 import { CrawlReport } from '../../services/api';
 
 interface TechnicalTabProps {
@@ -8,11 +8,14 @@ interface TechnicalTabProps {
 
 const TechnicalTab: React.FC<TechnicalTabProps> = ({ report }) => {
   const [showAllPages, setShowAllPages] = useState(false);
+  const [expandedClusters, setExpandedClusters] = useState<Set<string>>(new Set());
 
   const r = report.report;
   if (!r) return null;
 
   const il = r.internal_linking;
+  const at = il?.anchor_text;
+  const clusters = il?.topic_clusters;
 
   const scoreColor = (score: number) => {
     if (score >= 80) return 'text-green-600';
@@ -25,6 +28,32 @@ const TechnicalTab: React.FC<TechnicalTabProps> = ({ report }) => {
     if (score >= 60) return 'border-yellow-200 bg-yellow-50';
     return 'border-red-200 bg-red-50';
   };
+
+  const clusterColor = (ratio: number) => {
+    if (ratio >= 80) return 'bg-green-500';
+    if (ratio >= 40) return 'bg-yellow-500';
+    return 'bg-red-500';
+  };
+
+  const clusterBadgeColor = (ratio: number) => {
+    if (ratio >= 80) return 'text-green-700 bg-green-100';
+    if (ratio >= 40) return 'text-yellow-700 bg-yellow-100';
+    return 'text-red-700 bg-red-100';
+  };
+
+  const toggleCluster = (name: string) => {
+    setExpandedClusters(prev => {
+      const next = new Set(prev);
+      if (next.has(name)) {
+        next.delete(name);
+      } else {
+        next.add(name);
+      }
+      return next;
+    });
+  };
+
+  const stripDomain = (url: string) => url.replace(/^https?:\/\/[^/]+/, '') || '/';
 
   return (
     <div className="space-y-6">
@@ -98,7 +127,7 @@ const TechnicalTab: React.FC<TechnicalTabProps> = ({ report }) => {
                         rel="noopener noreferrer"
                         className="text-sm text-secondary-600 hover:underline font-medium"
                       >
-                        {page.url.replace(/^https?:\/\/[^/]+/, '') || '/'}
+                        {stripDomain(page.url)}
                       </a>
                       {page.title && page.title !== 'Untitled' && (
                         <span className="text-xs text-gray-500 ml-2">{page.title}</span>
@@ -107,6 +136,189 @@ const TechnicalTab: React.FC<TechnicalTabProps> = ({ report }) => {
                     <span className="text-xs text-gray-400">Depth {page.depth}</span>
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* Anchor Text Quality */}
+          {at && (
+            <div className={`rounded-lg border p-6 ${scoreBorderColor(at.anchor_score)}`}>
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                    <Type className="w-5 h-5" />
+                    Anchor Text Quality
+                  </h3>
+                  <p className="text-sm text-gray-600 mt-1">
+                    How descriptive are your internal link anchor texts?
+                  </p>
+                </div>
+                <div className="text-right">
+                  <div className={`text-4xl font-bold ${scoreColor(at.anchor_score)}`}>
+                    {at.anchor_score}
+                  </div>
+                  <div className="text-xs text-gray-500">out of 100</div>
+                </div>
+              </div>
+
+              {/* Distribution Bar */}
+              {(() => {
+                const total = at.descriptive_count + at.partial_count + at.generic_count + at.missing_count;
+                if (total === 0) return null;
+                const pct = (n: number) => Math.max(n > 0 ? 2 : 0, Math.round(n / total * 100));
+                return (
+                  <div className="mb-4">
+                    <div className="flex rounded-full overflow-hidden h-4 bg-gray-200">
+                      {at.descriptive_count > 0 && (
+                        <div className="bg-green-500 transition-all" style={{ width: `${pct(at.descriptive_count)}%` }} title={`Descriptive: ${at.descriptive_count}`} />
+                      )}
+                      {at.partial_count > 0 && (
+                        <div className="bg-blue-400 transition-all" style={{ width: `${pct(at.partial_count)}%` }} title={`Partial: ${at.partial_count}`} />
+                      )}
+                      {at.generic_count > 0 && (
+                        <div className="bg-yellow-500 transition-all" style={{ width: `${pct(at.generic_count)}%` }} title={`Generic: ${at.generic_count}`} />
+                      )}
+                      {at.missing_count > 0 && (
+                        <div className="bg-red-500 transition-all" style={{ width: `${pct(at.missing_count)}%` }} title={`Missing: ${at.missing_count}`} />
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-gray-600">
+                      <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-green-500 inline-block" /> Descriptive ({at.descriptive_count})</span>
+                      <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-blue-400 inline-block" /> Partial ({at.partial_count})</span>
+                      <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-yellow-500 inline-block" /> Generic ({at.generic_count})</span>
+                      <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-red-500 inline-block" /> Missing ({at.missing_count})</span>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Worst Anchors Table */}
+              {at.worst_anchors && at.worst_anchors.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-medium text-gray-700 mb-2">Anchors Needing Improvement</h4>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-gray-200">
+                          <th className="text-left py-2 pr-3 text-gray-500 font-medium">Anchor Text</th>
+                          <th className="text-left py-2 pr-3 text-gray-500 font-medium">Source Page</th>
+                          <th className="text-left py-2 text-gray-500 font-medium">Target Page</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {at.worst_anchors.map((wa, i) => (
+                          <tr key={i} className="border-b border-gray-50">
+                            <td className="py-2 pr-3">
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                                wa.category === 'missing' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'
+                              }`}>
+                                {wa.anchor}
+                              </span>
+                            </td>
+                            <td className="py-2 pr-3 text-secondary-600 truncate max-w-[200px]">
+                              <a href={wa.source_url} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                                {stripDomain(wa.source_url)}
+                              </a>
+                            </td>
+                            <td className="py-2 text-secondary-600 truncate max-w-[200px]">
+                              <a href={wa.target_url} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                                {stripDomain(wa.target_url)}
+                              </a>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Topic Clusters */}
+          {clusters && clusters.length > 0 && (
+            <div className="bg-white rounded-lg border border-gray-200 p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-1 flex items-center gap-2">
+                <Network className="w-5 h-5" />
+                Topic Clusters
+              </h3>
+              <p className="text-sm text-gray-500 mb-4">
+                Pages grouped by URL path. Low cross-linking means missed opportunities for related pages to reference each other.
+              </p>
+              <div className="space-y-3">
+                {clusters.map((cluster) => {
+                  const isExpanded = expandedClusters.has(cluster.cluster_name);
+                  return (
+                    <div key={cluster.cluster_name} className="border border-gray-100 rounded-lg overflow-hidden">
+                      <button
+                        onClick={() => toggleCluster(cluster.cluster_name)}
+                        className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors text-left"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          {isExpanded ? <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" /> : <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />}
+                          <div className="min-w-0">
+                            <span className="font-medium text-gray-900">{cluster.cluster_name}</span>
+                            <span className="text-xs text-gray-400 ml-2">{cluster.page_count} pages</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3 flex-shrink-0">
+                          <div className="w-24 h-2 rounded-full bg-gray-200 overflow-hidden">
+                            <div className={`h-full rounded-full ${clusterColor(cluster.cross_link_ratio)}`} style={{ width: `${cluster.cross_link_ratio}%` }} />
+                          </div>
+                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${clusterBadgeColor(cluster.cross_link_ratio)}`}>
+                            {cluster.cross_link_ratio}%
+                          </span>
+                        </div>
+                      </button>
+
+                      {isExpanded && (
+                        <div className="px-4 pb-4 border-t border-gray-100">
+                          <div className="mt-3 text-xs text-gray-500 mb-2">
+                            {cluster.cross_links_found} of {cluster.cross_links_possible} possible cross-links exist
+                          </div>
+
+                          {/* Pages in cluster */}
+                          <div className="mb-3">
+                            <div className="text-xs font-medium text-gray-500 mb-1">Pages</div>
+                            <div className="flex flex-wrap gap-1">
+                              {cluster.pages.map((p, i) => (
+                                <a
+                                  key={i}
+                                  href={p.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-block text-xs px-2 py-1 bg-gray-100 text-secondary-600 rounded hover:bg-gray-200 truncate max-w-[250px]"
+                                >
+                                  {stripDomain(p.url)}
+                                </a>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Missing links suggestions */}
+                          {cluster.missing_links && cluster.missing_links.length > 0 && (
+                            <div>
+                              <div className="text-xs font-medium text-gray-500 mb-2">Suggested Cross-Links</div>
+                              <div className="space-y-1.5">
+                                {cluster.missing_links.map((ml, i) => (
+                                  <div key={i} className="flex items-center gap-2 text-xs bg-yellow-50 border border-yellow-100 rounded px-3 py-2">
+                                    <span className="text-gray-700 truncate max-w-[180px]" title={ml.from_title}>
+                                      {stripDomain(ml.from_url)}
+                                    </span>
+                                    <ArrowRight className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                                    <span className="text-gray-700 truncate max-w-[180px]" title={ml.to_title}>
+                                      {stripDomain(ml.to_url)}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -143,7 +355,7 @@ const TechnicalTab: React.FC<TechnicalTabProps> = ({ report }) => {
                             rel="noopener noreferrer"
                             className="text-secondary-600 hover:underline truncate block max-w-xs"
                           >
-                            {page.url.replace(/^https?:\/\/[^/]+/, '') || '/'}
+                            {stripDomain(page.url)}
                           </a>
                           {page.title && page.title !== 'Untitled' && (
                             <div className="text-xs text-gray-400 truncate max-w-xs">{page.title}</div>
@@ -200,7 +412,7 @@ const TechnicalTab: React.FC<TechnicalTabProps> = ({ report }) => {
                         rel="noopener noreferrer"
                         className="block text-xs text-secondary-600 hover:underline truncate"
                       >
-                        {url.replace(/^https?:\/\/[^/]+/, '') || '/'}
+                        {stripDomain(url)}
                       </a>
                     ))}
                   </div>

@@ -565,6 +565,116 @@ async def generate_crawl_report(
 
         linking_score = max(0, linking_score)
 
+        # --- Anchor Text Quality ---
+        GENERIC_ANCHORS = {
+            "click here", "here", "read more", "learn more", "more", "link",
+            "this", "go", "visit", "see more", "details", "info", "continue",
+            "next", "previous", "back", "home", "page", "website", "site",
+        }
+
+        anchor_analysis = {"descriptive": [], "partial": [], "generic": [], "missing": []}
+        for link in internal_links:
+            anchor = (link.get("anchor_text") or "").strip()
+            if not anchor:
+                anchor_analysis["missing"].append(link)
+            elif anchor.lower() in GENERIC_ANCHORS or anchor.startswith("http"):
+                anchor_analysis["generic"].append(link)
+            elif len(anchor.split()) <= 2 and len(anchor) < 15:
+                anchor_analysis["partial"].append(link)
+            else:
+                anchor_analysis["descriptive"].append(link)
+
+        total_anchors = len(internal_links)
+        anchor_score = 100
+        if total_anchors > 0:
+            generic_ratio = len(anchor_analysis["generic"]) / total_anchors
+            missing_ratio = len(anchor_analysis["missing"]) / total_anchors
+            anchor_score -= int(generic_ratio * 50)
+            anchor_score -= int(missing_ratio * 30)
+            anchor_score = max(0, anchor_score)
+
+        # Blend anchor score into linking score (70% structure, 30% anchors)
+        if total_anchors > 0:
+            linking_score = int(linking_score * 0.7 + anchor_score * 0.3)
+
+        # Build worst anchors list (up to 5 missing + 5 generic)
+        worst_anchors = []
+        for cat in ["missing", "generic"]:
+            for l in anchor_analysis[cat][:5]:
+                worst_anchors.append({
+                    "anchor": (l.get("anchor_text") or "").strip() or "(empty)",
+                    "source_url": page_id_map.get(l.get("source_page_id"), {}).get("url", ""),
+                    "target_url": l.get("target_url", ""),
+                    "category": cat,
+                })
+
+        # --- Topic Cluster Detection ---
+        from collections import defaultdict
+
+        def get_path_prefix(url: str) -> str:
+            """Extract the first path segment as cluster key."""
+            parsed = urlparse(url)
+            segments = [s for s in parsed.path.strip("/").split("/") if s]
+            return "/" + segments[0] if segments else "/"
+
+        # Build clusters from URL path prefixes
+        path_clusters = defaultdict(list)
+        for page in pages:
+            prefix = get_path_prefix(page.get("url", ""))
+            if prefix != "/":
+                path_clusters[prefix].append(page)
+
+        # Build link graph: source_page_id → set of normalized target URLs
+        link_graph = defaultdict(set)
+        for link in internal_links:
+            source_id = link.get("source_page_id")
+            target_norm = normalize_url(link.get("target_url", ""))
+            if source_id:
+                link_graph[source_id].add(target_norm)
+
+        topic_clusters = []
+        for prefix, cluster_pages in path_clusters.items():
+            if len(cluster_pages) < 2:
+                continue
+
+            cluster_urls = {normalize_url(p.get("url", "")) for p in cluster_pages}
+
+            cross_links = 0
+            possible_links = len(cluster_pages) * (len(cluster_pages) - 1)
+            missing_links = []
+
+            for page in cluster_pages:
+                page_id = page.get("id")
+                outbound_targets = link_graph.get(page_id, set())
+                page_norm = normalize_url(page.get("url", ""))
+                for other in cluster_pages:
+                    other_norm = normalize_url(other.get("url", ""))
+                    if other_norm != page_norm:
+                        if other_norm in outbound_targets:
+                            cross_links += 1
+                        else:
+                            missing_links.append({
+                                "from_url": page.get("url"),
+                                "from_title": page.get("title", "Untitled"),
+                                "to_url": other.get("url"),
+                                "to_title": other.get("title", "Untitled"),
+                            })
+
+            cross_link_ratio = round(cross_links / possible_links * 100) if possible_links > 0 else 0
+
+            topic_clusters.append({
+                "cluster_name": prefix,
+                "page_count": len(cluster_pages),
+                "cross_link_ratio": cross_link_ratio,
+                "cross_links_found": cross_links,
+                "cross_links_possible": possible_links,
+                "missing_links": missing_links[:10],
+                "pages": [{"url": p.get("url"), "title": p.get("title", "Untitled")} for p in cluster_pages],
+            })
+
+        # Sort: worst cross-linking first
+        topic_clusters.sort(key=lambda c: c["cross_link_ratio"])
+
         # --- Problem Pages ---
         problem_pages = []
         for page in pages:
@@ -1145,6 +1255,16 @@ async def generate_crawl_report(
                 "least_linked": least_linked_internal,
                 "depth_distribution": depth_dist,
                 "page_details": linking_details,
+                "anchor_text": {
+                    "anchor_score": anchor_score,
+                    "descriptive_count": len(anchor_analysis["descriptive"]),
+                    "partial_count": len(anchor_analysis["partial"]),
+                    "generic_count": len(anchor_analysis["generic"]),
+                    "missing_count": len(anchor_analysis["missing"]),
+                    "worst_anchors": worst_anchors,
+                },
+                "topic_clusters": topic_clusters,
+                "cluster_count": len(topic_clusters),
             },
 
             # --- Image Analysis ---
