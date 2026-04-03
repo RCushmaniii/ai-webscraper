@@ -38,8 +38,7 @@ class ErrorBoundary extends Component<Props, State> {
       errorInfo,
     });
 
-    // TODO: Log error to error reporting service (Sentry, LogRocket, etc.)
-    // logErrorToService(error, errorInfo);
+    // Error reporting integration point — add Sentry.captureException(error) here when ready
   }
 
   handleReset = () => {

@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { usePageTitle } from '../hooks/usePageTitle';
 
 const HomePage: React.FC = () => {
-  usePageTitle('');
+  usePageTitle('Home');
   const { user } = useAuth();
   const navigate = useNavigate();
 

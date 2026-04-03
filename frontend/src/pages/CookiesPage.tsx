@@ -107,7 +107,7 @@ const CookiesPage: React.FC = () => {
             </p>
             <div className="space-y-4">
               <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                <h4 className="font-semibold text-gray-900 mb-2">Supabase (Authentication & Database)</h4>
+                <h3 className="font-semibold text-gray-900 mb-2">Supabase (Authentication & Database)</h3>
                 <p className="text-gray-700 text-sm mb-2">
                   Used for secure authentication and data storage. Essential for the Service to function.
                 </p>
@@ -117,7 +117,7 @@ const CookiesPage: React.FC = () => {
               </div>
 
               <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                <h4 className="font-semibold text-gray-900 mb-2">OpenAI (AI Analysis)</h4>
+                <h3 className="font-semibold text-gray-900 mb-2">OpenAI (AI Analysis)</h3>
                 <p className="text-gray-700 text-sm mb-2">
                   Powers our AI content analysis features. Data is processed according to OpenAI's privacy policy.
                 </p>
@@ -133,13 +133,13 @@ const CookiesPage: React.FC = () => {
             <h2 className="text-2xl font-bold text-gray-900 mb-4">4. How Long Do Cookies Last?</h2>
             <div className="space-y-3">
               <div>
-                <h4 className="font-semibold text-gray-900 mb-1">Session Cookies</h4>
+                <h3 className="font-semibold text-gray-900 mb-1">Session Cookies</h3>
                 <p className="text-gray-700">
                   Temporary cookies that are deleted when you close your browser. Used for authentication and session management.
                 </p>
               </div>
               <div>
-                <h4 className="font-semibold text-gray-900 mb-1">Persistent Cookies</h4>
+                <h3 className="font-semibold text-gray-900 mb-1">Persistent Cookies</h3>
                 <p className="text-gray-700">
                   Remain on your device for a set period (typically 30-365 days) or until you delete them. Used for preferences and analytics.
                 </p>
