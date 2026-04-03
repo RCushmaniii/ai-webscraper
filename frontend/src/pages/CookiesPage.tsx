@@ -3,7 +3,7 @@ import { Cookie, Mail, Settings, Eye, Shield } from 'lucide-react';
 import { usePageTitle } from '../hooks/usePageTitle';
 
 const CookiesPage: React.FC = () => {
-  usePageTitle('Cookie Policy');
+  usePageTitle('Cookie Policy', 'AI WebScraper cookie policy — what cookies we use, why, and how to manage your preferences.');
 
   return (
     <div className="min-h-screen bg-gray-50 py-12">

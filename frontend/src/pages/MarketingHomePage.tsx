@@ -22,7 +22,7 @@ import {
 import { usePageTitle } from '../hooks/usePageTitle';
 
 const MarketingHomePage: React.FC = () => {
-  usePageTitle('AI-Powered Site Audits');
+  usePageTitle('AI-Powered Site Audits', 'Crawl your website, detect SEO and accessibility issues, and get AI-powered recommendations you can act on immediately. Free audit available.');
 
   const { user } = useAuth();
   const navigate = useNavigate();

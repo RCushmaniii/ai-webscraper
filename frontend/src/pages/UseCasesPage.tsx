@@ -4,7 +4,7 @@ import { CheckCircle, ArrowRight, TrendingUp, Clock, DollarSign, Users, Zap, Bar
 import { usePageTitle } from '../hooks/usePageTitle';
 
 const UseCasesPage: React.FC = () => {
-  usePageTitle('Use Cases');
+  usePageTitle('Use Cases', 'See how SEO agencies, content teams, small businesses, and web dev shops use AI WebScraper to audit sites faster and deliver better results.');
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Hero Section */}
