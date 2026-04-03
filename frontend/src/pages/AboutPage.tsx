@@ -243,7 +243,7 @@ const AboutPage: React.FC = () => {
           </div>
 
           <div className="mt-8 bg-secondary-50 border border-secondary-200 rounded-lg p-6">
-            <h4 className="font-semibold text-gray-900 mb-2">Why This Stack Matters</h4>
+            <h3 className="font-semibold text-gray-900 mb-2">Why This Stack Matters</h3>
             <p className="text-gray-700 leading-relaxed">
               A year ago, production-ready LLM APIs didn't exist. Structured outputs were experimental. The combination of 
               reliable AI services, modern web frameworks, and scalable infrastructure makes this application possible today 
