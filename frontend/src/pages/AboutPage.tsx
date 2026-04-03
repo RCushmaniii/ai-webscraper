@@ -4,7 +4,7 @@ import { Sparkles, Zap, Code, Brain, Layers, TrendingUp, Users, Globe, Rocket } 
 import { usePageTitle } from '../hooks/usePageTitle';
 
 const AboutPage: React.FC = () => {
-  usePageTitle('About');
+  usePageTitle('About', 'AI WebScraper combines Python, React, and large language models to deliver web intelligence that understands content like a human but scales like a machine.');
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Hero Section */}

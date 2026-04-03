@@ -3,7 +3,7 @@ import { Mail, Shield, Lock, Eye, Database, UserCheck } from 'lucide-react';
 import { usePageTitle } from '../hooks/usePageTitle';
 
 const PrivacyPage: React.FC = () => {
-  usePageTitle('Privacy Policy');
+  usePageTitle('Privacy Policy', 'AI WebScraper privacy policy — how we collect, use, and protect your data. Built by CushLabs.');
 
   return (
     <div className="min-h-screen bg-gray-50 py-12">

@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase';
 import { usePageTitle } from '../hooks/usePageTitle';
 
 const SignupPage: React.FC = () => {
-  usePageTitle('Sign Up');
+  usePageTitle('Sign Up', 'Create a free AI WebScraper account and run your first AI-powered site audit in minutes.');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);

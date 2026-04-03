@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { usePageTitle } from '../hooks/usePageTitle';
 
 const QuickStartPage: React.FC = () => {
-  usePageTitle('Quick Start');
+  usePageTitle('Quick Start', 'Get started with AI WebScraper in minutes. Create an account, enter a URL, and get your first AI-powered site audit.');
 
   const { user } = useAuth();
   const navigate = useNavigate();

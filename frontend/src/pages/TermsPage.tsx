@@ -3,7 +3,7 @@ import { FileText, Mail, AlertCircle, Scale, CreditCard, Ban } from 'lucide-reac
 import { usePageTitle } from '../hooks/usePageTitle';
 
 const TermsPage: React.FC = () => {
-  usePageTitle('Terms of Service');
+  usePageTitle('Terms of Service', 'AI WebScraper terms of service — usage guidelines, limitations, and legal terms for the platform.');
 
   return (
     <div className="min-h-screen bg-gray-50 py-12">

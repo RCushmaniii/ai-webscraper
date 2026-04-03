@@ -16,7 +16,7 @@ interface DocItem {
 }
 
 const DocsPage: React.FC = () => {
-  usePageTitle('Documentation');
+  usePageTitle('Documentation', 'Complete documentation for AI WebScraper — crawl configuration, SEO issue detection, AI analysis reports, and API reference.');
   const [activeSection, setActiveSection] = useState<string>('overview');  // Auto-load Platform Overview
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['introduction']));
 
