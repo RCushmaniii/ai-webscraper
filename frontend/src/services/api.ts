@@ -292,6 +292,34 @@ export interface CrawlReport {
       least_linked: Array<{ url: string; title: string; inbound: number; outbound: number; depth: number }>;
       depth_distribution: Record<string, number>;
       page_details: Array<{ url: string; title: string; inbound: number; outbound: number; depth: number }>;
+      anchor_text?: {
+        anchor_score: number;
+        descriptive_count: number;
+        partial_count: number;
+        generic_count: number;
+        missing_count: number;
+        worst_anchors: Array<{
+          anchor: string;
+          source_url: string;
+          target_url: string;
+          category: string;
+        }>;
+      };
+      topic_clusters?: Array<{
+        cluster_name: string;
+        page_count: number;
+        cross_link_ratio: number;
+        cross_links_found: number;
+        cross_links_possible: number;
+        missing_links: Array<{
+          from_url: string;
+          from_title: string;
+          to_url: string;
+          to_title: string;
+        }>;
+        pages: Array<{ url: string; title: string }>;
+      }>;
+      cluster_count?: number;
     };
     top_issues: Array<{
       type: string;
