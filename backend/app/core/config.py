@@ -1,9 +1,28 @@
 import os
+import sys
+import logging
 from pathlib import Path
 from pydantic_settings import BaseSettings
 from dotenv import load_dotenv
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
+
+# --- Startup Validation ---
+# These vars are required for the app to function. Fail fast if missing.
+_REQUIRED_ENV_VARS = [
+    "SUPABASE_URL",
+    "SUPABASE_KEY",
+    "SUPABASE_SERVICE_ROLE_KEY",
+]
+
+_missing = [v for v in _REQUIRED_ENV_VARS if not os.getenv(v, "").strip()]
+if _missing:
+    print(f"FATAL: Missing required environment variables: {', '.join(_missing)}", file=sys.stderr)
+    print("The app cannot start without these. Check your .env file or Docker compose environment.", file=sys.stderr)
+    sys.exit(1)
+
 
 class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
@@ -78,13 +97,12 @@ class Settings(BaseSettings):
 
     # Production CORS origins (strict - only actual domains)
     _PROD_CORS_ORIGINS: list[str] = [
-        "https://ai-webscraper-tan.vercel.app",  # Vercel frontend
-        "https://webscraper.cushlabs.ai",         # Future custom domain
+        "https://scraper.cushlabs.ai",             # Production domain
     ]
 
     # Staging CORS origins
     _STAGING_CORS_ORIGINS: list[str] = [
-        "https://ai-webscraper-tan.vercel.app",
+        "https://scraper.cushlabs.ai",
     ]
 
     # Get CORS origins from environment variable OR use defaults based on environment

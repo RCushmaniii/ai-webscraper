@@ -14,18 +14,17 @@ jest.mock('../../services/api', () => ({
   },
 }));
 
-// Mock auth context
+// Mock auth context — provider: 'email' to show password change section
 const mockAuthContext = {
   session: null,
   user: {
     id: 'user-123',
     email: 'test@example.com',
-    full_name: 'Test User',
+    user_metadata: { full_name: 'Test User' },
+    app_metadata: { provider: 'email' },
+    last_sign_in_at: '2023-08-01T00:00:00Z',
     role: 'admin',
     created_at: '2023-01-01T00:00:00Z',
-    last_login: '2023-08-01T00:00:00Z',
-    app_metadata: {},
-    user_metadata: {},
     aud: 'authenticated',
   } as any,
   loading: false,
@@ -52,28 +51,27 @@ describe('ProfilePage Component', () => {
 
   test('renders profile information correctly', () => {
     renderProfilePage();
-    
-    expect(screen.getByText('Profile Settings')).toBeInTheDocument();
+
+    expect(screen.getByText('Your Profile')).toBeInTheDocument();
     expect(screen.getByDisplayValue('Test User')).toBeInTheDocument();
     expect(screen.getByDisplayValue('test@example.com')).toBeInTheDocument();
-    expect(screen.getByText('Admin')).toBeInTheDocument();
   });
 
   test('allows updating profile information', async () => {
     (apiService.updateUserProfile as jest.Mock).mockResolvedValue({ success: true });
-    
+
     renderProfilePage();
-    
+
     const fullNameInput = screen.getByLabelText('Full Name');
     fireEvent.change(fullNameInput, { target: { value: 'Updated Name' } });
-    
-    const updateButton = screen.getByRole('button', { name: /update profile/i });
-    fireEvent.click(updateButton);
-    
+
+    const saveButton = screen.getByRole('button', { name: /save changes/i });
+    fireEvent.click(saveButton);
+
     await waitFor(() => {
-      expect(screen.getByText('Profile updated successfully!')).toBeInTheDocument();
+      expect(screen.getByText('Profile updated successfully')).toBeInTheDocument();
     });
-    
+
     expect(apiService.updateUserProfile).toHaveBeenCalledWith({
       full_name: 'Updated Name',
     });
@@ -82,12 +80,12 @@ describe('ProfilePage Component', () => {
 
   test('shows error message when profile update fails', async () => {
     (apiService.updateUserProfile as jest.Mock).mockRejectedValue(new Error('Update failed'));
-    
+
     renderProfilePage();
-    
-    const updateButton = screen.getByRole('button', { name: /update profile/i });
-    fireEvent.click(updateButton);
-    
+
+    const saveButton = screen.getByRole('button', { name: /save changes/i });
+    fireEvent.click(saveButton);
+
     await waitFor(() => {
       expect(screen.getByText('Failed to update profile. Please try again.')).toBeInTheDocument();
     });
@@ -95,24 +93,24 @@ describe('ProfilePage Component', () => {
 
   test('allows changing password with correct current password', async () => {
     (apiService.updateUserPassword as jest.Mock).mockResolvedValue({ success: true });
-    
+
     renderProfilePage();
-    
+
     const currentPasswordInput = screen.getByLabelText('Current Password');
     const newPasswordInput = screen.getByLabelText('New Password');
     const confirmPasswordInput = screen.getByLabelText('Confirm New Password');
-    
+
     fireEvent.change(currentPasswordInput, { target: { value: 'currentPass123' } });
     fireEvent.change(newPasswordInput, { target: { value: 'newPass123' } });
     fireEvent.change(confirmPasswordInput, { target: { value: 'newPass123' } });
-    
-    const changePasswordButton = screen.getByRole('button', { name: /change password/i });
-    fireEvent.click(changePasswordButton);
-    
+
+    const updatePasswordButton = screen.getByRole('button', { name: /update password/i });
+    fireEvent.click(updatePasswordButton);
+
     await waitFor(() => {
-      expect(screen.getByText('Password changed successfully!')).toBeInTheDocument();
+      expect(screen.getByText('Password updated successfully')).toBeInTheDocument();
     });
-    
+
     expect(apiService.updateUserPassword).toHaveBeenCalledWith({
       current_password: 'currentPass123',
       new_password: 'newPass123',
@@ -121,17 +119,19 @@ describe('ProfilePage Component', () => {
 
   test('shows error when passwords do not match', async () => {
     renderProfilePage();
-    
+
+    const currentPasswordInput = screen.getByLabelText('Current Password');
     const newPasswordInput = screen.getByLabelText('New Password');
     const confirmPasswordInput = screen.getByLabelText('Confirm New Password');
-    
+
+    fireEvent.change(currentPasswordInput, { target: { value: 'currentPass123' } });
     fireEvent.change(newPasswordInput, { target: { value: 'newPass123' } });
     fireEvent.change(confirmPasswordInput, { target: { value: 'differentPass' } });
-    
-    const changePasswordButton = screen.getByRole('button', { name: /change password/i });
-    fireEvent.click(changePasswordButton);
-    
-    expect(screen.getByText('New passwords do not match.')).toBeInTheDocument();
+
+    const updatePasswordButton = screen.getByRole('button', { name: /update password/i });
+    fireEvent.click(updatePasswordButton);
+
+    expect(screen.getByText('New passwords do not match')).toBeInTheDocument();
     expect(apiService.updateUserPassword).not.toHaveBeenCalled();
   });
 });
