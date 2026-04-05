@@ -8,7 +8,7 @@ python-multipart==0.0.6
 beautifulsoup4==4.12.2
 lxml>=4.9.4,<6
 httpx>=0.27.0,<0.29.0
-requests==2.31.0
+requests==2.33.1
 trafilatura==1.7.0
 
 # Browser automation
