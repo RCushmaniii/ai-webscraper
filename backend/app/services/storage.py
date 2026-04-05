@@ -163,10 +163,11 @@ def cleanup_old_storage(max_age_days: int = 90) -> dict:
     Queries the database for old crawl IDs, then removes their storage dirs.
     Returns summary of what was cleaned.
     """
-    from app.core.auth import get_service_client
+    from supabase import create_client
+    from app.core.config import settings
 
     cutoff = (datetime.now(timezone.utc) - timedelta(days=max_age_days)).isoformat()
-    client = get_service_client()
+    client = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY)
 
     # Get IDs of crawls older than the cutoff
     result = client.table("crawls").select("id").lt("created_at", cutoff).execute()
