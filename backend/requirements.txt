@@ -17,7 +17,7 @@ playwright>=1.40.0
 webdriver-manager==4.0.1
 
 # Database and storage
-supabase==2.27.0
+supabase==2.28.3
 python-dotenv==1.0.0
 
 # File handling and utilities
