@@ -23,6 +23,7 @@ frontend/venv
 frontend/.venv
 
 frontend/build
+frontend/test-screenshots
 
 dist
 build
