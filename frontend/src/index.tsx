@@ -1,10 +1,18 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import * as Sentry from '@sentry/react';
 import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
 import { BrowserRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from 'react-query';
+
+Sentry.init({
+  dsn: process.env.REACT_APP_SENTRY_DSN,
+  sendDefaultPii: true,
+  environment: process.env.NODE_ENV,
+  enabled: process.env.NODE_ENV === 'production',
+});
 
 const queryClient = new QueryClient({
   defaultOptions: {

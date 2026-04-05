@@ -5,10 +5,19 @@ from starlette.middleware.gzip import GZipMiddleware
 import time
 import logging
 import asyncio
+import os
 from contextlib import asynccontextmanager
+import sentry_sdk
 
 from app.api.api import api_router
 from app.core.config import settings
+
+sentry_sdk.init(
+    dsn=os.environ.get("SENTRY_DSN"),
+    send_default_pii=True,
+    environment=os.environ.get("ENVIRONMENT", "development"),
+    traces_sample_rate=0.2,
+)
 from app.services.crawl_monitor import check_and_fix_stale_crawls
 from app.services.storage import cleanup_old_storage
 from app.middleware.rate_limiter import rate_limit_middleware
