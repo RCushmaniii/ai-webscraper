@@ -1,5 +1,5 @@
 import React from 'react';
-import { Brain, Target, MessageSquare, List } from 'lucide-react';
+import { Brain, Target, MessageSquare, List, Clock, AlertTriangle } from 'lucide-react';
 import { CrawlReport } from '../../services/api';
 
 interface ContentBrandTabProps {
@@ -194,6 +194,79 @@ const ContentBrandTab: React.FC<ContentBrandTabProps> = ({ report }) => {
           </div>
         </div>
       )}
+
+      {/* Content Freshness Analysis */}
+      {r.content_freshness && r.content_freshness.pages_with_dates > 0 && (() => {
+        const cf = r.content_freshness;
+        const scoreBg = cf.freshness_score >= 70 ? 'border-green-200 bg-green-50'
+          : cf.freshness_score >= 50 ? 'border-yellow-200 bg-yellow-50'
+          : 'border-red-200 bg-red-50';
+        return (
+          <div className={`rounded-lg border p-6 ${scoreBg}`}>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                  <Clock className="w-5 h-5" />
+                  Content Freshness
+                </h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  {cf.pages_with_dates} of {r.metrics?.total_pages || '?'} pages have detectable dates
+                  ({cf.date_coverage_pct}% coverage)
+                </p>
+              </div>
+              <div className="text-right">
+                <div className={`text-4xl font-bold ${scoreColor(cf.freshness_score)}`}>
+                  {cf.freshness_score}
+                </div>
+                <div className="text-xs text-gray-500">out of 100</div>
+              </div>
+            </div>
+
+            {/* Key Stats */}
+            <div className="grid grid-cols-3 gap-4 mb-4">
+              <div className="text-center p-3 rounded-lg bg-white/60 border border-gray-100">
+                <div className="text-2xl font-bold text-gray-900">{cf.recent_count}</div>
+                <div className="text-xs text-gray-500">Recent (&lt;90 days)</div>
+              </div>
+              <div className="text-center p-3 rounded-lg bg-white/60 border border-gray-100">
+                <div className="text-2xl font-bold text-gray-900">{cf.avg_age_days !== null ? `${cf.avg_age_days}d` : '—'}</div>
+                <div className="text-xs text-gray-500">Average Age</div>
+              </div>
+              <div className="text-center p-3 rounded-lg bg-white/60 border border-gray-100">
+                <div className={`text-2xl font-bold ${cf.stale_count > 0 ? 'text-red-600' : 'text-green-600'}`}>{cf.stale_count}</div>
+                <div className="text-xs text-gray-500">Stale (&gt;1 year)</div>
+              </div>
+            </div>
+
+            {/* Stale Pages Warning */}
+            {cf.stale_pages && cf.stale_pages.length > 0 && (
+              <div className="mt-4">
+                <h4 className="text-sm font-medium text-red-700 mb-2 flex items-center gap-1">
+                  <AlertTriangle className="w-4 h-4" />
+                  Stale Content (oldest first)
+                </h4>
+                <div className="space-y-1.5">
+                  {cf.stale_pages.map((page, i) => (
+                    <div key={i} className="flex items-center justify-between py-2 px-3 bg-white/70 rounded border border-red-100 text-sm">
+                      <div className="min-w-0">
+                        <a href={page.url} target="_blank" rel="noopener noreferrer" className="text-secondary-600 hover:underline truncate block max-w-xs">
+                          {page.url.replace(/^https?:\/\/[^/]+/, '') || '/'}
+                        </a>
+                        {page.title && page.title !== 'Untitled' && (
+                          <span className="text-xs text-gray-400">{page.title}</span>
+                        )}
+                      </div>
+                      <div className="text-xs text-gray-500 flex-shrink-0 ml-4">
+                        {page.date} ({Math.round(page.days_old / 30)}mo ago)
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 };
