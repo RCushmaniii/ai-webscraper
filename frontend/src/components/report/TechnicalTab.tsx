@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AlertCircle, CheckCircle, Link2, AlertTriangle, ArrowDown, ArrowUp, Type, Network, ChevronDown, ChevronRight, ArrowRight } from 'lucide-react';
+import { AlertCircle, CheckCircle, Link2, AlertTriangle, ArrowDown, ArrowUp, Type, Network, ChevronDown, ChevronRight, ArrowRight, Code2 } from 'lucide-react';
 import { CrawlReport } from '../../services/api';
 
 interface TechnicalTabProps {
@@ -320,6 +320,77 @@ const TechnicalTab: React.FC<TechnicalTabProps> = ({ report }) => {
                   );
                 })}
               </div>
+            </div>
+          )}
+
+          {/* Schema / Structured Data Coverage */}
+          {r.schema_coverage && (
+            <div className={`rounded-lg border p-6 ${scoreBorderColor(r.schema_coverage.schema_score)}`}>
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                    <Code2 className="w-5 h-5" />
+                    Schema / Structured Data
+                  </h3>
+                  <p className="text-sm text-gray-600 mt-1">
+                    {r.schema_coverage.pages_with_schema} of {r.metrics?.total_pages || '?'} pages have structured data
+                    ({r.schema_coverage.schema_coverage_pct}% coverage)
+                  </p>
+                </div>
+                <div className="text-right">
+                  <div className={`text-4xl font-bold ${scoreColor(r.schema_coverage.schema_score)}`}>
+                    {r.schema_coverage.schema_score}
+                  </div>
+                  <div className="text-xs text-gray-500">out of 100</div>
+                </div>
+              </div>
+
+              {/* Types Found */}
+              {r.schema_coverage.types_found.length > 0 && (
+                <div className="mb-4">
+                  <h4 className="text-sm font-medium text-gray-700 mb-2">Schema Types Detected</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {r.schema_coverage.types_found.map((type) => (
+                      <span key={type} className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-green-100 text-green-800 border border-green-200">
+                        {type}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Missing Recommended */}
+              {r.schema_coverage.missing_recommended.length > 0 && (
+                <div className="mb-4">
+                  <h4 className="text-sm font-medium text-gray-700 mb-2">Recommended But Missing</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {r.schema_coverage.missing_recommended.map((type) => (
+                      <span key={type} className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-yellow-100 text-yellow-800 border border-yellow-200">
+                        {type}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Pages Without Schema */}
+              {r.schema_coverage.pages_without_schema.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-medium text-gray-700 mb-2">Pages Without Structured Data</h4>
+                  <div className="space-y-1.5">
+                    {r.schema_coverage.pages_without_schema.map((page, i) => (
+                      <div key={i} className="flex items-center py-1.5 px-3 bg-white/70 rounded border border-gray-100 text-sm">
+                        <a href={page.url} target="_blank" rel="noopener noreferrer" className="text-secondary-600 hover:underline truncate">
+                          {stripDomain(page.url)}
+                        </a>
+                        {page.title && page.title !== 'Untitled' && (
+                          <span className="text-xs text-gray-400 ml-2 truncate">{page.title}</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

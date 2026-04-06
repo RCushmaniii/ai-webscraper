@@ -675,6 +675,227 @@ async def generate_crawl_report(
         # Sort: worst cross-linking first
         topic_clusters.sort(key=lambda c: c["cross_link_ratio"])
 
+        # --- Content Freshness Analysis ---
+        import re
+        import json as json_module
+        from datetime import datetime as dt_freshness
+        from app.services.storage import get_file_content
+
+        # Load HTML paths for all pages
+        all_page_ids = [p.get("id") for p in pages if p.get("id")]
+        all_html_paths = {}
+        if all_page_ids:
+            try:
+                html_resp = supabase_client.table("pages").select("id, html_storage_path").in_(
+                    "id", all_page_ids
+                ).execute()
+                for r_row in (html_resp.data or []):
+                    path = r_row.get("html_storage_path") or r_row.get("html_snapshot_path")
+                    if path:
+                        all_html_paths[r_row["id"]] = path
+            except Exception as e:
+                logger.warning(f"Could not fetch HTML paths for freshness/schema: {e}")
+
+        # Date extraction patterns
+        DATE_PATTERNS = [
+            r'\d{4}-\d{2}-\d{2}',  # 2024-01-15
+            r'\d{4}/\d{2}/\d{2}',  # 2024/01/15
+        ]
+        DATE_FORMATS = ["%Y-%m-%d", "%Y/%m/%d"]
+
+        def extract_page_date(html_content: str) -> Optional[str]:
+            """Extract publish/modified date from HTML meta tags, time elements, schema."""
+            from bs4 import BeautifulSoup
+            soup = BeautifulSoup(html_content, 'html.parser')
+
+            # 1. Check meta tags (article:published_time, article:modified_time, date, etc.)
+            date_meta_names = [
+                "article:modified_time", "article:published_time",
+                "og:updated_time", "last-modified", "date",
+                "DC.date.issued", "dcterms.modified",
+            ]
+            for name in date_meta_names:
+                tag = soup.find("meta", attrs={"property": name}) or soup.find("meta", attrs={"name": name})
+                if tag and tag.get("content"):
+                    content = tag["content"][:10]
+                    for fmt in DATE_FORMATS:
+                        try:
+                            dt_freshness.strptime(content, fmt)
+                            return content
+                        except ValueError:
+                            continue
+
+            # 2. Check <time> elements with datetime attribute
+            for time_tag in soup.find_all("time", datetime=True):
+                dt_val = time_tag["datetime"][:10]
+                for fmt in DATE_FORMATS:
+                    try:
+                        dt_freshness.strptime(dt_val, fmt)
+                        return dt_val
+                    except ValueError:
+                        continue
+
+            # 3. Check JSON-LD schema for datePublished / dateModified
+            for script in soup.find_all("script", type="application/ld+json"):
+                try:
+                    data = json_module.loads(script.string or "")
+                    items = data if isinstance(data, list) else [data]
+                    for item in items:
+                        for key in ["dateModified", "datePublished", "dateCreated"]:
+                            if key in item:
+                                return str(item[key])[:10]
+                except Exception:
+                    continue
+
+            # 4. Check URL for date pattern (e.g., /2024/01/15/article-slug)
+            return None
+
+        freshness_pages = []
+        now_date = datetime.now(timezone.utc)
+
+        for page in pages:
+            page_id = page.get("id")
+            html_path = all_html_paths.get(page_id)
+            if not html_path:
+                continue
+
+            try:
+                file_content = await get_file_content(html_path)
+                if not file_content:
+                    continue
+                html_text = file_content.decode("utf-8", errors="replace")
+                date_str = extract_page_date(html_text)
+                if date_str:
+                    try:
+                        page_date = dt_freshness.fromisoformat(date_str.replace("Z", "+00:00"))
+                        if page_date.tzinfo is None:
+                            page_date = page_date.replace(tzinfo=timezone.utc)
+                        days_old = (now_date - page_date).days
+                        freshness_pages.append({
+                            "url": page.get("url"),
+                            "title": page.get("title", "Untitled"),
+                            "date": date_str,
+                            "days_old": days_old,
+                        })
+                    except Exception:
+                        pass
+            except Exception as e:
+                logger.debug(f"Freshness: error processing {page.get('url')}: {e}")
+                continue
+
+        # Calculate freshness metrics
+        freshness_pages.sort(key=lambda x: x["days_old"], reverse=True)
+        pages_with_dates = len(freshness_pages)
+        date_coverage_pct = round(pages_with_dates / total_pages * 100) if total_pages > 0 else 0
+
+        stale_threshold = 365  # pages older than 1 year
+        stale_pages = [p for p in freshness_pages if p["days_old"] > stale_threshold]
+        recent_pages = [p for p in freshness_pages if p["days_old"] <= 90]
+
+        # Freshness score: 100 = all pages recent, 0 = all stale
+        freshness_score = 100
+        if pages_with_dates > 0:
+            stale_ratio = len(stale_pages) / pages_with_dates
+            freshness_score -= int(stale_ratio * 60)
+            # Penalize low date coverage
+            if date_coverage_pct < 50:
+                freshness_score -= int((50 - date_coverage_pct) * 0.4)
+            freshness_score = max(0, min(100, freshness_score))
+
+        avg_age_days = round(sum(p["days_old"] for p in freshness_pages) / pages_with_dates) if pages_with_dates > 0 else None
+
+        # --- Schema / Structured Data Coverage ---
+        def extract_schema_types(html_content: str) -> list:
+            """Extract JSON-LD schema @type values from HTML."""
+            from bs4 import BeautifulSoup
+            soup = BeautifulSoup(html_content, 'html.parser')
+            types_found = []
+
+            for script in soup.find_all("script", type="application/ld+json"):
+                try:
+                    data = json_module.loads(script.string or "")
+                    items = data if isinstance(data, list) else [data]
+                    for item in items:
+                        if "@type" in item:
+                            t = item["@type"]
+                            if isinstance(t, list):
+                                types_found.extend(t)
+                            else:
+                                types_found.append(t)
+                        # Check @graph
+                        if "@graph" in item and isinstance(item["@graph"], list):
+                            for node in item["@graph"]:
+                                if "@type" in node:
+                                    t = node["@type"]
+                                    if isinstance(t, list):
+                                        types_found.extend(t)
+                                    else:
+                                        types_found.append(t)
+                except Exception:
+                    continue
+
+            # Also check for microdata (itemtype attribute)
+            for el in soup.find_all(attrs={"itemtype": True}):
+                itemtype = el["itemtype"]
+                # Extract type name from schema.org URL
+                if "schema.org/" in itemtype:
+                    types_found.append(itemtype.split("schema.org/")[-1])
+
+            return list(set(types_found))
+
+        RECOMMENDED_SCHEMAS = {
+            "Organization", "LocalBusiness", "WebSite", "WebPage",
+            "BreadcrumbList", "FAQPage", "Article", "BlogPosting",
+            "Product", "Service", "Person", "SiteNavigationElement",
+        }
+
+        schema_pages = []
+        all_schema_types_found = set()
+        pages_with_schema = 0
+
+        for page in pages:
+            page_id = page.get("id")
+            html_path = all_html_paths.get(page_id)
+            if not html_path:
+                continue
+
+            try:
+                file_content = await get_file_content(html_path)
+                if not file_content:
+                    continue
+                html_text = file_content.decode("utf-8", errors="replace")
+                types = extract_schema_types(html_text)
+                if types:
+                    pages_with_schema += 1
+                    all_schema_types_found.update(types)
+                schema_pages.append({
+                    "url": page.get("url"),
+                    "title": page.get("title", "Untitled"),
+                    "schema_types": types,
+                    "has_schema": len(types) > 0,
+                })
+            except Exception as e:
+                logger.debug(f"Schema: error processing {page.get('url')}: {e}")
+                continue
+
+        schema_coverage_pct = round(pages_with_schema / total_pages * 100) if total_pages > 0 else 0
+        missing_recommended = sorted(RECOMMENDED_SCHEMAS - all_schema_types_found)
+        present_types = sorted(all_schema_types_found)
+
+        # Schema score: coverage + recommended types bonus
+        schema_score = 0
+        if total_pages > 0:
+            # Base: % of pages with any schema (up to 60 points)
+            schema_score += min(60, int(schema_coverage_pct * 0.6))
+            # Bonus: recommended types found (up to 40 points)
+            recommended_found = all_schema_types_found & RECOMMENDED_SCHEMAS
+            if RECOMMENDED_SCHEMAS:
+                schema_score += int(len(recommended_found) / len(RECOMMENDED_SCHEMAS) * 40)
+            schema_score = min(100, schema_score)
+
+        # Pages missing schema (for the report — up to 10)
+        pages_without_schema = [p for p in schema_pages if not p["has_schema"]][:10]
+
         # --- Problem Pages ---
         problem_pages = []
         for page in pages:
@@ -1265,6 +1486,41 @@ async def generate_crawl_report(
                 },
                 "topic_clusters": topic_clusters,
                 "cluster_count": len(topic_clusters),
+            },
+
+            # --- Content Freshness ---
+            "content_freshness": {
+                "freshness_score": freshness_score,
+                "pages_with_dates": pages_with_dates,
+                "date_coverage_pct": date_coverage_pct,
+                "avg_age_days": avg_age_days,
+                "stale_count": len(stale_pages),
+                "recent_count": len(recent_pages),
+                "stale_pages": [
+                    {"url": p["url"], "title": p["title"], "date": p["date"], "days_old": p["days_old"]}
+                    for p in stale_pages[:10]
+                ],
+                "oldest_pages": [
+                    {"url": p["url"], "title": p["title"], "date": p["date"], "days_old": p["days_old"]}
+                    for p in freshness_pages[:5]
+                ],
+                "newest_pages": [
+                    {"url": p["url"], "title": p["title"], "date": p["date"], "days_old": p["days_old"]}
+                    for p in sorted(freshness_pages, key=lambda x: x["days_old"])[:5]
+                ],
+            },
+
+            # --- Schema / Structured Data ---
+            "schema_coverage": {
+                "schema_score": schema_score,
+                "pages_with_schema": pages_with_schema,
+                "schema_coverage_pct": schema_coverage_pct,
+                "types_found": present_types,
+                "missing_recommended": missing_recommended,
+                "pages_without_schema": [
+                    {"url": p["url"], "title": p["title"]}
+                    for p in pages_without_schema
+                ],
             },
 
             # --- Image Analysis ---

@@ -321,6 +321,25 @@ export interface CrawlReport {
       }>;
       cluster_count?: number;
     };
+    content_freshness?: {
+      freshness_score: number;
+      pages_with_dates: number;
+      date_coverage_pct: number;
+      avg_age_days: number | null;
+      stale_count: number;
+      recent_count: number;
+      stale_pages: Array<{ url: string; title: string; date: string; days_old: number }>;
+      oldest_pages: Array<{ url: string; title: string; date: string; days_old: number }>;
+      newest_pages: Array<{ url: string; title: string; date: string; days_old: number }>;
+    };
+    schema_coverage?: {
+      schema_score: number;
+      pages_with_schema: number;
+      schema_coverage_pct: number;
+      types_found: string[];
+      missing_recommended: string[];
+      pages_without_schema: Array<{ url: string; title: string }>;
+    };
     top_issues: Array<{
       type: string;
       count: number;
