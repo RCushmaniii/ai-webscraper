@@ -1,6 +1,6 @@
 # Core FastAPI dependencies
 fastapi==0.104.1
-uvicorn[standard]==0.43.0
+uvicorn[standard]==0.44.0
 pydantic[email]>=2.11.7,<3
 python-multipart==0.0.22
 
