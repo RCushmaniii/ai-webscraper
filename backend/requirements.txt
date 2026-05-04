@@ -22,7 +22,7 @@ python-dotenv==1.0.0
 
 # File handling and utilities
 aiofiles==23.2.1
-Pillow==10.1.0
+Pillow==12.2.0
 reportlab>=4.0.0
 
 # JWT and authentication
