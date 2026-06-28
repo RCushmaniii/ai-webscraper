@@ -6,23 +6,23 @@ import LoginPage from '../LoginPage';
 import { AuthContext } from '../../contexts/AuthContext';
 
 // Mock supabase
-jest.mock('../../lib/supabase', () => ({
+vi.mock('../../lib/supabase', () => ({
   supabase: {
     auth: {
-      signOut: jest.fn().mockResolvedValue({}),
-      signInWithOAuth: jest.fn().mockResolvedValue({ error: null }),
+      signOut: vi.fn().mockResolvedValue({}),
+      signInWithOAuth: vi.fn().mockResolvedValue({ error: null }),
     },
   },
 }));
 
 // Mock useNavigate
-const mockNavigate = jest.fn();
-jest.mock('react-router-dom', () => ({
-  ...jest.requireActual('react-router-dom'),
+const mockNavigate = vi.fn();
+vi.mock('react-router-dom', async () => ({
+  ...await vi.importActual('react-router-dom'),
   useNavigate: () => mockNavigate,
 }));
 
-const mockSignIn = jest.fn();
+const mockSignIn = vi.fn();
 
 const mockAuthContext = {
   session: null,
@@ -30,8 +30,8 @@ const mockAuthContext = {
   loading: false,
   isAdmin: false,
   signIn: mockSignIn,
-  signOut: jest.fn(),
-  refreshSession: jest.fn(),
+  signOut: vi.fn(),
+  refreshSession: vi.fn(),
 };
 
 const renderLoginPage = (authOverrides = {}) => {
@@ -46,7 +46,7 @@ const renderLoginPage = (authOverrides = {}) => {
 
 describe('LoginPage', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   test('renders login form with email and password fields', () => {

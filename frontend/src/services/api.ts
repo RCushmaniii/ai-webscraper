@@ -1,5 +1,5 @@
-import axios, { AxiosInstance } from 'axios';
-import { supabase } from '../lib/supabase';
+import axios, { AxiosInstance } from "axios";
+import { supabase } from "../lib/supabase";
 
 // Simple in-memory cache with TTL
 interface CacheEntry<T> {
@@ -39,7 +39,7 @@ class ApiCache {
         keysToDelete.push(key);
       }
     });
-    keysToDelete.forEach(key => this.cache.delete(key));
+    keysToDelete.forEach((key) => this.cache.delete(key));
   }
 }
 
@@ -73,7 +73,14 @@ export interface Crawl {
   user_id: string;
   url: string;
   name: string;
-  status: 'pending' | 'queued' | 'running' | 'in_progress' | 'completed' | 'failed' | 'cancelled';
+  status:
+    | "pending"
+    | "queued"
+    | "running"
+    | "in_progress"
+    | "completed"
+    | "failed"
+    | "cancelled";
   max_depth: number;
   max_pages: number;
   respect_robots_txt: boolean;
@@ -113,8 +120,8 @@ export interface Page {
   screenshot_path?: string;
   crawl_depth: number;
   created_at: string;
-  is_primary?: boolean;  // True if page is a main navigation target
-  nav_score?: number;    // Navigation importance score (0-20+)
+  is_primary?: boolean; // True if page is a main navigation target
+  nav_score?: number; // Navigation importance score (0-20+)
 }
 
 export interface Link {
@@ -122,15 +129,15 @@ export interface Link {
   crawl_id: string;
   source_page_id?: string;
   source_url?: string;
-  url?: string;  // Some backends use 'url' for target
+  url?: string; // Some backends use 'url' for target
   target_url: string;
   anchor_text: string;
-  link_type?: string;  // 'internal' or 'external'
+  link_type?: string; // 'internal' or 'external'
   is_internal: boolean;
   is_broken: boolean;
   status_code?: number;
-  nav_score?: number;  // Navigation importance score (0-20+)
-  is_navigation?: boolean;  // Is this a main navigation link?
+  nav_score?: number; // Navigation importance score (0-20+)
+  is_navigation?: boolean; // Is this a main navigation link?
   created_at: string;
 }
 
@@ -139,7 +146,7 @@ export interface Issue {
   crawl_id: string;
   page_id: string | null;
   type: string;
-  severity: 'critical' | 'high' | 'medium' | 'low';
+  severity: "critical" | "high" | "medium" | "low";
   message: string;
   pointer: string | null;
   context: string;
@@ -188,8 +195,20 @@ export interface CrawlReport {
       title: string;
       score: number;
       checks: {
-        title: { status: string; value?: string; length?: number; detail?: string; target?: string };
-        meta_description: { status: string; value?: string; length?: number; detail?: string; target?: string };
+        title: {
+          status: string;
+          value?: string;
+          length?: number;
+          detail?: string;
+          target?: string;
+        };
+        meta_description: {
+          status: string;
+          value?: string;
+          length?: number;
+          detail?: string;
+          target?: string;
+        };
         h1: { status: string; value?: string };
         content_depth: { status: string; word_count?: number; detail?: string };
         response_time: { status: string; ms?: number };
@@ -234,7 +253,7 @@ export interface CrawlReport {
         description: string;
         pages_affected: number;
         recommended_action: string;
-        priority: 'critical' | 'high' | 'medium';
+        priority: "critical" | "high" | "medium";
         affected_urls?: string[];
       }>;
       quick_wins: string[];
@@ -288,10 +307,28 @@ export interface CrawlReport {
       orphan_pages: Array<{ url: string; title: string; depth: number }>;
       orphan_count: number;
       dead_end_count: number;
-      most_linked: Array<{ url: string; title: string; inbound: number; outbound: number; depth: number }>;
-      least_linked: Array<{ url: string; title: string; inbound: number; outbound: number; depth: number }>;
+      most_linked: Array<{
+        url: string;
+        title: string;
+        inbound: number;
+        outbound: number;
+        depth: number;
+      }>;
+      least_linked: Array<{
+        url: string;
+        title: string;
+        inbound: number;
+        outbound: number;
+        depth: number;
+      }>;
       depth_distribution: Record<string, number>;
-      page_details: Array<{ url: string; title: string; inbound: number; outbound: number; depth: number }>;
+      page_details: Array<{
+        url: string;
+        title: string;
+        inbound: number;
+        outbound: number;
+        depth: number;
+      }>;
       anchor_text?: {
         anchor_score: number;
         descriptive_count: number;
@@ -328,9 +365,24 @@ export interface CrawlReport {
       avg_age_days: number | null;
       stale_count: number;
       recent_count: number;
-      stale_pages: Array<{ url: string; title: string; date: string; days_old: number }>;
-      oldest_pages: Array<{ url: string; title: string; date: string; days_old: number }>;
-      newest_pages: Array<{ url: string; title: string; date: string; days_old: number }>;
+      stale_pages: Array<{
+        url: string;
+        title: string;
+        date: string;
+        days_old: number;
+      }>;
+      oldest_pages: Array<{
+        url: string;
+        title: string;
+        date: string;
+        days_old: number;
+      }>;
+      newest_pages: Array<{
+        url: string;
+        title: string;
+        date: string;
+        days_old: number;
+      }>;
     };
     schema_coverage?: {
       schema_score: number;
@@ -355,22 +407,26 @@ export interface CrawlReport {
 // API class
 class ApiService {
   private api: AxiosInstance;
-  
+
   constructor() {
     this.api = axios.create({
-      baseURL: process.env.REACT_APP_API_URL || 'http://localhost:8000/api/v1',
+      baseURL:
+        import.meta.env.REACT_APP_API_URL || "http://localhost:8000/api/v1",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
     });
-    
+
     // Add auth token to requests
     this.api.interceptors.request.use(async (config) => {
       try {
-        const { data: { session }, error } = await supabase.auth.getSession();
+        const {
+          data: { session },
+          error,
+        } = await supabase.auth.getSession();
 
         if (error) {
-          console.error('Error getting session');
+          console.error("Error getting session");
           return config;
         }
 
@@ -381,9 +437,9 @@ class ApiService {
           // token attached
         }
       } catch (error) {
-        console.error('Error in auth interceptor:', error);
+        console.error("Error in auth interceptor:", error);
       }
-      
+
       return config;
     });
 
@@ -396,9 +452,11 @@ class ApiService {
       async (error) => {
         // Handle 401 — clear session and redirect (no retry)
         if (error.response?.status === 401) {
-          console.error('401 Unauthorized - clearing session and redirecting to login');
+          console.error(
+            "401 Unauthorized - clearing session and redirecting to login",
+          );
           await supabase.auth.signOut();
-          window.location.href = '/login';
+          window.location.href = "/login";
           return Promise.reject(error);
         }
 
@@ -417,50 +475,63 @@ class ApiService {
 
         config._retryCount = (config._retryCount || 0) + 1;
         const delay = RETRY_DELAY_MS * Math.pow(2, config._retryCount - 1);
-        console.warn(`Retrying request (${config._retryCount}/${MAX_RETRIES}) after ${delay}ms: ${config.url}`);
+        console.warn(
+          `Retrying request (${config._retryCount}/${MAX_RETRIES}) after ${delay}ms: ${config.url}`,
+        );
 
-        await new Promise(resolve => setTimeout(resolve, delay));
+        await new Promise((resolve) => setTimeout(resolve, delay));
         return this.api(config);
-      }
+      },
     );
   }
-  
+
   // User endpoints
   async getCurrentUser(): Promise<User> {
-    const response = await this.api.get('/users/me');
+    const response = await this.api.get("/users/me");
     return response.data;
   }
-  
+
   async getUsers(): Promise<User[]> {
-    const response = await this.api.get('/users');
+    const response = await this.api.get("/users");
     return response.data;
   }
-  
-  async createUser(userData: { email: string; password: string; full_name: string; is_admin: boolean }): Promise<User> {
-    const response = await this.api.post('/users', userData);
+
+  async createUser(userData: {
+    email: string;
+    password: string;
+    full_name: string;
+    is_admin: boolean;
+  }): Promise<User> {
+    const response = await this.api.post("/users", userData);
     return response.data;
   }
-  
+
   async deleteUser(id: string): Promise<{ message: string }> {
     const response = await this.api.delete(`/users/${id}`);
     return response.data;
   }
-  
+
   async updateUserProfile(profileData: { full_name: string }): Promise<User> {
-    const response = await this.api.patch('/users/me/profile', profileData);
+    const response = await this.api.patch("/users/me/profile", profileData);
     return response.data;
   }
-  
-  async updateUserPassword(passwordData: { current_password: string; new_password: string }): Promise<{ message: string }> {
-    const response = await this.api.post('/users/me/change-password', passwordData);
+
+  async updateUserPassword(passwordData: {
+    current_password: string;
+    new_password: string;
+  }): Promise<{ message: string }> {
+    const response = await this.api.post(
+      "/users/me/change-password",
+      passwordData,
+    );
     return response.data;
   }
-  
+
   // Crawl endpoints
   async createCrawl(crawl: CrawlCreate): Promise<Crawl> {
-    apiCache.invalidate('crawls');
-    apiCache.invalidate('dashboard-stats');
-    const response = await this.api.post('/crawls', crawl);
+    apiCache.invalidate("crawls");
+    apiCache.invalidate("dashboard-stats");
+    const response = await this.api.post("/crawls", crawl);
     return response.data;
   }
 
@@ -468,7 +539,7 @@ class ApiService {
     const cacheKey = `crawls:${JSON.stringify(params || {})}`;
     const cached = apiCache.get<Crawl[]>(cacheKey);
     if (cached) return cached;
-    const response = await this.api.get('/crawls', { params });
+    const response = await this.api.get("/crawls", { params });
     apiCache.set(cacheKey, response.data);
     return response.data;
   }
@@ -482,37 +553,42 @@ class ApiService {
     total_broken_links: number;
     total_issues: number;
   }> {
-    const cacheKey = 'dashboard-stats';
+    const cacheKey = "dashboard-stats";
     const cached = apiCache.get<any>(cacheKey);
     if (cached) return cached;
-    const response = await this.api.get('/crawls/dashboard-stats');
+    const response = await this.api.get("/crawls/dashboard-stats");
     apiCache.set(cacheKey, response.data, 60_000); // 60s TTL for stats
     return response.data;
   }
-  
+
   async getCrawl(id: string): Promise<Crawl> {
     const response = await this.api.get(`/crawls/${id}`);
     return response.data;
   }
-  
+
   async stopCrawl(id: string): Promise<{ message: string }> {
     const response = await this.api.post(`/crawls/${id}/stop`);
     return response.data;
   }
 
   async deleteCrawl(id: string): Promise<{ message: string }> {
-    apiCache.invalidate('crawls');
-    apiCache.invalidate('dashboard-stats');
+    apiCache.invalidate("crawls");
+    apiCache.invalidate("dashboard-stats");
     const response = await this.api.delete(`/crawls/${id}`);
     return response.data;
   }
 
-  async markCrawlFailed(id: string): Promise<{ message: string; crawl_id: string }> {
+  async markCrawlFailed(
+    id: string,
+  ): Promise<{ message: string; crawl_id: string }> {
     const response = await this.api.post(`/crawls/${id}/mark-failed`);
     return response.data;
   }
-  
-  async getCrawlPages(id: string, params?: { skip?: number; limit?: number }): Promise<Page[]> {
+
+  async getCrawlPages(
+    id: string,
+    params?: { skip?: number; limit?: number },
+  ): Promise<Page[]> {
     const response = await this.api.get(`/crawls/${id}/pages`, { params });
     return response.data;
   }
@@ -522,31 +598,40 @@ class ApiService {
     return response.data;
   }
 
-  async getCrawlLinks(id: string, params?: { 
-    skip?: number; 
-    limit?: number;
-    is_broken?: boolean;
-    is_internal?: boolean;
-  }): Promise<Link[]> {
+  async getCrawlLinks(
+    id: string,
+    params?: {
+      skip?: number;
+      limit?: number;
+      is_broken?: boolean;
+      is_internal?: boolean;
+    },
+  ): Promise<Link[]> {
     const response = await this.api.get(`/crawls/${id}/links`, { params });
     return response.data;
   }
-  
-  async getCrawlIssues(id: string, params?: {
-    skip?: number;
-    limit?: number;
-    severity?: string;
-  }): Promise<Issue[]> {
+
+  async getCrawlIssues(
+    id: string,
+    params?: {
+      skip?: number;
+      limit?: number;
+      severity?: string;
+    },
+  ): Promise<Issue[]> {
     const response = await this.api.get(`/crawls/${id}/issues`, { params });
     return response.data;
   }
 
-  async getCrawlImages(id: string, params?: {
-    skip?: number;
-    limit?: number;
-    is_broken?: boolean;
-    has_alt?: boolean;
-  }): Promise<Image[]> {
+  async getCrawlImages(
+    id: string,
+    params?: {
+      skip?: number;
+      limit?: number;
+      is_broken?: boolean;
+      has_alt?: boolean;
+    },
+  ): Promise<Image[]> {
     const response = await this.api.get(`/crawls/${id}/images`, { params });
     return response.data;
   }
@@ -555,7 +640,7 @@ class ApiService {
     const response = await this.api.get(`/crawls/${id}/audit`);
     return response.data;
   }
-  
+
   async getCrawlSummary(id: string): Promise<any> {
     const response = await this.api.get(`/crawls/${id}/summary`);
     return response.data;
@@ -579,34 +664,55 @@ class ApiService {
   }
 
   async exportReportPdf(crawlId: string): Promise<Blob> {
-    const response = await this.api.get(`/analysis/crawl/${crawlId}/report/export/pdf`, {
-      responseType: 'blob'
-    });
+    const response = await this.api.get(
+      `/analysis/crawl/${crawlId}/report/export/pdf`,
+      {
+        responseType: "blob",
+      },
+    );
     return response.data;
   }
 
-  async exportReportCsv(crawlId: string, exportType: 'page_audits' | 'findings'): Promise<Blob> {
-    const response = await this.api.get(`/analysis/crawl/${crawlId}/report/export/csv`, {
-      params: { export_type: exportType },
-      responseType: 'blob'
-    });
+  async exportReportCsv(
+    crawlId: string,
+    exportType: "page_audits" | "findings",
+  ): Promise<Blob> {
+    const response = await this.api.get(
+      `/analysis/crawl/${crawlId}/report/export/csv`,
+      {
+        params: { export_type: exportType },
+        responseType: "blob",
+      },
+    );
     return response.data;
   }
 
-  async getPageHtml(crawlId: string, pageId: string): Promise<{ html_content: string }> {
+  async getPageHtml(
+    crawlId: string,
+    pageId: string,
+  ): Promise<{ html_content: string }> {
     const response = await this.api.get(`/crawls/${crawlId}/html/${pageId}`);
     return response.data;
   }
-  
-  async getPageScreenshot(crawlId: string, pageId: string): Promise<{ screenshot_path: string }> {
-    const response = await this.api.get(`/crawls/${crawlId}/screenshot/${pageId}`);
+
+  async getPageScreenshot(
+    crawlId: string,
+    pageId: string,
+  ): Promise<{ screenshot_path: string }> {
+    const response = await this.api.get(
+      `/crawls/${crawlId}/screenshot/${pageId}`,
+    );
     return response.data;
   }
 
-  async searchCrawlData(crawlId: string, query: string, params?: {
-    skip?: number;
-    limit?: number;
-  }): Promise<{
+  async searchCrawlData(
+    crawlId: string,
+    query: string,
+    params?: {
+      skip?: number;
+      limit?: number;
+    },
+  ): Promise<{
     query: string;
     results: {
       pages: Page[];
@@ -622,19 +728,23 @@ class ApiService {
     const response = await this.api.get(`/crawls/${crawlId}/search`, {
       params: {
         query,
-        ...params
-      }
+        ...params,
+      },
     });
     return response.data;
   }
 
   async getPageLinks(crawlId: string, pageId: string): Promise<Link[]> {
-    const response = await this.api.get(`/crawls/${crawlId}/pages/${pageId}/links`);
+    const response = await this.api.get(
+      `/crawls/${crawlId}/pages/${pageId}/links`,
+    );
     return response.data;
   }
 
   async getPageImages(crawlId: string, pageId: string): Promise<Image[]> {
-    const response = await this.api.get(`/crawls/${crawlId}/pages/${pageId}/images`);
+    const response = await this.api.get(
+      `/crawls/${crawlId}/pages/${pageId}/images`,
+    );
     return response.data;
   }
 
@@ -644,10 +754,10 @@ class ApiService {
     is_unlimited: boolean;
     remaining: number | null;
   }> {
-    const cached = apiCache.get<any>('usage');
+    const cached = apiCache.get<any>("usage");
     if (cached) return cached;
-    const response = await this.api.get('/crawls/usage');
-    apiCache.set('usage', response.data, 60_000);
+    const response = await this.api.get("/crawls/usage");
+    apiCache.set("usage", response.data, 60_000);
     return response.data;
   }
 }

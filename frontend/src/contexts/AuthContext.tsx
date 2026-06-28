@@ -1,12 +1,23 @@
-import React, { createContext, useContext, useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { Session, User } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabase';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useRef,
+  useMemo,
+  useCallback,
+} from "react";
+import { Session, User } from "@supabase/supabase-js";
+import { supabase } from "../lib/supabase";
 
 interface AuthContextType {
   session: Session | null;
   user: User | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<{
+  signIn: (
+    email: string,
+    password: string,
+  ) => Promise<{
     error: Error | null;
     data: Session | null;
   }>;
@@ -15,9 +26,13 @@ interface AuthContextType {
   isAdmin: boolean;
 }
 
-export const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export const AuthContext = createContext<AuthContextType | undefined>(
+  undefined,
+);
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -38,11 +53,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Validate session is not expired
       const expiresAt = session.expires_at;
       const now = Math.floor(Date.now() / 1000);
-      
+
       if (expiresAt && expiresAt < now) {
         // Session expired, try to refresh
-        const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
-        
+        const { data: refreshData, error: refreshError } =
+          await supabase.auth.refreshSession();
+
         if (refreshError || !refreshData.session) {
           // Refresh failed, clear session
           await supabase.auth.signOut();
@@ -51,7 +67,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setLoading(false);
           return;
         }
-        
+
         // Use refreshed session
         setSession(refreshData.session);
         setUser(refreshData.session.user);
@@ -62,23 +78,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(session.user);
         checkUserRole(session.user.id);
       }
-      
+
       setLoading(false);
     });
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          checkUserRole(session.user.id);
-        } else {
-          setIsAdmin(false);
-        }
-        setLoading(false);
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        checkUserRole(session.user.id);
+      } else {
+        setIsAdmin(false);
       }
-    );
+      setLoading(false);
+    });
 
     return () => {
       subscription.unsubscribe();
@@ -95,7 +111,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (session?.expires_at) {
       const expiresAtMs = session.expires_at * 1000;
-      const refreshAtMs = expiresAtMs - (5 * 60 * 1000); // 5 min before expiry
+      const refreshAtMs = expiresAtMs - 5 * 60 * 1000; // 5 min before expiry
       const delay = refreshAtMs - Date.now();
 
       if (delay > 0) {
@@ -108,7 +124,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
             // If refresh fails, don't force logout — let the next API call handle it
           } catch (err) {
-            console.error('Background session refresh failed:', err);
+            console.error("Background session refresh failed:", err);
           }
         }, delay);
       }
@@ -127,26 +143,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Use backend API instead of direct Supabase query to avoid RLS issues
       const session = await supabase.auth.getSession();
       const token = session.data.session?.access_token;
-      
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/users/me`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      
+
+      const response = await fetch(
+        `${import.meta.env.REACT_APP_API_URL}/users/me`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        },
+      );
+
       if (!response.ok) {
-        
         // Don't fail silently - this is causing the redirect loop
         // Just set admin to false and continue
         setIsAdmin(false);
         return;
       }
-      
+
       const data = await response.json();
       setIsAdmin(data?.is_admin || false);
     } catch (error) {
-      console.error('Error checking user role');
+      console.error("Error checking user role");
       setIsAdmin(false);
     }
   };
@@ -159,7 +177,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
 
       if (error) {
-        console.error('Supabase auth error:', error);
+        console.error("Supabase auth error:", error);
         return { data: null, error };
       }
 
@@ -169,7 +187,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       return { data: data.session, error: null };
     } catch (error) {
-      console.error('Error signing in:', error);
+      console.error("Error signing in:", error);
       return { data: null, error: error as Error };
     }
   }, []);
@@ -182,7 +200,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(null);
       setIsAdmin(false);
     } catch (error) {
-      console.error('Error signing out');
+      console.error("Error signing out");
     }
   }, []);
 
@@ -195,19 +213,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await checkUserRole(data.session.user.id);
       }
     } catch (error) {
-      console.error('Error refreshing session:', error);
+      console.error("Error refreshing session:", error);
     }
   }, []);
 
-  const value = useMemo(() => ({
-    session,
-    user,
-    loading,
-    signIn,
-    signOut,
-    refreshSession,
-    isAdmin,
-  }), [session, user, loading, signIn, signOut, refreshSession, isAdmin]);
+  const value = useMemo(
+    () => ({
+      session,
+      user,
+      loading,
+      signIn,
+      signOut,
+      refreshSession,
+      isAdmin,
+    }),
+    [session, user, loading, signIn, signOut, refreshSession, isAdmin],
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
@@ -215,7 +236,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 };

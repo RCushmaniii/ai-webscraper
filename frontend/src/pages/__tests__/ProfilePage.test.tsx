@@ -1,4 +1,5 @@
 import React from 'react';
+import { type Mock } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { BrowserRouter } from 'react-router-dom';
@@ -7,10 +8,10 @@ import { apiService } from '../../services/api';
 import { AuthContext } from '../../contexts/AuthContext';
 
 // Mock the API service
-jest.mock('../../services/api', () => ({
+vi.mock('../../services/api', () => ({
   apiService: {
-    updateUserProfile: jest.fn(),
-    updateUserPassword: jest.fn(),
+    updateUserProfile: vi.fn(),
+    updateUserPassword: vi.fn(),
   },
 }));
 
@@ -29,14 +30,14 @@ const mockAuthContext = {
   } as any,
   loading: false,
   isAdmin: true,
-  signIn: jest.fn(),
-  signOut: jest.fn(),
-  refreshSession: jest.fn(),
+  signIn: vi.fn(),
+  signOut: vi.fn(),
+  refreshSession: vi.fn(),
 };
 
 describe('ProfilePage Component', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   const renderProfilePage = () => {
@@ -58,7 +59,7 @@ describe('ProfilePage Component', () => {
   });
 
   test('allows updating profile information', async () => {
-    (apiService.updateUserProfile as jest.Mock).mockResolvedValue({ success: true });
+    (apiService.updateUserProfile as Mock).mockResolvedValue({ success: true });
 
     renderProfilePage();
 
@@ -79,7 +80,7 @@ describe('ProfilePage Component', () => {
   });
 
   test('shows error message when profile update fails', async () => {
-    (apiService.updateUserProfile as jest.Mock).mockRejectedValue(new Error('Update failed'));
+    (apiService.updateUserProfile as Mock).mockRejectedValue(new Error('Update failed'));
 
     renderProfilePage();
 
@@ -92,7 +93,7 @@ describe('ProfilePage Component', () => {
   });
 
   test('allows changing password with correct current password', async () => {
-    (apiService.updateUserPassword as jest.Mock).mockResolvedValue({ success: true });
+    (apiService.updateUserPassword as Mock).mockResolvedValue({ success: true });
 
     renderProfilePage();
 
