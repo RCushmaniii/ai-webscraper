@@ -1,0 +1,42 @@
+name: Supabase Keep-Alive
+
+# Free-tier Supabase projects auto-pause after ~7 days with no database
+# activity. The backend's stale-crawl monitor normally keeps it warm, but only
+# while the container is up — any backend downtime longer than a week lets the
+# project pause (which is what took scraper.cushlabs.ai's DB offline).
+#
+# This job is intentionally decoupled from the VPS: GitHub runs it on a
+# schedule regardless of backend state, issuing a real PostgREST query so the
+# database registers activity and never idles into a paused state.
+
+on:
+  schedule:
+    - cron: "17 7 */2 * *" # every 2 days at 07:17 UTC (well inside the ~7-day window)
+  workflow_dispatch: {} # allow manual runs from the Actions tab
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Query Supabase to prevent auto-pause
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "::error::Missing SUPABASE_URL or SUPABASE_ANON_KEY repo secret"
+            exit 1
+          fi
+          code=$(curl -s -o /dev/null -w "%{http_code}" \
+            "$SUPABASE_URL/rest/v1/crawls?select=id&limit=1" \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY")
+          echo "Supabase REST responded: HTTP $code"
+          # 2xx/4xx all mean the request reached the DB layer (activity registered).
+          # Only a 5xx or connection failure (000) indicates the project is down/paused.
+          if [ "$code" = "000" ] || [ "$code" -ge 500 ]; then
+            echo "::error::Supabase unreachable (HTTP $code) — project may be paused"
+            exit 1
+          fi
+          echo "Keep-alive ping succeeded."
