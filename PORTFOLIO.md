@@ -2,10 +2,10 @@
 # =============================================================================
 # PORTFOLIO.MD — AI WebScraper
 # =============================================================================
-portfolio_enabled: false
-portfolio_priority: 3
+portfolio_enabled: true
+portfolio_priority: 18
 portfolio_featured: false
-portfolio_last_reviewed: "2026-03-10"
+portfolio_last_reviewed: "2026-06-28"
 
 title: "AI-Powered Web Scraper & SEO Analyzer"
 tagline: "Crawl websites, detect SEO issues, and generate AI-powered analysis reports"
@@ -23,7 +23,14 @@ tags:
   - "react"
   - "supabase"
 
-thumbnail: ""
+thumbnail: "/images/portfolio/ai-webscraper-01.webp"
+slides:
+  - src: "/images/portfolio/ai-webscraper-01.webp"
+    alt_en: "AI WebScraper crawl configuration screen with start URL, depth, page limits, rate limiting, and robots.txt controls"
+    alt_es: "Pantalla de configuración de rastreo de AI WebScraper con URL inicial, profundidad, límites de páginas, control de velocidad y respeto a robots.txt"
+  - src: "/images/portfolio/ai-webscraper-02.webp"
+    alt_en: "GPT-4 generated site analysis report showing health score, technical SEO, content quality, and crawl metrics"
+    alt_es: "Reporte de análisis del sitio generado con GPT-4 que muestra el puntaje de salud, SEO técnico, calidad de contenido y métricas de rastreo"
 hero_images: []
 demo_video_url: ""
 
@@ -74,19 +81,6 @@ health_status:
   dependabot: "Y"
   secret_scanning: "Y"
   db_backup: "-"
-health_status:
-  sentry: "-"
-  testing: "Y"
-  ci_cd: "Y"
-  health_endpoint: "-"
-  security_headers: "-"
-  rate_limiting: "-"
-  env_validation: "partial"
-  analytics: "DEFERRED"
-  structured_logging: "-"
-  dependabot: "Y"
-  secret_scanning: "Y"
-  db_backup: "-"
 ---
 
 ## Overview
@@ -129,12 +123,14 @@ Free users get 3 crawls to evaluate the platform. Admin users get unlimited acce
 ## Results
 
 **For the End User:**
+
 - Complete site audit in minutes instead of hours of manual checking
 - Actionable AI-generated recommendations prioritized by severity
 - Accessible to non-technical users through a clean web interface
 - Free tier available for evaluation without commitment
 
 **Technical Demonstration:**
+
 - Full-stack production architecture: React + FastAPI + Celery + Redis + Supabase
 - Async crawling with rate limiting, depth control, and safety boundaries
 - LLM integration with structured outputs, token tracking, and cost budgeting
