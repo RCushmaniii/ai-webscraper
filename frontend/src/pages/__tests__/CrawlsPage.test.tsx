@@ -1,4 +1,5 @@
 import React from 'react';
+import { type Mock } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { BrowserRouter } from 'react-router-dom';
@@ -6,21 +7,21 @@ import CrawlsPage from '../CrawlsPage';
 import { apiService } from '../../services/api';
 
 // Mock the API service
-jest.mock('../../services/api', () => ({
+vi.mock('../../services/api', () => ({
   apiService: {
-    getCrawls: jest.fn(),
-    getUsage: jest.fn(),
-    deleteCrawl: jest.fn(),
-    createCrawl: jest.fn(),
+    getCrawls: vi.fn(),
+    getUsage: vi.fn(),
+    deleteCrawl: vi.fn(),
+    createCrawl: vi.fn(),
   },
 }));
 
 // Mock sonner toast
-jest.mock('sonner', () => ({
+vi.mock('sonner', () => ({
   toast: {
-    error: jest.fn(),
-    success: jest.fn(),
-    loading: jest.fn().mockReturnValue('toast-id'),
+    error: vi.fn(),
+    success: vi.fn(),
+    loading: vi.fn().mockReturnValue('toast-id'),
   },
 }));
 
@@ -92,14 +93,14 @@ const renderCrawlsPage = () => {
 
 describe('CrawlsPage', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
-    (apiService.getCrawls as jest.Mock).mockResolvedValue(mockCrawls);
-    (apiService.getUsage as jest.Mock).mockResolvedValue(mockUsage);
+    vi.clearAllMocks();
+    (apiService.getCrawls as Mock).mockResolvedValue(mockCrawls);
+    (apiService.getUsage as Mock).mockResolvedValue(mockUsage);
   });
 
   test('renders loading skeleton initially', () => {
     // Make getCrawls hang so loading state persists
-    (apiService.getCrawls as jest.Mock).mockImplementation(() => new Promise(() => {}));
+    (apiService.getCrawls as Mock).mockImplementation(() => new Promise(() => {}));
     renderCrawlsPage();
 
     expect(screen.getByRole('status')).toBeInTheDocument();
@@ -143,7 +144,7 @@ describe('CrawlsPage', () => {
   });
 
   test('shows empty state when no crawls exist', async () => {
-    (apiService.getCrawls as jest.Mock).mockResolvedValue([]);
+    (apiService.getCrawls as Mock).mockResolvedValue([]);
     renderCrawlsPage();
 
     await waitFor(() => {
@@ -169,7 +170,7 @@ describe('CrawlsPage', () => {
   });
 
   test('does not show "Delete Failed" when no failed crawls', async () => {
-    (apiService.getCrawls as jest.Mock).mockResolvedValue([mockCrawls[0]]);
+    (apiService.getCrawls as Mock).mockResolvedValue([mockCrawls[0]]);
     renderCrawlsPage();
 
     await waitFor(() => {
@@ -225,7 +226,7 @@ describe('CrawlsPage', () => {
   });
 
   test('hides unlimited usage indicator for admin users', async () => {
-    (apiService.getUsage as jest.Mock).mockResolvedValue({
+    (apiService.getUsage as Mock).mockResolvedValue({
       current_count: 50,
       limit: null,
       is_unlimited: true,
@@ -240,7 +241,7 @@ describe('CrawlsPage', () => {
   });
 
   test('shows upgrade button when no crawls remaining', async () => {
-    (apiService.getUsage as jest.Mock).mockResolvedValue({
+    (apiService.getUsage as Mock).mockResolvedValue({
       current_count: 3,
       limit: 3,
       is_unlimited: false,

@@ -6,9 +6,9 @@ import HomePage from '../HomePage';
 import { AuthContext } from '../../contexts/AuthContext';
 
 // Mock useNavigate
-const mockNavigate = jest.fn();
-jest.mock('react-router-dom', () => ({
-  ...jest.requireActual('react-router-dom'),
+const mockNavigate = vi.fn();
+vi.mock('react-router-dom', async () => ({
+  ...await vi.importActual('react-router-dom'),
   useNavigate: () => mockNavigate,
 }));
 
@@ -18,9 +18,9 @@ const renderHomePage = (user: any = null) => {
     user,
     loading: false,
     isAdmin: false,
-    signIn: jest.fn(),
-    signOut: jest.fn(),
-    refreshSession: jest.fn(),
+    signIn: vi.fn(),
+    signOut: vi.fn(),
+    refreshSession: vi.fn(),
   };
 
   return render(
@@ -34,7 +34,7 @@ const renderHomePage = (user: any = null) => {
 
 describe('HomePage', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   test('renders main heading and description', () => {
