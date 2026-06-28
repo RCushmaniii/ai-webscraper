@@ -62,3 +62,6 @@ __pycache__/
 
 # Log files
 *.log
+
+# Claude local settings (machine-specific, do not commit)
+.claude/settings.local.json
