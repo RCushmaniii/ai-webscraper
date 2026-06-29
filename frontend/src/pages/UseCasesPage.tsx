@@ -1,10 +1,158 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
-import { CheckCircle, ArrowRight, TrendingUp, Clock, DollarSign, Users, Zap, BarChart3, Target } from 'lucide-react';
-import { usePageTitle } from '../hooks/usePageTitle';
+import React from "react";
+import { Link } from "react-router-dom";
+import {
+  CheckCircle,
+  ArrowRight,
+  TrendingUp,
+  Clock,
+  DollarSign,
+  Users,
+  Zap,
+  BarChart3,
+  Target,
+  Search,
+  ShieldCheck,
+  Sparkles,
+  FileText,
+  SlidersHorizontal,
+} from "lucide-react";
+import { usePageTitle } from "../hooks/usePageTitle";
+
+const featureCategories = [
+  {
+    icon: Search,
+    title: "Intelligent Crawling & Data Capture",
+    items: [
+      [
+        "Full-site crawl from one URL",
+        "Map an entire site — no manual page-by-page checking.",
+      ],
+      [
+        "JavaScript rendering (Playwright)",
+        "Analyzes modern JS-heavy sites exactly as visitors see them.",
+      ],
+      [
+        "HTML snapshots & screenshots",
+        "A visual + structural record for before/after comparison.",
+      ],
+      [
+        "Smart external-link safety",
+        "Crawls stay fast, focused, and safe — no runaway crawling.",
+      ],
+      [
+        "Non-HTML handling (PDFs, images)",
+        "No false flags — the analysis stays accurate.",
+      ],
+    ],
+  },
+  {
+    icon: ShieldCheck,
+    title: "Technical SEO & Site-Health Detection",
+    items: [
+      [
+        "Broken internal links & images",
+        "Catch dead paths that frustrate users and search engines.",
+      ],
+      [
+        "Duplicate titles & meta descriptions",
+        "Eliminate the duplication that dilutes rankings.",
+      ],
+      [
+        "Missing H1s & thin content",
+        "Surface the structural gaps that cap SEO performance.",
+      ],
+      [
+        "Oversized / slow pages",
+        "Find the pages quietly costing you conversions.",
+      ],
+      [
+        "Severity-rated issue list",
+        "Every issue ranked critical → medium so priorities are obvious.",
+      ],
+    ],
+  },
+  {
+    icon: Sparkles,
+    title: "AI-Powered Analysis & Reporting",
+    items: [
+      [
+        "Executive summary",
+        "A leadership-ready overview of what to fix first and why.",
+      ],
+      [
+        "Copy-paste title & meta fixes",
+        "Paste improved text straight into your CMS.",
+      ],
+      [
+        "Per-page quality scores",
+        "Know objectively which pages are strong and which drag you down.",
+      ],
+      [
+        "Impact × effort scoring",
+        "Spend time on the high-impact, low-effort wins first.",
+      ],
+      [
+        "Freshness & schema analysis",
+        "Catch stale pages and missing rich-result markup.",
+      ],
+    ],
+  },
+  {
+    icon: FileText,
+    title: "Content & Strategy Intelligence",
+    items: [
+      [
+        "Topic, keyword & entity extraction",
+        "See what each page ranks for — and what you are missing.",
+      ],
+      [
+        "Page categorization & purpose",
+        "Understand your content mix and funnel gaps at a glance.",
+      ],
+      ["Brand-voice & tone audit", "Keep every page consistent and on-brand."],
+      [
+        "Content-gap & intent-gap analysis",
+        "Find the content you should have to capture lost demand.",
+      ],
+      [
+        "AI alt-text suggestions",
+        "Improve accessibility and image SEO automatically.",
+      ],
+    ],
+  },
+  {
+    icon: SlidersHorizontal,
+    title: "Workflow, Access & Operations",
+    items: [
+      [
+        "Secure, tiered access",
+        "A professional access model — ready to gate by plan.",
+      ],
+      [
+        "Dashboard & per-page drill-down",
+        "Run, monitor, and explore audits from one interface.",
+      ],
+      [
+        "Data exports & image inventory",
+        "Take findings into your own reports and deliverables.",
+      ],
+      [
+        "Built-in docs & quick-start",
+        "Onboard a new user or client without hand-holding.",
+      ],
+      [
+        "Self-maintaining infrastructure",
+        "Crawl monitoring, cleanup, and uptime safeguards run quietly.",
+      ],
+    ],
+  },
+];
 
 const UseCasesPage: React.FC = () => {
-  usePageTitle('Use Cases', 'See how SEO agencies, content teams, small businesses, and web dev shops use AI WebScraper to audit sites faster and deliver better results.');
+  usePageTitle(
+    "Use Cases",
+    "See how SEO agencies, content teams, small businesses, and web dev shops use AI WebScraper to audit sites faster and deliver better results.",
+  );
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Hero Section */}
@@ -15,12 +163,14 @@ const UseCasesPage: React.FC = () => {
               How Teams Use AI WebScraper
             </h1>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
-              From SEO agencies scaling client work to small businesses optimizing their online presence —
-              here's how different teams get value from AI-powered site analysis.
+              From SEO agencies scaling client work to small businesses
+              optimizing their online presence — here's how different teams get
+              value from AI-powered site analysis.
             </p>
             <p className="mt-4 text-sm text-gray-500 max-w-2xl mx-auto">
-              The scenarios below are hypothetical examples based on common workflows. Actual results
-              depend on your site size, traffic, and how central your website is to your business.
+              The scenarios below are hypothetical examples based on common
+              workflows. Actual results depend on your site size, traffic, and
+              how central your website is to your business.
             </p>
           </div>
         </div>
@@ -38,19 +188,24 @@ const UseCasesPage: React.FC = () => {
                 Scale Client Audits Without Scaling Headcount
               </h2>
               <p className="text-lg text-gray-700 mb-6 leading-relaxed">
-                Imagine an SEO agency that spends 15-20 hours per client audit — manually reviewing pages,
-                checking meta tags, compiling spreadsheets. They can realistically handle a handful of clients per month
-                before hitting capacity.
+                Imagine an SEO agency that spends 15-20 hours per client audit —
+                manually reviewing pages, checking meta tags, compiling
+                spreadsheets. They can realistically handle a handful of clients
+                per month before hitting capacity.
               </p>
 
               <div className="space-y-4 mb-8">
                 <div className="flex items-start gap-3">
                   <Clock className="w-6 h-6 text-blue-600 flex-shrink-0 mt-1" />
                   <div>
-                    <h3 className="font-semibold text-gray-900 mb-1">The Bottleneck</h3>
+                    <h3 className="font-semibold text-gray-900 mb-1">
+                      The Bottleneck
+                    </h3>
                     <p className="text-gray-600">
-                      Client sites typically run 200-500 pages. Manual review means clicking through every page,
-                      taking notes, and assembling reports by hand. It's thorough, but it doesn't scale.
+                      Client sites typically run 200-500 pages. Manual review
+                      means clicking through every page, taking notes, and
+                      assembling reports by hand. It's thorough, but it doesn't
+                      scale.
                     </p>
                   </div>
                 </div>
@@ -58,11 +213,14 @@ const UseCasesPage: React.FC = () => {
                 <div className="flex items-start gap-3">
                   <Zap className="w-6 h-6 text-blue-600 flex-shrink-0 mt-1" />
                   <div>
-                    <h3 className="font-semibold text-gray-900 mb-1">With AI WebScraper</h3>
+                    <h3 className="font-semibold text-gray-900 mb-1">
+                      With AI WebScraper
+                    </h3>
                     <p className="text-gray-600">
-                      The crawler maps the site, the issue detector flags problems, and the AI prioritizes
-                      fixes by business impact — all within minutes. The analyst's time shifts from data gathering
-                      to client strategy.
+                      The crawler maps the site, the issue detector flags
+                      problems, and the AI prioritizes fixes by business impact
+                      — all within minutes. The analyst's time shifts from data
+                      gathering to client strategy.
                     </p>
                   </div>
                 </div>
@@ -70,17 +228,22 @@ const UseCasesPage: React.FC = () => {
                 <div className="flex items-start gap-3">
                   <TrendingUp className="w-6 h-6 text-blue-600 flex-shrink-0 mt-1" />
                   <div>
-                    <h3 className="font-semibold text-gray-900 mb-1">The Upside</h3>
+                    <h3 className="font-semibold text-gray-900 mb-1">
+                      The Upside
+                    </h3>
                     <p className="text-gray-600">
-                      When audit time drops significantly, the same team can serve more clients —
-                      or spend more time on high-value strategy work that commands higher fees.
+                      When audit time drops significantly, the same team can
+                      serve more clients — or spend more time on high-value
+                      strategy work that commands higher fees.
                     </p>
                   </div>
                 </div>
               </div>
 
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-                <div className="text-sm font-medium text-blue-700 mb-3">Potential Impact</div>
+                <div className="text-sm font-medium text-blue-700 mb-3">
+                  Potential Impact
+                </div>
                 <ul className="space-y-2 text-sm text-gray-700">
                   <li className="flex items-start gap-2">
                     <CheckCircle className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
@@ -92,18 +255,24 @@ const UseCasesPage: React.FC = () => {
                   </li>
                   <li className="flex items-start gap-2">
                     <CheckCircle className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
-                    <span>Deliver AI-enhanced reports clients can act on immediately</span>
+                    <span>
+                      Deliver AI-enhanced reports clients can act on immediately
+                    </span>
                   </li>
                 </ul>
               </div>
             </div>
 
             <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-8 border border-blue-200">
-              <h3 className="text-xl font-semibold text-gray-900 mb-6">Hypothetical: Before vs After</h3>
+              <h3 className="text-xl font-semibold text-gray-900 mb-6">
+                Hypothetical: Before vs After
+              </h3>
 
               <div className="space-y-6">
                 <div>
-                  <div className="text-sm font-medium text-gray-500 mb-2">MANUAL WORKFLOW</div>
+                  <div className="text-sm font-medium text-gray-500 mb-2">
+                    MANUAL WORKFLOW
+                  </div>
                   <div className="bg-white rounded-lg p-4 border border-gray-200">
                     <ul className="space-y-2 text-sm text-gray-700">
                       <li>• 15-20 hours per audit</li>
@@ -119,7 +288,9 @@ const UseCasesPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <div className="text-sm font-medium text-gray-500 mb-2">AI-ASSISTED WORKFLOW</div>
+                  <div className="text-sm font-medium text-gray-500 mb-2">
+                    AI-ASSISTED WORKFLOW
+                  </div>
                   <div className="bg-white rounded-lg p-4 border border-green-200">
                     <ul className="space-y-2 text-sm text-gray-700">
                       <li className="flex items-center gap-2">
@@ -153,40 +324,52 @@ const UseCasesPage: React.FC = () => {
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div className="order-2 lg:order-1">
               <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-8 border border-purple-200">
-                <h3 className="text-xl font-semibold text-gray-900 mb-6">The Value Depends on Your Traffic</h3>
+                <h3 className="text-xl font-semibold text-gray-900 mb-6">
+                  The Value Depends on Your Traffic
+                </h3>
 
                 <div className="space-y-4">
                   <div className="bg-white rounded-lg p-4 border border-gray-200">
                     <div className="flex items-center gap-2 mb-2">
                       <BarChart3 className="w-5 h-5 text-purple-600" />
-                      <span className="font-semibold text-gray-900 text-sm">High-Traffic Site (10k+ visits/mo)</span>
+                      <span className="font-semibold text-gray-900 text-sm">
+                        High-Traffic Site (10k+ visits/mo)
+                      </span>
                     </div>
                     <p className="text-sm text-gray-600">
-                      Your website is a major revenue driver. A 404 on a conversion page, a slow-loading
-                      landing page, or missing meta data could be costing you real money every day. An audit
-                      here can surface high-impact fixes quickly.
+                      Your website is a major revenue driver. A 404 on a
+                      conversion page, a slow-loading landing page, or missing
+                      meta data could be costing you real money every day. An
+                      audit here can surface high-impact fixes quickly.
                     </p>
                   </div>
 
                   <div className="bg-white rounded-lg p-4 border border-gray-200">
                     <div className="flex items-center gap-2 mb-2">
                       <BarChart3 className="w-5 h-5 text-purple-600" />
-                      <span className="font-semibold text-gray-900 text-sm">Growing Site (1k-10k visits/mo)</span>
+                      <span className="font-semibold text-gray-900 text-sm">
+                        Growing Site (1k-10k visits/mo)
+                      </span>
                     </div>
                     <p className="text-sm text-gray-600">
-                      You're building momentum. Technical issues and SEO gaps at this stage can cap your growth
-                      ceiling. Catching them early means your content investment compounds instead of stalling.
+                      You're building momentum. Technical issues and SEO gaps at
+                      this stage can cap your growth ceiling. Catching them
+                      early means your content investment compounds instead of
+                      stalling.
                     </p>
                   </div>
 
                   <div className="bg-white rounded-lg p-4 border border-gray-200">
                     <div className="flex items-center gap-2 mb-2">
                       <BarChart3 className="w-5 h-5 text-purple-600" />
-                      <span className="font-semibold text-gray-900 text-sm">New Site (Under 1k visits/mo)</span>
+                      <span className="font-semibold text-gray-900 text-sm">
+                        New Site (Under 1k visits/mo)
+                      </span>
                     </div>
                     <p className="text-sm text-gray-600">
-                      You want to make sure the foundation is solid before investing in content and marketing.
-                      An audit catches structural issues early, when they're cheapest to fix.
+                      You want to make sure the foundation is solid before
+                      investing in content and marketing. An audit catches
+                      structural issues early, when they're cheapest to fix.
                     </p>
                   </div>
                 </div>
@@ -201,8 +384,9 @@ const UseCasesPage: React.FC = () => {
                 Know What's Actually Wrong — Without the Jargon
               </h2>
               <p className="text-lg text-gray-700 mb-6 leading-relaxed">
-                You built a website, or someone built it for you. It looks fine. But is it actually working
-                for your business? Most small business owners don't have an SEO team — and hiring a consultant
+                You built a website, or someone built it for you. It looks fine.
+                But is it actually working for your business? Most small
+                business owners don't have an SEO team — and hiring a consultant
                 for a one-time audit can be expensive.
               </p>
 
@@ -210,10 +394,14 @@ const UseCasesPage: React.FC = () => {
                 <div className="flex items-start gap-3">
                   <Zap className="w-6 h-6 text-purple-600 flex-shrink-0 mt-1" />
                   <div>
-                    <h3 className="font-semibold text-gray-900 mb-1">Plain-English Recommendations</h3>
+                    <h3 className="font-semibold text-gray-900 mb-1">
+                      Plain-English Recommendations
+                    </h3>
                     <p className="text-gray-600">
-                      No technical jargon. Every issue comes with a clear explanation of why it matters
-                      and what to do about it — tagged by whether it's a 5-minute fix or needs a developer.
+                      No technical jargon. Every issue comes with a clear
+                      explanation of why it matters and what to do about it —
+                      tagged by whether it's a 5-minute fix or needs a
+                      developer.
                     </p>
                   </div>
                 </div>
@@ -221,10 +409,13 @@ const UseCasesPage: React.FC = () => {
                 <div className="flex items-start gap-3">
                   <Zap className="w-6 h-6 text-purple-600 flex-shrink-0 mt-1" />
                   <div>
-                    <h3 className="font-semibold text-gray-900 mb-1">Prioritized by Business Impact</h3>
+                    <h3 className="font-semibold text-gray-900 mb-1">
+                      Prioritized by Business Impact
+                    </h3>
                     <p className="text-gray-600">
-                      Not all issues are equal. A broken link on your homepage matters more than a missing
-                      alt tag on a footer image. The AI ranks everything so you know what to tackle first.
+                      Not all issues are equal. A broken link on your homepage
+                      matters more than a missing alt tag on a footer image. The
+                      AI ranks everything so you know what to tackle first.
                     </p>
                   </div>
                 </div>
@@ -232,10 +423,12 @@ const UseCasesPage: React.FC = () => {
                 <div className="flex items-start gap-3">
                   <Zap className="w-6 h-6 text-purple-600 flex-shrink-0 mt-1" />
                   <div>
-                    <h3 className="font-semibold text-gray-900 mb-1">Effort Estimates on Every Fix</h3>
+                    <h3 className="font-semibold text-gray-900 mb-1">
+                      Effort Estimates on Every Fix
+                    </h3>
                     <p className="text-gray-600">
-                      Know exactly what you can handle yourself and what to hand to a developer.
-                      No more guessing about scope or cost.
+                      Know exactly what you can handle yourself and what to hand
+                      to a developer. No more guessing about scope or cost.
                     </p>
                   </div>
                 </div>
@@ -257,14 +450,17 @@ const UseCasesPage: React.FC = () => {
                 Maintain Quality Across Hundreds of Pages
               </h2>
               <p className="text-lg text-gray-700 mb-6 leading-relaxed">
-                As your site grows, content quality tends to drift. Pages get stale. Meta descriptions
-                go missing. Brand voice shifts between authors. Manual review at scale is impractical —
-                which is exactly where AI-powered analysis shines.
+                As your site grows, content quality tends to drift. Pages get
+                stale. Meta descriptions go missing. Brand voice shifts between
+                authors. Manual review at scale is impractical — which is
+                exactly where AI-powered analysis shines.
               </p>
 
               <div className="space-y-6">
                 <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                  <div className="font-semibold text-gray-900 mb-2">What the AI Catches</div>
+                  <div className="font-semibold text-gray-900 mb-2">
+                    What the AI Catches
+                  </div>
                   <ul className="space-y-2 text-sm text-gray-700">
                     <li className="flex items-center gap-2">
                       <CheckCircle className="w-4 h-4 text-green-600" />
@@ -294,43 +490,63 @@ const UseCasesPage: React.FC = () => {
                 </div>
 
                 <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                  <div className="font-semibold text-gray-900 mb-2">Why It Matters</div>
+                  <div className="font-semibold text-gray-900 mb-2">
+                    Why It Matters
+                  </div>
                   <p className="text-sm text-gray-700">
-                    For sites where organic search is a significant traffic source, technical SEO issues
-                    can silently cap your growth. A site with clean structure, consistent metadata, and
-                    no broken paths gives search engines — and visitors — confidence in your content.
+                    For sites where organic search is a significant traffic
+                    source, technical SEO issues can silently cap your growth. A
+                    site with clean structure, consistent metadata, and no
+                    broken paths gives search engines — and visitors —
+                    confidence in your content.
                   </p>
                 </div>
               </div>
             </div>
 
             <div className="bg-gradient-to-br from-green-50 to-teal-50 rounded-2xl p-8 border border-green-200">
-              <h3 className="text-xl font-semibold text-gray-900 mb-6">Hypothetical Workflow</h3>
+              <h3 className="text-xl font-semibold text-gray-900 mb-6">
+                Hypothetical Workflow
+              </h3>
 
               <div className="space-y-6">
                 <div>
-                  <div className="text-sm font-medium text-gray-500 mb-3">WITHOUT AUTOMATION</div>
+                  <div className="text-sm font-medium text-gray-500 mb-3">
+                    WITHOUT AUTOMATION
+                  </div>
                   <div className="space-y-3">
                     <div className="bg-white rounded-lg p-3 border border-gray-200">
                       <div className="flex items-center gap-2 mb-1">
                         <Clock className="w-4 h-4 text-gray-400" />
-                        <span className="text-sm font-medium text-gray-900">Days 1-5</span>
+                        <span className="text-sm font-medium text-gray-900">
+                          Days 1-5
+                        </span>
                       </div>
-                      <p className="text-sm text-gray-600">Manually review pages, check meta data, note issues</p>
+                      <p className="text-sm text-gray-600">
+                        Manually review pages, check meta data, note issues
+                      </p>
                     </div>
                     <div className="bg-white rounded-lg p-3 border border-gray-200">
                       <div className="flex items-center gap-2 mb-1">
                         <Clock className="w-4 h-4 text-gray-400" />
-                        <span className="text-sm font-medium text-gray-900">Days 6-8</span>
+                        <span className="text-sm font-medium text-gray-900">
+                          Days 6-8
+                        </span>
                       </div>
-                      <p className="text-sm text-gray-600">Compile findings into a report, prioritize manually</p>
+                      <p className="text-sm text-gray-600">
+                        Compile findings into a report, prioritize manually
+                      </p>
                     </div>
                     <div className="bg-white rounded-lg p-3 border border-gray-200">
                       <div className="flex items-center gap-2 mb-1">
                         <Clock className="w-4 h-4 text-gray-400" />
-                        <span className="text-sm font-medium text-gray-900">Days 9-10</span>
+                        <span className="text-sm font-medium text-gray-900">
+                          Days 9-10
+                        </span>
                       </div>
-                      <p className="text-sm text-gray-600">Distribute to team, create action items</p>
+                      <p className="text-sm text-gray-600">
+                        Distribute to team, create action items
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -340,28 +556,42 @@ const UseCasesPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <div className="text-sm font-medium text-gray-500 mb-3">WITH AI WEBSCRAPER</div>
+                  <div className="text-sm font-medium text-gray-500 mb-3">
+                    WITH AI WEBSCRAPER
+                  </div>
                   <div className="space-y-3">
                     <div className="bg-white rounded-lg p-3 border border-green-200">
                       <div className="flex items-center gap-2 mb-1">
                         <Zap className="w-4 h-4 text-green-600" />
-                        <span className="text-sm font-medium text-gray-900">Minutes</span>
+                        <span className="text-sm font-medium text-gray-900">
+                          Minutes
+                        </span>
                       </div>
-                      <p className="text-sm text-gray-600">Crawl the site and detect issues automatically</p>
+                      <p className="text-sm text-gray-600">
+                        Crawl the site and detect issues automatically
+                      </p>
                     </div>
                     <div className="bg-white rounded-lg p-3 border border-green-200">
                       <div className="flex items-center gap-2 mb-1">
                         <Zap className="w-4 h-4 text-green-600" />
-                        <span className="text-sm font-medium text-gray-900">Same Day</span>
+                        <span className="text-sm font-medium text-gray-900">
+                          Same Day
+                        </span>
                       </div>
-                      <p className="text-sm text-gray-600">Generate AI report with prioritized, actionable fixes</p>
+                      <p className="text-sm text-gray-600">
+                        Generate AI report with prioritized, actionable fixes
+                      </p>
                     </div>
                     <div className="bg-white rounded-lg p-3 border border-green-200">
                       <div className="flex items-center gap-2 mb-1">
                         <Zap className="w-4 h-4 text-green-600" />
-                        <span className="text-sm font-medium text-gray-900">Next Day</span>
+                        <span className="text-sm font-medium text-gray-900">
+                          Next Day
+                        </span>
                       </div>
-                      <p className="text-sm text-gray-600">Team starts fixing — highest-impact items first</p>
+                      <p className="text-sm text-gray-600">
+                        Team starts fixing — highest-impact items first
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -382,8 +612,9 @@ const UseCasesPage: React.FC = () => {
               Turn Website Launches Into Ongoing Relationships
             </h2>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Most dev agencies build a site and move on. The opportunity is offering ongoing site
-              health monitoring as a value-added service — turning one-time projects into recurring revenue.
+              Most dev agencies build a site and move on. The opportunity is
+              offering ongoing site health monitoring as a value-added service —
+              turning one-time projects into recurring revenue.
             </p>
           </div>
 
@@ -392,10 +623,13 @@ const UseCasesPage: React.FC = () => {
               <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center mb-4">
                 <Users className="w-6 h-6 text-orange-600" />
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">The Service Model</h3>
+              <h3 className="text-xl font-semibold text-gray-900 mb-3">
+                The Service Model
+              </h3>
               <p className="text-gray-600 mb-4">
-                After launching a client's site, offer monthly health reports as a premium add-on.
-                Most clients value the peace of mind — especially if their website drives leads or sales.
+                After launching a client's site, offer monthly health reports as
+                a premium add-on. Most clients value the peace of mind —
+                especially if their website drives leads or sales.
               </p>
               <div className="text-sm text-orange-600 font-medium">
                 Low effort, high perceived value
@@ -406,7 +640,9 @@ const UseCasesPage: React.FC = () => {
               <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center mb-4">
                 <Target className="w-6 h-6 text-orange-600" />
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">What You Deliver</h3>
+              <h3 className="text-xl font-semibold text-gray-900 mb-3">
+                What You Deliver
+              </h3>
               <ul className="space-y-2 text-sm text-gray-600">
                 <li className="flex items-start gap-2">
                   <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
@@ -431,11 +667,13 @@ const UseCasesPage: React.FC = () => {
               <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center mb-4">
                 <DollarSign className="w-6 h-6 text-orange-600" />
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">The Business Case</h3>
+              <h3 className="text-xl font-semibold text-gray-900 mb-3">
+                The Business Case
+              </h3>
               <p className="text-gray-600 mb-4">
-                AI WebScraper does the heavy lifting. Your team reviews the output and presents it
-                to the client. Minimal time investment with strong margins — the kind of service
-                that scales.
+                AI WebScraper does the heavy lifting. Your team reviews the
+                output and presents it to the client. Minimal time investment
+                with strong margins — the kind of service that scales.
               </p>
               <div className="text-sm text-orange-600 font-medium">
                 Recurring revenue from existing relationships
@@ -445,31 +683,113 @@ const UseCasesPage: React.FC = () => {
 
           <div className="mt-12 bg-gradient-to-br from-orange-50 to-yellow-50 rounded-2xl p-8 border border-orange-200">
             <div className="text-center mb-6">
-              <h3 className="text-2xl font-bold text-gray-900 mb-2">Why This Works</h3>
-              <p className="text-gray-600">Recurring services benefit both you and your clients</p>
+              <h3 className="text-2xl font-bold text-gray-900 mb-2">
+                Why This Works
+              </h3>
+              <p className="text-gray-600">
+                Recurring services benefit both you and your clients
+              </p>
             </div>
             <div className="grid md:grid-cols-3 gap-6">
               <div className="text-center">
-                <div className="text-lg font-bold text-orange-600 mb-2">For Your Agency</div>
+                <div className="text-lg font-bold text-orange-600 mb-2">
+                  For Your Agency
+                </div>
                 <p className="text-sm text-gray-600">
-                  Predictable monthly revenue, deeper client relationships, and a reason to stay in touch
-                  after launch day.
+                  Predictable monthly revenue, deeper client relationships, and
+                  a reason to stay in touch after launch day.
                 </p>
               </div>
               <div className="text-center">
-                <div className="text-lg font-bold text-orange-600 mb-2">For Your Clients</div>
+                <div className="text-lg font-bold text-orange-600 mb-2">
+                  For Your Clients
+                </div>
                 <p className="text-sm text-gray-600">
-                  Peace of mind that their site stays healthy. Issues caught before they become
-                  problems. Expert guidance on tap.
+                  Peace of mind that their site stays healthy. Issues caught
+                  before they become problems. Expert guidance on tap.
                 </p>
               </div>
               <div className="text-center">
-                <div className="text-lg font-bold text-orange-600 mb-2">For Retention</div>
+                <div className="text-lg font-bold text-orange-600 mb-2">
+                  For Retention
+                </div>
                 <p className="text-sm text-gray-600">
-                  Clients who get monthly reports feel cared for. When they need their next project built,
-                  you're already the trusted partner.
+                  Clients who get monthly reports feel cared for. When they need
+                  their next project built, you're already the trusted partner.
                 </p>
               </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Features & Benefits */}
+      <section className="py-20 bg-white border-t border-gray-100">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-14">
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-secondary-100 text-secondary-700 rounded-full text-sm font-medium mb-4">
+              Complete Feature Set
+            </div>
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+              Every Feature, and Why It Matters
+            </h2>
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
+              AI WebScraper reads your website like a search engine — then hands
+              you the fix list like a consultant. Here's everything it does, and
+              the benefit behind each capability.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {featureCategories.map((category) => {
+              const Icon = category.icon;
+              return (
+                <div
+                  key={category.title}
+                  className="bg-white rounded-2xl border border-gray-200 p-6 shadow-soft hover:shadow-soft-lg transition-shadow"
+                >
+                  <div className="flex items-center gap-3 mb-5">
+                    <div className="w-11 h-11 bg-secondary-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <Icon className="w-6 h-6 text-secondary-600" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-900 leading-tight">
+                      {category.title}
+                    </h3>
+                  </div>
+                  <ul className="space-y-3">
+                    {category.items.map(([feature, benefit]) => (
+                      <li key={feature} className="flex items-start gap-2.5">
+                        <CheckCircle className="w-4 h-4 text-secondary-600 flex-shrink-0 mt-1" />
+                        <div>
+                          <span className="block text-sm font-semibold text-gray-900">
+                            {feature}
+                          </span>
+                          <span className="block text-sm text-gray-600">
+                            {benefit}
+                          </span>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })}
+
+            {/* "Why it stands apart" closing card */}
+            <div className="bg-gradient-to-br from-primary-800 to-primary-900 rounded-2xl p-6 shadow-soft text-white flex flex-col justify-center">
+              <Target className="w-8 h-8 text-secondary-400 mb-4" />
+              <h3 className="text-xl font-bold mb-3">Why It Stands Apart</h3>
+              <p className="text-primary-100 text-sm leading-relaxed mb-4">
+                Generic crawlers tell you <em>what</em> is on a page. AI
+                WebScraper tells you
+                <strong className="text-white"> what to do about it</strong> —
+                prioritized, scored, and written in plain language you (or your
+                client) can act on immediately.
+              </p>
+              <p className="text-secondary-300 text-sm font-medium">
+                The difference between a diagnostic readout and a treatment
+                plan.
+              </p>
             </div>
           </div>
         </div>
@@ -482,7 +802,8 @@ const UseCasesPage: React.FC = () => {
             See What Your Site Audit Looks Like
           </h2>
           <p className="text-xl text-secondary-100 mb-8">
-            Paste your URL and get a consultant-grade audit in minutes. Free to start.
+            Paste your URL and get a consultant-grade audit in minutes. Free to
+            start.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link
