@@ -50,7 +50,8 @@ slides:
     alt_en: "Slide: 'From website crawl to growth roadmap' — enter your website URL and start a free AI audit"
     alt_es: "Diapositiva: 'Del rastreo del sitio web a una hoja de ruta de crecimiento' — ingresa la URL de tu sitio e inicia una auditoría con IA gratis"
 hero_images: []
-demo_video_url: ""
+demo_video_url: "/video/ai-webscraper-brief.mp4"
+demo_video_poster: "/images/portfolio/ai-webscraper-brief-poster.webp"
 
 live_url: "https://scraper.cushlabs.ai"
 demo_url: ""
