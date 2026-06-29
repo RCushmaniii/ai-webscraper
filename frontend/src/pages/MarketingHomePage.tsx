@@ -3,6 +3,10 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import {
   Sparkles,
+  Globe,
+  Waypoints,
+  ClipboardCheck,
+  AlertTriangle,
   Target,
   TrendingUp,
   Zap,
@@ -316,58 +320,161 @@ const MarketingHomePage: React.FC = () => {
         </div>
       </section>
 
-      {/* How It Works */}
+      {/* How It Works — From URL to action in 5 steps */}
       <section className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-5xl font-bold text-gray-900 mb-6">
-              How It Works
+              From URL to action in 5 steps
             </h2>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Paste a URL. Get a consultant-grade report. Three steps, three
-              minutes.
+              Paste a URL. Get a consultant-grade, copy-paste-ready action plan
+              — usually in minutes.
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-12 max-w-5xl mx-auto">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-secondary-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <span className="text-2xl font-bold text-secondary-600">1</span>
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">
-                Paste Your URL
-              </h3>
-              <p className="text-gray-600">
-                Enter any website URL. Configure depth, page limits, and crawl
-                settings — or just use the defaults.
-              </p>
-            </div>
+          <div className="relative">
+            {/* Connecting line (desktop) */}
+            <div
+              className="hidden lg:block absolute top-8 left-[10%] right-[10%] h-0.5 bg-gradient-to-r from-primary-800 via-secondary-500 to-secondary-600"
+              aria-hidden="true"
+            />
+            <ol className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-10 lg:gap-6 relative">
+              {[
+                {
+                  icon: Globe,
+                  title: "Enter a URL",
+                  desc: "Drop in any website address.",
+                },
+                {
+                  icon: Waypoints,
+                  title: "Crawl the full site",
+                  desc: "We safely map every reachable page.",
+                },
+                {
+                  icon: Search,
+                  title: "Detect technical & content issues",
+                  desc: "Problems flagged automatically across the site.",
+                },
+                {
+                  icon: Brain,
+                  title: "Analyze with AI",
+                  desc: "Findings prioritized by real business impact.",
+                },
+                {
+                  icon: ClipboardCheck,
+                  title: "Get prioritized, copy-paste fixes",
+                  desc: "Paste straight into your CMS — or hand to your AI assistant.",
+                },
+              ].map((step, i) => {
+                const Icon = step.icon;
+                return (
+                  <li
+                    key={step.title}
+                    className="relative flex flex-col items-center text-center"
+                  >
+                    <div className="w-16 h-16 rounded-full bg-white border-2 border-secondary-500 flex items-center justify-center mb-5 shadow-soft relative z-10">
+                      <Icon className="w-7 h-7 text-secondary-600" />
+                    </div>
+                    <div className="text-sm font-bold text-secondary-600 mb-1">
+                      Step {i + 1}
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                      {step.title}
+                    </h3>
+                    <p className="text-sm text-gray-600 max-w-[16rem]">
+                      {step.desc}
+                    </p>
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
+        </div>
+      </section>
 
-            <div className="text-center">
-              <div className="w-16 h-16 bg-secondary-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <span className="text-2xl font-bold text-secondary-600">2</span>
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">
-                AI Analyzes Everything
-              </h3>
-              <p className="text-gray-600">
-                The crawler maps your site. The issue detector flags problems.
-                The AI prioritizes fixes by business impact.
-              </p>
-            </div>
+      {/* Surfacing the signals that matter */}
+      <section className="py-20 bg-gradient-to-b from-gray-50 to-white border-t border-gray-100">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-14">
+            <h2 className="text-3xl md:text-5xl font-bold text-gray-900 mb-4">
+              Surfacing the signals that matter
+            </h2>
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              Automated detection of the highest-signal issues, sorted by
+              severity — so you always know what to fix first.
+            </p>
+          </div>
 
-            <div className="text-center">
-              <div className="w-16 h-16 bg-secondary-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <span className="text-2xl font-bold text-secondary-600">3</span>
+          <div className="max-w-5xl mx-auto space-y-5">
+            {[
+              {
+                level: "Critical Fixes",
+                marker: (
+                  <span
+                    className="w-5 h-5 rounded-full bg-red-700 flex-shrink-0"
+                    aria-hidden="true"
+                  />
+                ),
+                pill: "border-red-300 bg-red-50 text-red-800",
+                items: ["broken links"],
+              },
+              {
+                level: "High Priority",
+                marker: (
+                  <AlertTriangle
+                    className="w-5 h-5 text-orange-600 flex-shrink-0"
+                    fill="currentColor"
+                    aria-hidden="true"
+                  />
+                ),
+                pill: "border-orange-300 bg-orange-50 text-orange-800",
+                items: [
+                  "broken images",
+                  "oversized pages",
+                  "missing alt text",
+                  "duplicate titles",
+                ],
+              },
+              {
+                level: "Medium Priority",
+                marker: (
+                  <span
+                    className="w-4 h-4 rounded bg-yellow-500 flex-shrink-0"
+                    aria-hidden="true"
+                  />
+                ),
+                pill: "border-yellow-300 bg-yellow-50 text-yellow-800",
+                items: [
+                  "duplicate meta descriptions",
+                  "missing H1s",
+                  "thin content",
+                  "orphan pages",
+                ],
+              },
+            ].map((group) => (
+              <div
+                key={group.level}
+                className="bg-white rounded-2xl border border-gray-200 shadow-soft p-6 flex flex-col md:flex-row md:items-center gap-4"
+              >
+                <div className="flex items-center gap-3 md:w-56 flex-shrink-0">
+                  {group.marker}
+                  <span className="text-lg font-bold text-gray-900">
+                    {group.level}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {group.items.map((it) => (
+                    <span
+                      key={it}
+                      className={`px-3 py-1.5 rounded-full border text-sm font-medium ${group.pill}`}
+                    >
+                      {it}
+                    </span>
+                  ))}
+                </div>
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">
-                Get Your Action Plan
-              </h3>
-              <p className="text-gray-600">
-                A prioritized report with specific fixes, effort estimates, and
-                exportable deliverables. Hand it to your team and go.
-              </p>
-            </div>
+            ))}
           </div>
         </div>
       </section>
