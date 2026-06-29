@@ -130,6 +130,7 @@ class IssueDetector:
             await self._detect_duplicate_descriptions(seo_metadata)
             await self._detect_missing_h1(seo_metadata)
             await self._detect_multiple_h1s(seo_metadata)
+            await self._detect_noindex_pages(seo_metadata)
 
             logger.info(f"Detected {len(self.issues)} issues for crawl {self.crawl_id}")
             return self.issues
@@ -481,6 +482,41 @@ class IssueDetector:
         # This check will be implemented in Phase 2 when we enhance the crawler
         # For now, we'll skip this check
         pass
+
+    async def _detect_noindex_pages(self, seo_metadata: List[Dict[str, Any]]):
+        """Detect pages hidden from search engines via a noindex robots directive.
+
+        A `<meta name="robots" content="noindex">` (or "none") tells Google not
+        to index the page, so it cannot appear in search results at all. This is
+        occasionally intentional (thank-you pages, private/admin areas) but is a
+        high-impact problem when it lands on a page that should rank — one of the
+        most common silent SEO catastrophes. We surface it in plain language so a
+        non-technical owner can decide whether it's a mistake.
+        """
+        for meta in seo_metadata:
+            robots = (meta.get("robots_meta") or "").lower()
+            tokens = [t.strip() for t in robots.split(",")]
+            if "noindex" not in tokens and "none" not in tokens:
+                continue
+            if not self._is_html_page({
+                "content_type": meta.get("content_type"),
+                "title": meta.get("page_title"),
+                "url": meta.get("page_url"),  # Include URL for extension check
+            }):
+                continue
+            self._add_issue(
+                issue_type="Indexing - Page Blocked From Search",
+                severity="high",
+                message=(
+                    "This page is hidden from Google. Its robots meta tag contains "
+                    "\"noindex\", so search engines will not index it and it cannot "
+                    "appear in search results. If this page should rank, remove the "
+                    "noindex directive. If it's intentionally private (e.g. a "
+                    "thank-you or admin page), you can safely ignore this."
+                ),
+                context=meta.get("page_url", "Unknown URL"),
+                page_id=meta.get("page_id"),
+            )
 
 
 async def detect_and_store_issues(crawl_id: UUID, db_client=None) -> int:
