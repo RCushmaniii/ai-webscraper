@@ -312,17 +312,18 @@ async def generate_crawl_report(
             )
 
         # 2. Fetch comprehensive page data
-        # Note: Using actual column names from database (content_length instead of word_count)
         pages_response = supabase_client.table("pages").select(
-            "id, url, title, meta_description, status_code, content_length, "
+            "id, url, title, meta_description, status_code, content_length, word_count, "
             "response_time, content_type, seo_score, h1_tags, h2_tags, internal_links, "
             "external_links, images, nav_score, is_primary, depth"
         ).eq("crawl_id", crawl_id).execute()
         pages = pages_response.data or []
 
-        # Map content_length to word_count for compatibility with rest of code
+        # Use the real main-content word_count. Crawls created before word_count
+        # was persisted have NULL here — fall back to 0 rather than mislabeling the
+        # byte size (content_length) as a word count (the old "43,038 words" bug).
         for page in pages:
-            page["word_count"] = page.get("content_length", 0)
+            page["word_count"] = page.get("word_count") or 0
 
         # 3. Fetch all issues with full details
         issues_response = supabase_client.table("issues").select("*").eq("crawl_id", crawl_id).execute()

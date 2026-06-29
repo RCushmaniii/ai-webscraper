@@ -345,7 +345,8 @@ class Crawler:
                 "status_code": page.status_code,
                 "response_time": page.render_ms,
                 "content_type": page.content_type,
-                "content_length": page.page_size_bytes,
+                "content_length": page.page_size_bytes,  # page weight in bytes
+                "word_count": page.word_count,  # REAL main-content word count (excludes nav/footer boilerplate)
                 "h1_tags": h1_tags,  # REAL H1 tags
                 "h2_tags": h2_tags,  # REAL H2 tags
                 "internal_links": internal_links_count,  # REAL count
