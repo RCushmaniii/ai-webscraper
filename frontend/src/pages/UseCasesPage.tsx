@@ -1,5 +1,5 @@
-import React from "react";
-import { Link } from "react-router-dom";
+import React, { useEffect } from "react";
+import { Link, useLocation } from "react-router-dom";
 import {
   CheckCircle,
   ArrowRight,
@@ -153,6 +153,23 @@ const UseCasesPage: React.FC = () => {
     "Use Cases",
     "See how SEO agencies, content teams, small businesses, and web dev shops use AI WebScraper to audit sites faster and deliver better results.",
   );
+
+  // Scroll to the anchored use-case section when arriving via a hash link
+  // (e.g. /use-cases#seo-agency from the landing page). React Router v6 does
+  // not handle hash scrolling automatically, and this is a lazy route so we
+  // wait a tick for the section to mount.
+  const location = useLocation();
+  useEffect(() => {
+    if (!location.hash) return;
+    const id = location.hash.slice(1);
+    const t = setTimeout(() => {
+      document
+        .getElementById(id)
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
+    return () => clearTimeout(t);
+  }, [location]);
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Hero Section */}
@@ -177,7 +194,7 @@ const UseCasesPage: React.FC = () => {
       </section>
 
       {/* Use Case 1: SEO Agency */}
-      <section className="py-20 bg-white">
+      <section id="seo-agency" className="py-20 bg-white scroll-mt-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div>
@@ -319,7 +336,10 @@ const UseCasesPage: React.FC = () => {
       </section>
 
       {/* Use Case 2: Small Business Owner */}
-      <section className="py-20 bg-gradient-to-b from-gray-50 to-white">
+      <section
+        id="small-business"
+        className="py-20 bg-gradient-to-b from-gray-50 to-white scroll-mt-24"
+      >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div className="order-2 lg:order-1">
@@ -439,7 +459,7 @@ const UseCasesPage: React.FC = () => {
       </section>
 
       {/* Use Case 3: Content / Marketing Team */}
-      <section className="py-20 bg-white">
+      <section id="content-team" className="py-20 bg-white scroll-mt-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div>
@@ -602,7 +622,10 @@ const UseCasesPage: React.FC = () => {
       </section>
 
       {/* Use Case 4: Web Development Agency */}
-      <section className="py-20 bg-gradient-to-b from-gray-50 to-white">
+      <section
+        id="web-dev"
+        className="py-20 bg-gradient-to-b from-gray-50 to-white scroll-mt-24"
+      >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-orange-100 text-orange-700 rounded-full text-sm font-medium mb-4">
