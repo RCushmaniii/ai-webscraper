@@ -4,6 +4,43 @@ Entries are newest-first. Each entry documents one Claude Code working session.
 
 ---
 
+## Session: 2026-06-29
+
+### Accomplished
+
+- Fixed Sentry error `BACKEND-...-6`: ported `010_audit_logs.sql` (adds `audit_log.ip_address`) into the CLI migration set and applied via `supabase db push` (PR #78).
+- Image thumbnails now render: relaxed scraper CSP `img-src` to allow `https:` (VPS Caddyfile).
+- Wrote `docs/FEATURES.md` + added Features & Benefits section to Use Cases page (PR #76); deep-linked landing persona cards to use-case anchors (PR #77).
+- Landing page: replaced 3-step "How It Works" with 5-step stepper + added "Surfacing the signals that matter" severity section (PR #79).
+- Portfolio: optimized cover thumbnail + 8 marketing slides (cropped NotebookLM watermark) + brief video (29MB→14MB) to WebP/H.264; corrected PORTFOLIO.md (live_url, asyncio not Celery, health flags); EN+es-MX alt text (PR #79, #80).
+- Published ai-webscraper portfolio: uploaded 11 assets to R2 CDN, regenerated cushlabs `projects.generated.json`, deployed — live at www.cushlabs.ai/projects/ai-webscraper/ (cushlabs PR #138).
+- Added "hidden from Google" (noindex) issue check — zero added cost, plain-English (PR #81).
+- AI report: reworked Executive tab to lead with the treatment plan (critical issues, quick wins w/ copy buttons, strategic recs w/ impact×effort); fixed word-count bug (was page bytes); this also un-broke thin-content detection which never fired (PR #82).
+
+### Decisions Made
+
+- Indexing checks: added only noindex (high-value, plain-English); skipped canonical/robots/sitemap as too technical for the owner audience.
+- "Copy-paste fixes" wording: hybrid ("paste into CMS or hand to your AI assistant") — accurate without narrowing the audience.
+- Portfolio assets served from Cloudflare R2 CDN via `upload-to-r2.ts`, not committed to cushlabs/public.
+
+### Immediate Next Steps
+
+- [ ] Re-run a crawl to verify the word-count fix end-to-end (existing crawls have NULL `word_count` until re-run).
+- [ ] Rotate the `SENTRY_AUTH_TOKEN` (exposed in chat 2026-06-28).
+- [ ] (Optional) Score differentiation so perfect-score reports feel earned, not generic.
+
+### Technical Debt
+
+- Word-count correct only on new crawls; existing crawls need a re-run.
+- Caddyfile CSP edits (vitals + img-src) live only on the VPS, not version-controlled.
+- Old DB password remains in git history (rotation deferred).
+
+### Open Questions / Blockers
+
+- None.
+
+---
+
 ## Session: 2026-06-28
 
 ### Accomplished
