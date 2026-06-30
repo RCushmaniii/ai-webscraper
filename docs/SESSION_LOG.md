@@ -4,7 +4,43 @@ Entries are newest-first. Each entry documents one Claude Code working session.
 
 ---
 
-## Session: 2026-06-30
+## Session: 2026-06-30 (PM — outage recovery + report authenticity)
+
+### Accomplished
+
+- **Production outage fixed:** re-crawls saved 0 pages. Root cause: PR #82 added code writing/reading `pages.word_count` but no migration created the column → every insert threw 42703. Added `20260630183000_add_word_count_to_pages.sql`, applied; verified all 24 crawler insert columns now exist (PR #85).
+- **Silent-success guard (PR #86):** crawler now tracks `pages_saved`/`pages_save_failed` separately from `pages_crawled` (fetches). Worker marks `failed` when 0 saved (vs. lying "completed/10 pages"), warns on partial save, gates issue-detection/SEO-audit on `pages_saved > 0`. Frontend renders `crawl.error` banner (red=failed, amber=partial) — the field existed but was never shown.
+- **Report authenticity overhaul** (the "feels fake" fix, root-cause not prompt-nudge):
+  - **Earned scores (PR #88):** the 5 scores were LLM-generated → lazy 100s. Now `compute_health_scores()` computes them deterministically and OVERRIDES the model (granular & absolute). Verified clean=100, messy=39.
+  - **Anti-fabrication (PR #88):** killed the hallucinated "strategic score of 81" + invented "20-30% conversion" stats. Rewrote the model field descriptions that _taught_ fabrication; added hard EVIDENCE-BOUND rule + banned phrases. Quick wins now evidence-bound (clean site → zero, no CTA padding).
+  - **Score consistency (PR #89):** folded schema/internal-linking/strategy sub-scores into the 4 pillars (weight-renormalizing `_blend`, falls back gracefully). cushlabs now reads 96/96/95/100/95 — headline matches body (Schema 73 visibly pulls Technical/Trust down) instead of a flat-100 gloss.
+- **Copy-section button (PR #90):** serializes the whole Strategy & Conversion Analysis to plain text for pasting into an AI assistant.
+- Validated end-to-end on cushlabs.ai: Robert confirms the report now reads natural, accurate, internally consistent.
+
+### Decisions Made
+
+- Earned-but-absolute scoring (Robert's pick): a flawless site can still hit 100, but real gaps deduct. Scores moved to code because a score is measurement, not an intelligence task — the AI still owns all strategy/narrative.
+- Used existing `failed` status for save failures rather than a new `completed_with_errors` enum (would need a CHECK-constraint migration + every `status==='completed'` gate touched).
+- Continued cleaning prettier's wholesale frontend reformat each time (restore HEAD + reapply functional hunks via perl/python) to keep PR diffs tight.
+
+### Immediate Next Steps
+
+- [ ] Rotate the `SENTRY_AUTH_TOKEN` (exposed in chat 2026-06-28) — still outstanding.
+- [ ] (Optional) Verify the report-generation 429 cap with a real free-tier account.
+
+### Technical Debt
+
+- Per-page audit scoring leniency is untouched — `avg_page_score` still feeds Content; could tighten thresholds later.
+- Pre-existing `tsc` error in `CrawlDetailPage.tsx` (sort-direction comparison) — not blocking Vite build.
+- Caddyfile CSP edits live only on the VPS, not version-controlled.
+
+### Open Questions / Blockers
+
+- None.
+
+---
+
+## Session: 2026-06-30 (AM — prompt sharpening + report cap)
 
 ### Accomplished
 
