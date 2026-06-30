@@ -694,13 +694,16 @@ The client can already see the raw numbers and per-page scores in the dashboard.
    BAD: "Title length inconsistencies — adjust titles to be within 30-60 characters."
    GOOD: "4 of your 10 pages have titles under 25 chars — /consultation (23), /contact (21), /portfolio (23). These are all missing descriptive keywords. Meanwhile /projects/ai-chatbot-saas has the opposite problem at 79 chars. The short titles suggest a naming convention of 'PageName | CushLabs.ai' that doesn't give search engines enough to work with."
 
-2. QUICK WINS: Copy-paste fixes with the exact current and suggested values.
+2. QUICK WINS — the low-hanging fruit: the easiest, fastest, highest-impact fixes a non-technical owner can do in minutes. Each is a copy-paste fix with the exact current and suggested values. Start each one with an action verb.
    BAD: "Extend title on /consultation to recommended length."
    GOOD: "On /consultation, change 'Free Call | CushLabs.ai' (23 chars) to 'Free AI Consultation — Talk to a CushLabs Expert' (49 chars). This targets 'AI consultation' as a keyword and fills the SERP snippet."
+   DIVERSIFY — this is mandatory. Do NOT fill every slot with the same kind of fix. If many pages share one issue (e.g. 7 pages missing a meta description), give ONE representative quick win and append "(plus N more pages with the same fix)", then spend the remaining slots on DIFFERENT win types — a missing H1, a too-short title, an oversized image, a slow page. Five near-identical fixes is a FAIL; five different easy wins is the goal. Lead with the single easiest, highest-impact fix on the site.
 
-3. STRATEGIC RECOMMENDATIONS: Connect dots between findings to reveal business implications.
-   BAD: "Standardize titles and meta descriptions for better SEO."
+3. STRATEGIC RECOMMENDATIONS — the bigger-picture adjustments, in plain language a business owner understands. Each MUST connect TWO OR MORE specific findings into a single non-obvious insight, and its title MUST be a concrete claim about THIS site that names a URL, page type, or number. Aim for 2-4 sharp recommendations — never one vague catch-all.
+   BAD title: "Standardize titles and meta descriptions for better SEO."
+   BAD title: "Address Core SEO and UX Foundations." (generic — names nothing specific, connects nothing)
    GOOD: "Your /consultation page — the one page where visitors convert — has both the shortest title (23 chars) and shortest meta (92 chars) on the entire site. Search engines are writing the snippet for your most important conversion page. Fix this first."
+   If you cannot form a genuine multi-finding insight, return FEWER recommendations — do not pad with generic advice. One sharp recommendation beats three vague ones.
 
 4. STRENGTHS: Cite the actual numbers. "100% H1 coverage, 100% content depth (all pages 300+ words), and 100% sub-second response times across all 10 pages — the technical foundation and content quality are genuinely strong."
 
@@ -789,7 +792,10 @@ BANNED PHRASES (instant credibility kill):
 - "conduct regular site audits" / "implement SEO strategy" / "optimize SEO elements"
 - "enhance search visibility" / "improve overall performance" / "review and update"
 - "standardize" / "ensure consistency" / "align with best practices"
+- Generic strategic titles that name nothing specific: "Address core SEO foundations", "Strengthen technical SEO", "Improve SEO and UX", "Focus on fundamentals". Every strategic title must name a URL, page type, or number.
 - Any recommendation that doesn't reference a specific URL, number, or finding from above
+
+ACCESSIBLE & ACTION-ORIENTED: Write for a smart but non-technical business owner. Use plain language (explain jargon like "meta description" in passing), tie every point to a business outcome they care about (more traffic, more trust, more conversions), and start every fix and recommendation with a clear action verb ("Add", "Rewrite", "Trim", "Compress", "Fix").
 
 You must reference SPECIFIC data from above. If a finding says "Meta description too long on /services: 166 chars" then your recommendation must say "/services" and "166 chars" — not "some pages have long descriptions."
 
