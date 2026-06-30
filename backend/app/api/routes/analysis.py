@@ -23,6 +23,14 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/analysis", tags=["analysis"])
 
+# Max AI report generations per crawl for free-tier (non-admin) users.
+# The app is publicly reachable, so an unbounded "Regenerate" button lets anyone
+# burn the owner's OpenAI budget at will. The report is cached, so viewing is
+# free — only deliberate regeneration costs money. Free users get the initial
+# generation plus one regeneration (e.g. to pick up a prompt improvement or a
+# glitchy first result); admins are exempt and can iterate freely.
+FREE_REPORT_LIMIT = 2
+
 
 # =========================================
 # Request/Response Models
@@ -309,6 +317,20 @@ async def generate_crawl_report(
             raise HTTPException(
                 status_code=400,
                 detail=f"Crawl must be completed before generating report. Current status: {crawl.get('status')}"
+            )
+
+        # Cost-control: cap free-tier report generations per crawl. Admins exempt.
+        # Enforced here (not just in the UI) because a disabled button does
+        # nothing to stop a direct API call — this is the real lock.
+        generation_count = crawl.get("report_generation_count") or 0
+        if not current_user.is_admin and generation_count >= FREE_REPORT_LIMIT:
+            raise HTTPException(
+                status_code=429,
+                detail=(
+                    f"Report generation limit reached for this crawl "
+                    f"({FREE_REPORT_LIMIT} max). The last report is still available "
+                    f"to view and export. Run a new crawl to generate a fresh report."
+                ),
             )
 
         # 2. Fetch comprehensive page data
@@ -1584,15 +1606,29 @@ async def generate_crawl_report(
         # PHASE 5: STORE REPORT
         # =============================================
 
+        new_generation_count = generation_count + 1
         update_response = supabase_client.table("crawls").update({
             "ai_report": report,
-            "ai_report_generated_at": datetime.now(timezone.utc).isoformat()
+            "ai_report_generated_at": datetime.now(timezone.utc).isoformat(),
+            "report_generation_count": new_generation_count,
         }).eq("id", crawl_id).execute()
 
         if hasattr(update_response, "error") and update_response.error:
             logger.error(f"Failed to store report: {update_response.error}")
 
-        return report
+        # Return the wrapper shape (matching GET) so the client knows whether the
+        # user may regenerate again. Admins are never capped.
+        can_regenerate = current_user.is_admin or new_generation_count < FREE_REPORT_LIMIT
+        return {
+            "crawl_id": crawl_id,
+            "crawl_name": crawl.get("name"),
+            "site_url": crawl.get("url"),
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "report": report,
+            "report_generation_count": new_generation_count,
+            "report_limit": FREE_REPORT_LIMIT,
+            "can_regenerate": can_regenerate,
+        }
 
     except TaskDisabledError as e:
         raise HTTPException(status_code=403, detail=f"LLM feature disabled: {e}")
@@ -1634,7 +1670,7 @@ async def get_crawl_report(
 
     try:
         response = supabase_client.table("crawls").select(
-            "id, name, url, user_id, ai_report, ai_report_generated_at"
+            "id, name, url, user_id, ai_report, ai_report_generated_at, report_generation_count"
         ).eq("id", crawl_id).single().execute()
 
         if not response.data:
@@ -1652,12 +1688,17 @@ async def get_crawl_report(
                 detail="Report not generated yet. Use POST to generate a report."
             )
 
+        generation_count = crawl.get("report_generation_count") or 0
+        can_regenerate = current_user.is_admin or generation_count < FREE_REPORT_LIMIT
         return {
             "crawl_id": crawl_id,
             "crawl_name": crawl.get("name"),
             "site_url": crawl.get("url"),
             "generated_at": crawl.get("ai_report_generated_at"),
             "report": crawl.get("ai_report"),
+            "report_generation_count": generation_count,
+            "report_limit": FREE_REPORT_LIMIT,
+            "can_regenerate": can_regenerate,
         }
 
     except HTTPException:

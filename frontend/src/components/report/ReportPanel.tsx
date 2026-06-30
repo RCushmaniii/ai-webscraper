@@ -14,6 +14,9 @@ interface ReportPanelProps {
   onGenerateReport: () => void;
   crawlStatus?: string;
   crawlId?: string;
+  // False once a free-tier user hits the per-crawl generation cap. Admins are
+  // never capped, so this stays true for them.
+  canRegenerate?: boolean;
 }
 
 type ReportSubTab = 'executive' | 'page-audit' | 'content-brand' | 'technical';
@@ -32,6 +35,7 @@ const ReportPanel: React.FC<ReportPanelProps> = ({
   onGenerateReport,
   crawlStatus,
   crawlId,
+  canRegenerate = true,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<ReportSubTab>('executive');
   const [exportOpen, setExportOpen] = useState(false);
@@ -208,10 +212,17 @@ const ReportPanel: React.FC<ReportPanelProps> = ({
             )}
           </div>
 
-          {/* Regenerate button */}
+          {/* Regenerate button — disabled once a free-tier user hits the
+              per-crawl generation cap (cost control). Admins are never capped. */}
           <button
             onClick={onGenerateReport}
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            disabled={!canRegenerate}
+            title={
+              canRegenerate
+                ? undefined
+                : 'Regeneration limit reached for this crawl. The current report stays available to view and export.'
+            }
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
           >
             <RefreshCw className="w-4 h-4" />
             Regenerate

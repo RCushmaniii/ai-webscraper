@@ -279,7 +279,9 @@ const CrawlDetailPage: React.FC = () => {
     setGeneratingReport(true);
     try {
       const reportData = await apiService.generateCrawlReport(id);
-      setReport({ report: reportData } as CrawlReport);
+      // POST now returns the full wrapper (report + generation-cap metadata),
+      // matching GET — set it directly so can_regenerate stays accurate.
+      setReport(reportData);
       toast.success('Report generated successfully!');
     } catch (err: any) {
       console.error('Error generating report:', err);
@@ -2169,6 +2171,7 @@ const CrawlDetailPage: React.FC = () => {
                   onGenerateReport={handleGenerateReport}
                   crawlStatus={crawl?.status}
                   crawlId={id}
+                  canRegenerate={report?.can_regenerate ?? true}
                 />
               </div>
             )}
