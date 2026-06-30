@@ -54,7 +54,7 @@ demo_video_url: "/video/ai-webscraper-brief.mp4"
 demo_video_poster: "/images/portfolio/ai-webscraper-brief-poster.webp"
 
 live_url: "https://scraper.cushlabs.ai"
-demo_url: ""
+demo_url: "https://scraper.cushlabs.ai"
 case_study_url: ""
 
 problem_solved: |
