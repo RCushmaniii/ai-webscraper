@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { RefreshCw, ChevronUp, ChevronDown, Download, ExternalLink, FileText, Info, CheckCircle } from 'lucide-react';
+import { RefreshCw, ChevronUp, ChevronDown, Download, ExternalLink, FileText, Info, CheckCircle, AlertTriangle } from 'lucide-react';
 import { apiService, Crawl, Page, Link as CrawlLink, Issue, Image, CrawlReport } from '../services/api';
 import ConfirmationModal from '../components/ConfirmationModal';
 import SearchBar from '../components/SearchBar';
@@ -1199,6 +1199,30 @@ const CrawlDetailPage: React.FC = () => {
             <p className="text-gray-800">{crawl.js_rendering ? 'Enabled' : 'Disabled'}</p>
           </div>
         </div>
+
+        {/* Surface the crawl's error/warning so failures and partial saves
+            aren't silent. Red when the crawl failed; amber for a completed
+            crawl that lost some pages (partial save). */}
+        {crawl.error && (
+          <div
+            className={`mt-4 flex items-start gap-3 rounded-md border p-4 text-sm ${
+              crawl.status === 'failed'
+                ? 'border-red-200 bg-red-50 text-red-800'
+                : 'border-amber-200 bg-amber-50 text-amber-800'
+            }`}
+            role="alert"
+          >
+            <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-medium">
+                {crawl.status === 'failed'
+                  ? 'This crawl did not complete successfully'
+                  : 'This crawl completed with a warning'}
+              </p>
+              <p className="mt-1">{crawl.error}</p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Search Bar */}

@@ -79,34 +79,76 @@ async def crawl_site(crawl_id: str) -> Dict[str, Any]:
         # 4. Run the crawl
         await crawler.start()
 
-        logger.info(f"Crawl finished for {crawl_id}. Pages crawled: {crawler.pages_crawled}")
+        # pages_crawled counts pages FETCHED; pages_saved counts pages actually
+        # PERSISTED. They diverge when a DB insert fails (e.g. a missing column),
+        # which previously produced a "completed" crawl with 0 viewable pages.
+        pages_fetched = crawler.pages_crawled
+        pages_saved = crawler.pages_saved
+        pages_save_failed = crawler.pages_save_failed
+        logger.info(
+            f"Crawl finished for {crawl_id}. Fetched: {pages_fetched}, "
+            f"saved: {pages_saved}, save-failed: {pages_save_failed}"
+        )
 
-        progress = crawler.get_progress()
-
-        # 5. Update crawl status and final metrics in database
-        if progress.pages_crawled == 0:
+        # 5. Update crawl status and final metrics in database.
+        # Report the SAVED count as pages_crawled — that's what the user can
+        # actually view. Never report "completed" when nothing persisted.
+        now_iso = datetime.now().isoformat()
+        if pages_saved == 0:
+            if pages_fetched > 0:
+                # Pages were fetched but none saved — a database/persistence
+                # failure, not a crawl-reachability problem. Surface it loudly.
+                error_msg = (
+                    f"Crawl fetched {pages_fetched} page(s) but saved 0 to the "
+                    f"database ({pages_save_failed} insert failure(s)). This is a "
+                    f"persistence error (e.g. a schema mismatch) — check the "
+                    f"backend logs. No viewable pages were stored."
+                )
+                logger.error(f"Crawl {crawl_id}: {pages_fetched} fetched, 0 saved - marking as failed")
+            else:
+                error_msg = (
+                    "Crawl completed but no pages were successfully crawled. This "
+                    "could be due to: robots.txt blocking, connection issues, or "
+                    "invalid URL."
+                )
+                logger.warning(f"Crawl {crawl_id} completed with 0 pages - marking as failed")
             final_update = {
                 "status": "failed",
                 "pages_crawled": 0,
                 "total_links": 0,
-                "error": "Crawl completed but no pages were successfully crawled. This could be due to: robots.txt blocking, connection issues, or invalid URL.",
-                "completed_at": datetime.now().isoformat(),
-                "updated_at": datetime.now().isoformat()
+                "error": error_msg,
+                "completed_at": now_iso,
+                "updated_at": now_iso,
             }
-            logger.warning(f"Crawl {crawl_id} completed with 0 pages - marking as failed")
         else:
             final_update = {
                 "status": "completed",
-                "pages_crawled": progress.pages_crawled,
+                "pages_crawled": pages_saved,
                 "total_links": len(crawler.visited_urls) + len(crawler.url_queue),
-                "completed_at": datetime.now().isoformat(),
-                "updated_at": datetime.now().isoformat()
+                "completed_at": now_iso,
+                "updated_at": now_iso,
             }
+            if pages_save_failed > 0:
+                # Partial failure: the crawl is usable but incomplete. Keep it
+                # "completed" (report/issue-detection still apply) but record a
+                # visible warning so the missing pages aren't a silent loss.
+                final_update["error"] = (
+                    f"Partial save: {pages_save_failed} of {pages_fetched} fetched "
+                    f"page(s) failed to persist and are missing from this crawl. "
+                    f"Check the backend logs."
+                )
+                logger.warning(
+                    f"Crawl {crawl_id} completed with partial save: "
+                    f"{pages_saved} saved, {pages_save_failed} failed"
+                )
+            else:
+                # Clean run — clear any stale error from a prior re-run attempt.
+                final_update["error"] = None
 
         service_client.table("crawls").update(final_update).eq("id", crawl_id).execute()
 
-        # 6. Run Phase 1 issue detection (only if crawl was successful)
-        if progress.pages_crawled > 0:
+        # 6. Run Phase 1 issue detection (only if pages were actually saved)
+        if pages_saved > 0:
             try:
                 from app.services.issue_detector import detect_and_store_issues
                 issues_count = await detect_and_store_issues(UUID(crawl_id), db_client=service_client)
@@ -114,8 +156,8 @@ async def crawl_site(crawl_id: str) -> Dict[str, Any]:
             except Exception as issue_error:
                 logger.error(f"Error detecting issues for {crawl_id}: {issue_error}", exc_info=True)
 
-        # 7. Run comprehensive SEO audit
-        if settings.ENABLE_SEO_AUDIT:
+        # 7. Run comprehensive SEO audit (only if pages were actually saved)
+        if settings.ENABLE_SEO_AUDIT and pages_saved > 0:
             try:
                 from app.services.seo_auditor import SEOAuditor
                 auditor = SEOAuditor(crawl_id)
@@ -128,8 +170,9 @@ async def crawl_site(crawl_id: str) -> Dict[str, Any]:
 
         return {
             "crawl_id": crawl_id,
-            "status": "completed",
-            "pages_crawled": progress.pages_crawled,
+            "status": final_update["status"],
+            "pages_crawled": pages_saved,
+            "pages_save_failed": pages_save_failed,
         }
 
     except Exception as e:
