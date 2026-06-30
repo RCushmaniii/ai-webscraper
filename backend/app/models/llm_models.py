@@ -334,7 +334,7 @@ class CriticalIssue(BaseModel):
 
 class StrategicRecommendation(BaseModel):
     """A strategic recommendation — must connect multiple findings into a bigger picture"""
-    title: str = Field(..., description="A strategic insight, e.g. 'Your conversion page (/consultation) has the weakest SEO on the site'. NOT 'Improve SEO'.")
+    title: str = Field(..., description="A strategic insight that names a specific URL, page type, or number and connects 2+ findings, e.g. 'Your conversion page (/consultation) has the weakest SEO on the site'. NEVER a generic category like 'Improve SEO', 'Address core SEO foundations', or 'Strengthen technical SEO'.")
     description: str = Field(..., description="Connect dots: which findings combine to create a bigger problem or opportunity? Reference URLs and numbers. What would a $500/hr consultant say that isn't obvious from the data alone?")
     expected_impact: str = Field(..., description="Specific impact, e.g. 'Reclaiming SERP snippet control on 5 pages could improve CTR by 15-30%'. NOT 'improved visibility'.")
     effort_estimate: str = Field(..., description="e.g. '30 minutes to update all 5 meta descriptions', '2 hours for title rewrite + testing'")
@@ -366,7 +366,7 @@ class ExecutiveSummary(BaseModel):
     # Recommendations
     quick_wins: List[str] = Field(
         default_factory=list,
-        description="Copy-paste fixes. For titles: suggest 5-8 words in format 'Keyword — Modifier | Brand'. For meta descriptions: suggest exactly TWO complete sentences (value prop + CTA). NEVER suggest a one-sentence or one-fragment meta description. Example: 'On /services, replace meta with: \"AI support assistants and document automation tailored for small businesses. See how CushLabs can cut costs and save time.\"'",
+        description="The easiest, highest-impact low-hanging-fruit fixes, each starting with an action verb. DIVERSIFY across DIFFERENT issue types — never fill all slots with the same kind of fix; if many pages share one issue, give ONE representative win and append '(plus N more)', then use the other slots for different win types (a missing H1, a too-short title, an oversized image). Copy-paste fixes: for titles suggest 5-8 words in format 'Keyword — Modifier | Brand'; for meta descriptions suggest exactly TWO complete sentences (value prop + CTA), NEVER one fragment. Example: 'Add a meta on /services: \"AI support assistants and document automation tailored for small businesses. See how CushLabs can cut costs and save time.\"'",
         max_length=5
     )
     strategic_recommendations: List[StrategicRecommendation] = Field(
