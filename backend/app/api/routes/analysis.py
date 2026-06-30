@@ -32,7 +32,27 @@ router = APIRouter(prefix="/analysis", tags=["analysis"])
 FREE_REPORT_LIMIT = 2
 
 
-def compute_health_scores(summary_stats: Dict[str, Any], site_data: Dict[str, Any]) -> Dict[str, int]:
+def _blend(*pairs) -> int:
+    """Weighted average over 0-100 components, skipping any whose value is None.
+
+    Remaining weights renormalize, so an unavailable sub-signal (e.g. schema or
+    strategy scores on an older crawl) neither inflates nor tanks the pillar —
+    it simply falls back to the components we do have.
+    """
+    avail = [(w, float(v)) for w, v in pairs if v is not None]
+    total_w = sum(w for w, _ in avail)
+    if total_w <= 0:
+        return 0
+    return int(max(0, min(100, round(sum(w * v for w, v in avail) / total_w))))
+
+
+def compute_health_scores(
+    summary_stats: Dict[str, Any],
+    site_data: Dict[str, Any],
+    schema_score: Optional[int] = None,
+    linking_score: Optional[int] = None,
+    strategy_score: Optional[int] = None,
+) -> Dict[str, int]:
     """Deterministic, granular site-health scoring (granular & absolute).
 
     Scores are EARNED from measured signals, never LLM-generated. The LLM used
@@ -41,8 +61,12 @@ def compute_health_scores(summary_stats: Dict[str, Any], site_data: Dict[str, An
     numbers actually move with real quality. A genuinely flawless site can still
     reach 100, but any real gap deducts proportionally to how widespread it is.
 
-    Inputs are the same Python-computed metrics already shown in the dashboard
-    (pass rates, broken links, alt coverage, HTTP errors) — nothing invented.
+    Inputs are the same Python-computed metrics already shown elsewhere in the
+    report — nothing invented. The optional schema/linking/strategy sub-scores
+    are folded in so the four headline pillars stay CONSISTENT with the deeper
+    sections of the report (a site can't show "Technical 100" up top while the
+    Schema section reads 73 below). When those sub-scores aren't available
+    (older crawls), the pillars fall back to the fundamentals.
     """
     s = summary_stats or {}
     total_pages = max(int(site_data.get("total_pages", 0) or 0), 1)
@@ -64,20 +88,21 @@ def compute_health_scores(summary_stats: Dict[str, Any], site_data: Dict[str, An
     broken_health = 100.0 - min(broken_links / total_pages, 1.0) * 100.0
     error_health = 100.0 - min(error_pages / total_pages, 1.0) * 100.0
     alt_coverage = 100.0 if total_images == 0 else round((total_images - images_missing_alt) / total_images * 100.0)
+    integrity = min(broken_health, error_health)
 
-    def clamp(x: float) -> int:
-        return int(max(0, min(100, round(x))))
-
-    # Technical SEO — tag hygiene + crawl integrity.
-    technical = clamp(0.35 * title + 0.30 * meta + 0.20 * h1 + 0.15 * min(broken_health, error_health))
-    # Content quality — depth + overall per-page quality.
-    content_quality = clamp(0.60 * content + 0.40 * avg_page)
-    # User experience — speed + working links.
-    user_experience = clamp(0.70 * perf + 0.30 * broken_health)
-    # Trust signals — accessible images, snippet control, clean responses.
-    trust = clamp(0.45 * alt_coverage + 0.35 * meta + 0.20 * error_health)
+    # Technical SEO — tag hygiene + crawl integrity + structured data + linking.
+    technical = _blend(
+        (0.25, title), (0.20, meta), (0.15, h1), (0.15, integrity),
+        (0.15, schema_score), (0.10, linking_score),
+    )
+    # Content quality — depth + per-page quality + messaging/CRO strength.
+    content_quality = _blend((0.45, content), (0.30, avg_page), (0.25, strategy_score))
+    # User experience — speed + working links + navigability (internal linking).
+    user_experience = _blend((0.55, perf), (0.20, broken_health), (0.25, linking_score))
+    # Trust signals — accessible images, snippet control, clean responses, schema.
+    trust = _blend((0.40, alt_coverage), (0.25, meta), (0.15, error_health), (0.20, schema_score))
     # Overall — technical-weighted blend of the four pillars.
-    site_health = clamp(0.35 * technical + 0.25 * content_quality + 0.20 * user_experience + 0.20 * trust)
+    site_health = _blend((0.35, technical), (0.25, content_quality), (0.20, user_experience), (0.20, trust))
 
     return {
         "technical_seo": technical,
@@ -1400,8 +1425,20 @@ async def generate_crawl_report(
         # Override the LLM's self-assessed scores with deterministic, earned
         # values. The model narrates; the audit engine scores. This kills the
         # meaningless 100/100/100/100 gloss and makes the numbers move with real
-        # quality (granular & absolute). See compute_health_scores().
-        computed_scores = compute_health_scores(summary_stats, site_data)
+        # quality (granular & absolute). The schema/linking/strategy sub-scores
+        # (computed above) are folded in so the headline pillars stay consistent
+        # with the deeper report sections. See compute_health_scores().
+        avg_strategy_score = (
+            round(sum(r["analysis"]["overall_strategy_score"] for r in semantic_strategy_results) / len(semantic_strategy_results))
+            if semantic_strategy_results else None
+        )
+        computed_scores = compute_health_scores(
+            summary_stats,
+            site_data,
+            schema_score=schema_score,
+            linking_score=linking_score,
+            strategy_score=avg_strategy_score,
+        )
         executive_summary.technical_seo_score = computed_scores["technical_seo"]
         executive_summary.content_quality_score = computed_scores["content_quality"]
         executive_summary.user_experience_score = computed_scores["user_experience"]
