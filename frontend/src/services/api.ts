@@ -175,6 +175,12 @@ export interface CrawlReport {
   crawl_name?: string;
   site_url?: string;
   generated_at: string;
+  // Report generation cap (cost control). Free-tier users are limited to
+  // `report_limit` generations per crawl; admins are exempt (can_regenerate
+  // stays true). Surfaced by both GET and POST report endpoints.
+  report_generation_count?: number;
+  report_limit?: number;
+  can_regenerate?: boolean;
   report?: {
     crawl_id: string;
     generated_at: string;
