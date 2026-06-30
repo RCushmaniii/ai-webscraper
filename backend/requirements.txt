@@ -20,6 +20,9 @@ webdriver-manager==4.0.2
 supabase==2.28.3
 python-dotenv==1.2.2  # security: <1.2.2 advisory
 
+# Rate limiting (distributed, REST-based — works on serverless and VPS alike)
+upstash-redis>=1.2.0,<2
+
 # File handling and utilities
 aiofiles==23.2.1
 Pillow==12.2.0  # security: critical (<10.2.0) + high + medium advisories; transitive via reportlab, no direct use

@@ -149,4 +149,19 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
     OPENAI_MODEL: str = os.getenv("OPENAI_MODEL", "gpt-3.5-turbo")
 
+    # ============================================================================
+    # Rate Limiting (Upstash Redis)
+    # ============================================================================
+    # REST-based Upstash client works on any runtime. When both vars are set the
+    # distributed limiter activates; otherwise the in-memory fallback is used
+    # (dev only) and the middleware fails OPEN so a missing/broken store never
+    # blocks production traffic.
+    UPSTASH_REDIS_REST_URL: str = os.getenv("UPSTASH_REDIS_REST_URL", "")
+    UPSTASH_REDIS_REST_TOKEN: str = os.getenv("UPSTASH_REDIS_REST_TOKEN", "")
+
+    @property
+    def RATE_LIMIT_ENABLED(self) -> bool:
+        """Distributed rate limiting is live only when Upstash is configured."""
+        return bool(self.UPSTASH_REDIS_REST_URL.strip() and self.UPSTASH_REDIS_REST_TOKEN.strip())
+
 settings = Settings()

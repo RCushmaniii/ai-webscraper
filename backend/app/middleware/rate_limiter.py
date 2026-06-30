@@ -2,7 +2,12 @@
 Rate Limiting Middleware
 
 Implements request rate limiting based on subscription tiers.
-Uses Redis for distributed rate limiting (production) or in-memory for development.
+Uses Upstash Redis for distributed rate limiting (production) or in-memory for
+development. The middleware targets authenticated, mutating endpoints (the
+expensive write operations: crawl creation and AI analysis) and identifies the
+caller from the JWT `sub` claim, falling back to client IP. Read traffic, health
+checks, and static assets are never throttled so normal SPA navigation is
+unaffected and we avoid a remote round-trip on every request.
 """
 
 import time
@@ -11,10 +16,21 @@ from typing import Optional, Dict, Tuple
 from functools import wraps
 from fastapi import Request, HTTPException, status
 from fastapi.responses import JSONResponse
+from jose import jwt
 
-from app.core.rate_limits import get_rate_limit, get_tier_from_user, get_upgrade_message
+from app.core.config import settings
+from app.core.rate_limits import (
+    SubscriptionTier,
+    get_rate_limit,
+    get_tier_from_user,
+    get_upgrade_message,
+)
 
 logger = logging.getLogger(__name__)
+
+# HTTP methods that mutate state / trigger expensive work. GETs are intentionally
+# excluded — a dashboard page view fires several reads and must not hit limits.
+_MUTATING_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
 
 # ============================================================================
@@ -104,27 +120,138 @@ _rate_limiter = InMemoryRateLimiter()
 
 
 # ============================================================================
-# REDIS RATE LIMITER (Production)
+# UPSTASH REDIS RATE LIMITER (Production)
 # ============================================================================
 
-class RedisRateLimiter:
+class UpstashRateLimiter:
     """
-    Redis-based rate limiter for production use.
+    Distributed rate limiter backed by Upstash Redis (REST API).
 
-    Supports distributed rate limiting across multiple workers/servers.
-
-    TODO: Implement when Redis is added to infrastructure
+    Uses a fixed-window counter: INCR the key on every request and set an
+    EXPIRE equal to the window on the first hit. The key self-cleans when the
+    window elapses, so there is no separate cleanup job. Works across multiple
+    workers/instances and survives process restarts (unlike the in-memory
+    limiter), which is the whole point of using it in production.
     """
 
-    def __init__(self, redis_url: str):
-        """
-        Initialize Redis rate limiter.
+    def __init__(self, url: str, token: str):
+        # Imported lazily so the dependency is only required when configured.
+        from upstash_redis.asyncio import Redis
 
-        Args:
-            redis_url: Redis connection URL
+        self._redis = Redis(url=url, token=token)
+
+    async def check_rate_limit(
+        self,
+        key: str,
+        limit: int,
+        window_seconds: int,
+    ) -> Tuple[bool, int, int]:
         """
-        # TODO: Implement Redis connection
-        raise NotImplementedError("Redis rate limiter not yet implemented. Use InMemoryRateLimiter for now.")
+        Atomically increment the window counter and report status.
+
+        Returns:
+            Tuple of (allowed, current_count, reset_epoch_seconds).
+
+        Raises:
+            Exception: Any transport/Upstash error is propagated so the caller
+            can decide how to degrade. We fail OPEN at the call site — a broken
+            limiter must never take the API down.
+        """
+        count = await self._redis.incr(key)
+
+        # Only the first request in a window needs to arm the TTL. Anchoring the
+        # window to the first hit keeps this to one round-trip on every
+        # subsequent request.
+        if count == 1:
+            await self._redis.expire(key, window_seconds)
+
+        reset_time = int(time.time()) + window_seconds
+        return (count <= limit, count, reset_time)
+
+
+# Limiter selection: Upstash when configured, in-memory otherwise (dev only).
+_upstash_limiter: Optional[UpstashRateLimiter] = None
+
+if settings.RATE_LIMIT_ENABLED:
+    try:
+        _upstash_limiter = UpstashRateLimiter(
+            url=settings.UPSTASH_REDIS_REST_URL,
+            token=settings.UPSTASH_REDIS_REST_TOKEN,
+        )
+        logger.info("Rate limiting: Upstash Redis limiter active (distributed).")
+    except Exception as e:  # pragma: no cover - import/config failure
+        logger.error(f"Failed to initialize Upstash limiter, falling back to in-memory: {e}")
+        _upstash_limiter = None
+else:
+    logger.info(
+        "Rate limiting: Upstash not configured (UPSTASH_REDIS_REST_URL/TOKEN unset). "
+        "Using in-memory limiter — NOT suitable for multi-instance production."
+    )
+
+
+async def _enforce(identity: str, tier: str) -> Tuple[bool, Optional[str], Dict[str, str]]:
+    """
+    Check per-minute AND per-hour limits for an identity (user id or IP).
+
+    Fails OPEN on any limiter error so an Upstash outage degrades to "allow"
+    rather than locking every caller out. Returns (allowed, message, headers).
+    """
+    limits = get_rate_limit(tier)
+    windows = (
+        ("rpm", limits.requests_per_minute, 60),
+        ("rph", limits.requests_per_hour, 3600),
+    )
+
+    for limit_type, limit, window in windows:
+        key = f"rl:{identity}:{limit_type}"
+        try:
+            if _upstash_limiter is not None:
+                allowed, current, reset_time = await _upstash_limiter.check_rate_limit(key, limit, window)
+            else:
+                allowed, current, reset_time = _rate_limiter.check_rate_limit(key, limit, window)
+        except Exception as e:
+            # Fail open — never block legitimate traffic because the limiter is down.
+            logger.warning(f"Rate limiter unavailable ({e}); allowing request for {identity}.")
+            return (True, None, {})
+
+        if not allowed:
+            logger.warning(
+                f"Rate limit exceeded for {identity} ({tier}): {current}/{limit} {limit_type}."
+            )
+            headers = {
+                "Retry-After": str(window),
+                "X-RateLimit-Limit": str(limit),
+                "X-RateLimit-Remaining": "0",
+                "X-RateLimit-Reset": str(reset_time),
+            }
+            return (False, get_upgrade_message(tier, limit_type), headers)
+
+    return (True, None, {})
+
+
+def _identity_from_request(request: Request) -> Tuple[str, Optional[str]]:
+    """
+    Derive a rate-limit identity from the request.
+
+    Prefers the authenticated user (JWT `sub`) so limits are per-account. The
+    claim is read UNVERIFIED here purely as a bucketing key — forged tokens are
+    rejected downstream by get_current_user with a 401, and the IP fallback
+    still bounds anonymous/garbage-token floods. Returns (identity, user_id).
+    """
+    auth_header = request.headers.get("authorization", "")
+    if auth_header.lower().startswith("bearer "):
+        token = auth_header[7:].strip()
+        try:
+            sub = jwt.get_unverified_claims(token).get("sub")
+            if sub:
+                return (f"user:{sub}", sub)
+        except Exception:
+            pass  # Malformed token — fall through to IP-based bucketing.
+
+    # Behind Caddy the real client IP is the first entry of X-Forwarded-For.
+    fwd = request.headers.get("x-forwarded-for", "")
+    client_ip = fwd.split(",")[0].strip() if fwd else (request.client.host if request.client else "unknown")
+    return (f"ip:{client_ip}", None)
 
 
 # ============================================================================
@@ -187,40 +314,41 @@ async def rate_limit_middleware(request: Request, call_next):
     """
     FastAPI middleware for rate limiting.
 
-    Checks rate limits for authenticated users on every request.
+    Only mutating API requests (POST/PUT/PATCH/DELETE under /api/v1) are
+    throttled — these are the expensive operations (crawl creation, AI analysis)
+    that need protection from abuse. Reads, preflight, health checks, and static
+    assets pass straight through, so normal browsing never trips a limit and we
+    avoid a remote round-trip on every page load.
     """
-    # Skip rate limiting for health checks and static files
-    if request.url.path in ["/health", "/docs", "/redoc", "/openapi.json"]:
+    # Fast path: skip anything that isn't a mutating API call.
+    if (
+        request.method not in _MUTATING_METHODS
+        or not request.url.path.startswith(settings.API_V1_STR)
+    ):
         return await call_next(request)
 
-    # Get user from request (if authenticated)
-    user_id = getattr(request.state, "user_id", None)
+    identity, user_id = _identity_from_request(request)
 
-    if user_id:
-        # Get user's subscription tier
-        tier = get_tier_from_user(user_id)
+    # Expose the user id to downstream handlers / logging (previously never set,
+    # which is why the limiter was inert).
+    request.state.user_id = user_id
 
-        # Check rate limit (requests per minute)
-        allowed, error_msg = check_rate_limit_for_user(user_id, tier, "rpm")
+    tier = get_tier_from_user(user_id) if user_id else SubscriptionTier.FREE.value
+    allowed, error_msg, headers = await _enforce(identity, tier)
 
-        if not allowed:
-            return JSONResponse(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                content={
-                    "detail": error_msg,
-                    "retry_after": 60,  # Retry after 1 minute
-                    "upgrade_url": "/pricing"
-                },
-                headers={
-                    "Retry-After": "60",
-                    "X-RateLimit-Limit": str(get_rate_limit(tier).requests_per_minute),
-                    "X-RateLimit-Remaining": "0",
-                }
-            )
+    if not allowed:
+        headers = {**headers, "X-RateLimit-Remaining": "0"}
+        return JSONResponse(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            content={
+                "detail": error_msg,
+                "retry_after": int(headers.get("Retry-After", "60")),
+                "upgrade_url": "/pricing",
+            },
+            headers=headers,
+        )
 
-    # Continue to next middleware/route
-    response = await call_next(request)
-    return response
+    return await call_next(request)
 
 
 # ============================================================================
