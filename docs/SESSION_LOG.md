@@ -4,6 +4,39 @@ Entries are newest-first. Each entry documents one Claude Code working session.
 
 ---
 
+## Session: 2026-06-30
+
+### Accomplished
+
+- Sharpened executive-summary LLM prompts (PR #83): quick wins must DIVERSIFY across issue types ("five near-identical fixes is a FAIL"); strategic recs must connect 2+ findings + name a URL/page/number; banned generic titles ("Address core SEO foundations"); added accessible/action-oriented directive. `llm_service.py:659`, `llm_models.py`.
+- Capped AI report generation at 2 per crawl for free-tier users; admins exempt (PR #84). Server-enforced (429), not just UI — a disabled button can't stop a direct API call.
+  - Migration `20260630180000_add_report_generation_count.sql` (int, default 0); applied to remote via `supabase db push`.
+  - `POST/GET /report` now return `report_generation_count` / `report_limit` / `can_regenerate`; POST increments counter + returns GET's wrapper shape. `analysis.py` `FREE_REPORT_LIMIT = 2`.
+  - Frontend: Regenerate button disables w/ tooltip once capped (`ReportPanel.tsx`, `CrawlDetailPage.tsx`, `api.ts`).
+- Deployed both: CI built GHCR image → VPS pulled `:latest` + recreated container (health 200, cap code verified live); frontend `scp`'d to VPS.
+
+### Decisions Made
+
+- Report cap over auto-generate/confirm-dialog: public app + abuse vector ("not my money") justifies a hard server-side cap; admins exempt so prompt iteration stays unblocked. Free-tier worst case = 3 crawls × 2 reports = 6 generations.
+- Reverted prettier's wholesale reformat (~2,200 quote-churn lines) on the two touched frontend files; re-applied only functional hunks via `git apply`/perl so the PR diff stayed 81/+6/- and blame history clean.
+
+### Immediate Next Steps
+
+- [ ] Verify the 429 + disabled Regenerate button end-to-end with a free-tier (non-admin) account (Robert testing; admin is exempt so won't see the cap).
+- [ ] Observe PR #83 prompt output on a fresh cushlabs.ai crawl — confirm quick wins are diversified and strategic recs are specific.
+- [ ] Rotate the `SENTRY_AUTH_TOKEN` (exposed in chat 2026-06-28).
+
+### Technical Debt
+
+- Pre-existing `tsc` error in `CrawlDetailPage.tsx` (sort-direction comparison) — not blocking the Vite build, but should be cleaned up.
+- Caddyfile CSP edits live only on the VPS, not version-controlled.
+
+### Open Questions / Blockers
+
+- None.
+
+---
+
 ## Session: 2026-06-29
 
 ### Accomplished
