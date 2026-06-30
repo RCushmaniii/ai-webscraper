@@ -1,5 +1,5 @@
-import React from 'react';
-import { Brain, Target, MessageSquare, List, Clock, AlertTriangle } from 'lucide-react';
+import React, { useState } from 'react';
+import { Brain, Target, MessageSquare, List, Clock, AlertTriangle, Clipboard, Check } from 'lucide-react';
 import { CrawlReport } from '../../services/api';
 
 interface ContentBrandTabProps {
@@ -8,6 +8,93 @@ interface ContentBrandTabProps {
 
 const scoreColor = (score: number) =>
   score >= 70 ? 'text-green-600' : score >= 50 ? 'text-yellow-600' : 'text-red-600';
+
+type SemanticStrategy = NonNullable<NonNullable<CrawlReport['report']>['semantic_strategy']>;
+
+// Serialize the whole Strategy & Conversion Analysis into clean plain text,
+// ready to paste into an AI assistant ("evaluate my content based on this").
+const buildStrategyText = (strategy: SemanticStrategy, siteUrl?: string): string => {
+  const lines: string[] = [];
+  lines.push(`# Strategy & Conversion Analysis${siteUrl ? ` — ${siteUrl}` : ''}`);
+  lines.push(
+    `AI-evaluated messaging, intent alignment, and persuasion structure across ${strategy.pages_analyzed} pages.`,
+  );
+  if (strategy.avg_strategy_score !== null && strategy.avg_strategy_score !== undefined) {
+    lines.push(`Average strategy score: ${strategy.avg_strategy_score}/100`);
+  }
+  lines.push('');
+
+  strategy.page_analyses.forEach((p) => {
+    const a = p.analysis;
+    lines.push(`## ${p.purpose.replace(/_/g, ' ')} — ${p.url}  (Overall: ${a.overall_strategy_score}/100)`);
+    if (a.top_recommendation) lines.push(`Top recommendation: ${a.top_recommendation}`);
+    lines.push('');
+
+    lines.push(`Intent Alignment: ${a.intent_gap.alignment_score}/100`);
+    if (a.intent_gap.assessment) lines.push(a.intent_gap.assessment);
+    if (a.intent_gap.gaps.length) {
+      lines.push('Gaps:');
+      a.intent_gap.gaps.forEach((g) => lines.push(`- ${g}`));
+    }
+    if (a.intent_gap.suggestions.length) {
+      lines.push('Suggestions:');
+      a.intent_gap.suggestions.forEach((s) => lines.push(`- ${s}`));
+    }
+    lines.push('');
+
+    lines.push(`Tone & Persona: ${a.tone_audit.tone_match_score}/100`);
+    if (a.tone_audit.detected_tone) lines.push(`Detected tone: ${a.tone_audit.detected_tone}`);
+    if (a.tone_audit.audience_fit) lines.push(a.tone_audit.audience_fit);
+    if (a.tone_audit.issues.length) {
+      lines.push('Issues:');
+      a.tone_audit.issues.forEach((i) => lines.push(`- ${i}`));
+    }
+    lines.push('');
+
+    lines.push(`Skim Test: ${a.skim_test.skim_score}/100`);
+    if (a.skim_test.story_assessment) lines.push(a.skim_test.story_assessment);
+    if (a.skim_test.missing_beats.length) {
+      lines.push('Missing beats:');
+      a.skim_test.missing_beats.forEach((b) => lines.push(`- ${b}`));
+    }
+    if (a.skim_test.rewrite_suggestions.length) {
+      lines.push('Heading rewrites:');
+      a.skim_test.rewrite_suggestions.forEach((s) => lines.push(`- ${s}`));
+    }
+
+    if (a.suggested_title || a.suggested_meta) {
+      lines.push('');
+      lines.push('Suggested fixes:');
+      if (a.suggested_title) lines.push(`- Title: ${a.suggested_title}`);
+      if (a.suggested_meta) lines.push(`- Meta: ${a.suggested_meta}`);
+    }
+
+    lines.push('');
+    lines.push('---');
+    lines.push('');
+  });
+
+  return lines.join('\n').trim();
+};
+
+// Copy-to-clipboard button with transient "Copied" feedback.
+const CopyButton: React.FC<{ text: string; label: string }> = ({ text, label }) => {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      onClick={() => {
+        navigator.clipboard?.writeText(text);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      }}
+      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-purple-300 text-purple-700 hover:bg-purple-50 transition-colors"
+      aria-label={label}
+    >
+      {copied ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Clipboard className="w-3.5 h-3.5" />}
+      {copied ? 'Copied' : label}
+    </button>
+  );
+};
 
 const ContentBrandTab: React.FC<ContentBrandTabProps> = ({ report }) => {
   const r = report.report;
@@ -37,11 +124,17 @@ const ContentBrandTab: React.FC<ContentBrandTabProps> = ({ report }) => {
                 AI-evaluated messaging, intent alignment, and persuasion structure across {r.semantic_strategy.pages_analyzed} pages
               </p>
             </div>
-            {r.semantic_strategy.avg_strategy_score !== null && (
-              <div className={`text-2xl font-bold ${scoreColor(r.semantic_strategy.avg_strategy_score)}`}>
-                {r.semantic_strategy.avg_strategy_score}/100
-              </div>
-            )}
+            <div className="flex items-center gap-3 flex-shrink-0">
+              <CopyButton
+                text={buildStrategyText(r.semantic_strategy, r.site_url)}
+                label="Copy section"
+              />
+              {r.semantic_strategy.avg_strategy_score !== null && (
+                <div className={`text-2xl font-bold ${scoreColor(r.semantic_strategy.avg_strategy_score)}`}>
+                  {r.semantic_strategy.avg_strategy_score}/100
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="space-y-3">
