@@ -32,7 +32,13 @@ class Crawler:
         self.visited_urls: Set[str] = set()
         self.url_queue: List[Tuple[str, int, Optional[str], int, bool]] = []  # (url, depth, source_url, nav_score, is_navigation)
         self.start_time = time.time()
-        self.pages_crawled = 0
+        self.pages_crawled = 0  # pages FETCHED + processed (drives the crawl loop)
+        # Pages actually PERSISTED to the DB vs. failed inserts. pages_crawled
+        # counts fetches, so a DB-save failure (e.g. a missing column) silently
+        # produced a "completed" crawl with 0 viewable pages. The worker uses
+        # these to mark the crawl failed/degraded instead of falsely complete.
+        self.pages_saved = 0
+        self.pages_save_failed = 0
         self.client = httpx.AsyncClient(
             follow_redirects=True,
             max_redirects=10,
@@ -315,6 +321,7 @@ class Crawler:
             is_navigation: True if this page was linked from main navigation
             depth: Crawl depth (0 = starting URL, 1 = directly linked, etc.)
         """
+        saved = False  # did the page row itself persist? (gates failure counting)
         try:
             # Use actual SEO metadata if available, otherwise use defaults
             if seo_metadata:
@@ -366,13 +373,24 @@ class Crawler:
             if hasattr(result, "error") and result.error:
                 logger.error(f"Error saving page to database: {result.error}")
             else:
+                saved = True
                 logger.info(f"Saved page {page.url} to database with title: {title[:50]}")
+
+            if saved:
+                self.pages_saved += 1
+            else:
+                self.pages_save_failed += 1
 
             # Save SEO metadata to separate table if available
             if seo_metadata:
                 await self._save_seo_metadata_to_db(seo_metadata)
 
         except Exception as e:
+            # Only count a page-save failure if the page row itself never
+            # persisted. A later SEO-metadata error must not double-count a page
+            # that was already saved above.
+            if not saved:
+                self.pages_save_failed += 1
             logger.error(f"Error saving page to database: {e}", exc_info=True)
 
     def _calculate_seo_score_from_metadata(self, seo_metadata: SEOMetadata) -> int:
