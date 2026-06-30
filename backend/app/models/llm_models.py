@@ -336,7 +336,7 @@ class StrategicRecommendation(BaseModel):
     """A strategic recommendation — must connect multiple findings into a bigger picture"""
     title: str = Field(..., description="A strategic insight that names a specific URL, page type, or number and connects 2+ findings, e.g. 'Your conversion page (/consultation) has the weakest SEO on the site'. NEVER a generic category like 'Improve SEO', 'Address core SEO foundations', or 'Strengthen technical SEO'.")
     description: str = Field(..., description="Connect dots: which findings combine to create a bigger problem or opportunity? Reference URLs and numbers. What would a $500/hr consultant say that isn't obvious from the data alone?")
-    expected_impact: str = Field(..., description="Specific impact, e.g. 'Reclaiming SERP snippet control on 5 pages could improve CTR by 15-30%'. NOT 'improved visibility'.")
+    expected_impact: str = Field(..., description="The concrete outcome, tied to the specific finding — NO invented statistics. NEVER fabricate a percentage or dollar figure (no 'increases conversions by 20-30%', no 'boosts CTR by 15%') — you have no data to support a number, and a made-up figure destroys credibility. State WHAT improves and WHY, naming the affected pages: GOOD: 'Reclaims control of the Google search snippet on your 5 conversion pages, so visitors see your wording instead of whatever Google guesses.' BAD: 'Could improve CTR by 15-30%.'")
     effort_estimate: str = Field(..., description="e.g. '30 minutes to update all 5 meta descriptions', '2 hours for title rewrite + testing'")
     timeline: str
 
@@ -344,14 +344,19 @@ class StrategicRecommendation(BaseModel):
 class ExecutiveSummary(BaseModel):
     """Executive-level site analysis summary"""
     # Overview
+    # NOTE: all five scores below are OVERRIDDEN by the audit engine's
+    # deterministic scorer after generation (see analysis.compute_health_scores).
+    # Provide a reasonable estimate, but do not anchor your narrative to an exact
+    # score and NEVER cite a score the dashboard doesn't show (there is no
+    # "strategic score" — do not invent one).
     site_health_score: int = Field(..., ge=0, le=100)
     one_line_summary: str = Field(
         ...,
         description="One sentence summary of site health",
         max_length=200
     )
-    
-    # Scores breakdown
+
+    # Scores breakdown (engine-computed; see note above)
     technical_seo_score: int = Field(..., ge=0, le=100)
     content_quality_score: int = Field(..., ge=0, le=100)
     user_experience_score: int = Field(..., ge=0, le=100)

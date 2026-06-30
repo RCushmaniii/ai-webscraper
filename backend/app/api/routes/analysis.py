@@ -32,6 +32,62 @@ router = APIRouter(prefix="/analysis", tags=["analysis"])
 FREE_REPORT_LIMIT = 2
 
 
+def compute_health_scores(summary_stats: Dict[str, Any], site_data: Dict[str, Any]) -> Dict[str, int]:
+    """Deterministic, granular site-health scoring (granular & absolute).
+
+    Scores are EARNED from measured signals, never LLM-generated. The LLM used
+    to self-assess these and defaulted to a meaningless 100/100/100/100 on any
+    decent site; we now compute them in code and override its values, so the
+    numbers actually move with real quality. A genuinely flawless site can still
+    reach 100, but any real gap deducts proportionally to how widespread it is.
+
+    Inputs are the same Python-computed metrics already shown in the dashboard
+    (pass rates, broken links, alt coverage, HTTP errors) — nothing invented.
+    """
+    s = summary_stats or {}
+    total_pages = max(int(site_data.get("total_pages", 0) or 0), 1)
+    total_images = int(site_data.get("total_images", 0) or 0)
+    images_missing_alt = int(site_data.get("images_missing_alt", 0) or 0)
+    broken_links = int(site_data.get("broken_links", 0) or 0)
+    status = site_data.get("status_code_summary", {}) or {}
+    error_pages = int(status.get("4xx", 0) or 0) + int(status.get("5xx", 0) or 0)
+
+    # Pass rates (0-100), already computed upstream.
+    title = float(s.get("title_pass_rate", 0) or 0)
+    meta = float(s.get("meta_pass_rate", 0) or 0)
+    h1 = float(s.get("h1_pass_rate", 0) or 0)
+    content = float(s.get("content_pass_rate", 0) or 0)
+    perf = float(s.get("performance_pass_rate", 0) or 0)
+    avg_page = float(s.get("avg_page_score", 0) or 0)
+
+    # Prevalence-scaled integrity signals (as 0-100 "health" values).
+    broken_health = 100.0 - min(broken_links / total_pages, 1.0) * 100.0
+    error_health = 100.0 - min(error_pages / total_pages, 1.0) * 100.0
+    alt_coverage = 100.0 if total_images == 0 else round((total_images - images_missing_alt) / total_images * 100.0)
+
+    def clamp(x: float) -> int:
+        return int(max(0, min(100, round(x))))
+
+    # Technical SEO — tag hygiene + crawl integrity.
+    technical = clamp(0.35 * title + 0.30 * meta + 0.20 * h1 + 0.15 * min(broken_health, error_health))
+    # Content quality — depth + overall per-page quality.
+    content_quality = clamp(0.60 * content + 0.40 * avg_page)
+    # User experience — speed + working links.
+    user_experience = clamp(0.70 * perf + 0.30 * broken_health)
+    # Trust signals — accessible images, snippet control, clean responses.
+    trust = clamp(0.45 * alt_coverage + 0.35 * meta + 0.20 * error_health)
+    # Overall — technical-weighted blend of the four pillars.
+    site_health = clamp(0.35 * technical + 0.25 * content_quality + 0.20 * user_experience + 0.20 * trust)
+
+    return {
+        "technical_seo": technical,
+        "content_quality": content_quality,
+        "user_experience": user_experience,
+        "trust_signals": trust,
+        "site_health": site_health,
+    }
+
+
 # =========================================
 # Request/Response Models
 # =========================================
@@ -1340,6 +1396,17 @@ async def generate_crawl_report(
         if not semantic_strategy_results:
             llm_service = LLMService(crawl_id=crawl_id)
         executive_summary = await llm_service.generate_executive_summary(site_data)
+
+        # Override the LLM's self-assessed scores with deterministic, earned
+        # values. The model narrates; the audit engine scores. This kills the
+        # meaningless 100/100/100/100 gloss and makes the numbers move with real
+        # quality (granular & absolute). See compute_health_scores().
+        computed_scores = compute_health_scores(summary_stats, site_data)
+        executive_summary.technical_seo_score = computed_scores["technical_seo"]
+        executive_summary.content_quality_score = computed_scores["content_quality"]
+        executive_summary.user_experience_score = computed_scores["user_experience"]
+        executive_summary.trust_signals_score = computed_scores["trust_signals"]
+        executive_summary.site_health_score = computed_scores["site_health"]
 
         # =============================================
         # PHASE 4: BUILD COMPREHENSIVE REPORT

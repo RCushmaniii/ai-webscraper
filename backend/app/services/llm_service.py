@@ -660,6 +660,13 @@ Create a compelling meta description that:
 
 The data analysis is ALREADY DONE — I'm giving you the computed findings below. Your job is to NARRATE: tell the client what these numbers mean for their business, what patterns you see, and what they should prioritize.
 
+=== EVIDENCE-BOUND RULE (non-negotiable — read first) ===
+You may ONLY state facts and numbers that appear in the data below. This is an audit; fabrication destroys its credibility.
+- NEVER invent statistics. No "increases conversions by 20-30%", no "improves CTR by 15%", no "10-15% more inquiries". You have NO data to support any such figure. Describe impact in plain words instead ("gives you control of how this page looks in Google results"), never a made-up number.
+- NEVER cite a metric or score that isn't shown below. The only scores that exist are the page scores and pass rates given here — there is NO "strategic score", "engagement score", or any other. Do not invent one.
+- The four pillar scores (Technical SEO / Content / UX / Trust) are computed by our engine AFTER you write this, so do not state exact score values in your prose — refer to strengths and gaps qualitatively, backed by the pass rates and findings below.
+- Every number you write must be traceable to a line in the data below. If you don't have a number, don't use one.
+
 === SITE: {site_data.get('base_url', 'Unknown')} ===
 
 SCORECARD (computed by our audit engine):
@@ -697,7 +704,9 @@ The client can already see the raw numbers and per-page scores in the dashboard.
 2. QUICK WINS — the low-hanging fruit: the easiest, fastest, highest-impact fixes a non-technical owner can do in minutes. Each is a copy-paste fix with the exact current and suggested values. Start each one with an action verb.
    BAD: "Extend title on /consultation to recommended length."
    GOOD: "On /consultation, change 'Free Call | CushLabs.ai' (23 chars) to 'Free AI Consultation — Talk to a CushLabs Expert' (49 chars). This targets 'AI consultation' as a keyword and fills the SERP snippet."
-   DIVERSIFY — this is mandatory. Do NOT fill every slot with the same kind of fix. If many pages share one issue (e.g. 7 pages missing a meta description), give ONE representative quick win and append "(plus N more pages with the same fix)", then spend the remaining slots on DIFFERENT win types — a missing H1, a too-short title, an oversized image, a slow page. Five near-identical fixes is a FAIL; five different easy wins is the goal. Lead with the single easiest, highest-impact fix on the site.
+   EVIDENCE-BOUND: A quick win must correspond to a SPECIFIC MEASURED issue in the findings/pass rates above (a too-short title, a missing/over-length meta, a missing H1, thin content, an oversized image, a slow page). Do NOT invent generic engagement advice ("add a call-to-action", "add a button") as a quick win — those are unmeasured opinions and belong in STRATEGIC RECOMMENDATIONS, not here.
+   FEWER IS FINE: Return only as many quick wins as there are genuinely distinct, measured fixes. A clean site may have ONE or ZERO — that is a correct, honest answer. NEVER pad to fill five slots; padding with near-identical or invented fixes is a FAIL.
+   DIVERSIFY: When you do have several, don't fill every slot with the same kind of fix. If many pages share one issue (e.g. 7 pages missing a meta description), give ONE representative quick win and append "(plus N more pages with the same fix)", then spend remaining slots on DIFFERENT measured win types. Lead with the single easiest, highest-impact fix on the site.
 
 3. STRATEGIC RECOMMENDATIONS — the bigger-picture adjustments, in plain language a business owner understands. Each MUST connect TWO OR MORE specific findings into a single non-obvious insight, and its title MUST be a concrete claim about THIS site that names a URL, page type, or number. Aim for 2-4 sharp recommendations — never one vague catch-all.
    BAD title: "Standardize titles and meta descriptions for better SEO."
@@ -784,7 +793,7 @@ OTHER RULES:
 4. If a page's meta is already near the target range (e.g. 166 chars when target is max 160), suggest TRIMMING the existing text rather than rewriting entirely. Example: "On /services, trim the meta by removing 'than ever before' at the end — the first 155 chars already work."
 
 EDGE CASES:
-- If the site has ZERO issues (all pages score 100): Focus strengths on what they're doing right, give strategic growth recommendations instead of fixes, and note that the site is well-maintained.
+- If the site has ZERO measured issues (all pages score 100, all pass rates high): return an EMPTY quick_wins list — do NOT invent CTA/engagement "fixes" to fill it. Put genuine growth ideas in strategic_recommendations instead, focus strengths on what they're doing right, and say plainly that the site is well-maintained. An honest "no quick technical wins — here's where to grow next" beats five fabricated ones.
 - If the site has ALL critical issues: Don't soften the health score to be polite. A failing site should score below 50. Be honest — the client is paying for truth, not comfort.
 - If a page URL suggests it's a conversion page (/pricing, /contact, /consultation, /signup, /demo, /book, /schedule, /get-started): Flag it as high-priority even if the issue is technically "medium" — broken SEO on a conversion page has outsized business impact.
 
@@ -794,12 +803,14 @@ BANNED PHRASES (instant credibility kill):
 - "standardize" / "ensure consistency" / "align with best practices"
 - Generic strategic titles that name nothing specific: "Address core SEO foundations", "Strengthen technical SEO", "Improve SEO and UX", "Focus on fundamentals". Every strategic title must name a URL, page type, or number.
 - Any recommendation that doesn't reference a specific URL, number, or finding from above
+- ANY fabricated statistic: "increase conversions by 20-30%", "boost CTR by 15%", "10-15% more leads", "could 2x engagement". You have no data for these. Banned without exception — state the qualitative outcome instead.
+- Any reference to a "strategic score", "engagement score", or any metric not literally printed in the data above.
 
 ACCESSIBLE & ACTION-ORIENTED: Write for a smart but non-technical business owner. Use plain language (explain jargon like "meta description" in passing), tie every point to a business outcome they care about (more traffic, more trust, more conversions), and start every fix and recommendation with a clear action verb ("Add", "Rewrite", "Trim", "Compress", "Fix").
 
 You must reference SPECIFIC data from above. If a finding says "Meta description too long on /services: 166 chars" then your recommendation must say "/services" and "166 chars" — not "some pages have long descriptions."
 
-SCORING: Base the health score on the computed pass rates and page scores above, not your own assessment."""
+SCORING: Our audit engine computes and overrides all five scores deterministically from the pass rates and findings above — your job is the narrative, not the numbers. Do not contradict the data: if pass rates are low, do not call the site "well-optimized"; if they are high, acknowledge a genuinely strong foundation. Never state an exact score value in prose."""
 
         return await self._complete_structured(
             task=LLMTask.EXECUTIVE_SUMMARY,
