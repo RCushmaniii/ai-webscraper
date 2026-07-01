@@ -209,12 +209,13 @@ All authenticated routes use the `ProtectedRoute` wrapper:
 
 **Users have tier-based access**:
 
-| Tier | Crawl Limit | Access |
-|------|-------------|--------|
-| Free (`is_admin=false`) | 3 total crawls, 50 pages max | Basic features |
-| Admin (`is_admin=true`) | Unlimited | All features + user management |
+| Tier                    | Crawl Limit                  | Access                         |
+| ----------------------- | ---------------------------- | ------------------------------ |
+| Free (`is_admin=false`) | 3 total crawls, 50 pages max | Basic features                 |
+| Admin (`is_admin=true`) | Unlimited                    | All features + user management |
 
 **Implementation**:
+
 - `backend/app/api/routes/crawls.py` - `FREE_CRAWL_LIMIT = 3` and `FREE_MAX_PAGES = 50` constants
 - `/crawls/usage` endpoint returns current usage info
 - Frontend shows remaining crawls in CrawlsPage and CrawlNewPage
@@ -338,6 +339,7 @@ start.bat  # Starts frontend (port 3000) + backend (port 8000)
 **Cause**: Migration defines `html_storage_path`, crawler historically wrote `html_snapshot_path`. Production DB may have either or both.
 
 **Solution**: Always check BOTH column names when querying:
+
 ```python
 path = r.get("html_storage_path") or r.get("html_snapshot_path")
 ```
@@ -447,11 +449,15 @@ ai-webscraper/
 
 ### Deploy Backend
 
+**The box no longer builds the image.** CI (`.github/workflows/build-image.yml`) builds on every push to `main` that touches backend code and pushes to GHCR (`ghcr.io/rcushmaniii/ai-webscraper:latest`). The VPS just pulls. So the deploy flow is: merge to `main` → wait for the "Build & push image" workflow to go green → pull + recreate on the box:
+
 ```bash
-ssh deploy@178.156.192.117 'cd ~/apps/ai-webscraper && git pull && cd ~/apps/cushlabs-prod-server && docker compose up -d --build webscraper'
+ssh deploy@178.156.192.117 'cd ~/apps/cushlabs-prod-server && docker compose pull webscraper && docker compose up -d webscraper'
 ```
 
-Code changes require `--build`. Config-only changes (env vars) just need `docker compose restart webscraper`.
+- **Code changes:** merge to main, wait for the GHCR image build, then run the command above.
+- **Config-only changes (env vars in `~/apps/cushlabs-prod-server/.env.webscraper`):** no image pull needed, but you must **recreate** (not just `restart`) so the new `env_file` is read: `docker compose up -d webscraper`.
+- Do NOT use `--build` — the base image is ~2GB and CI already built it; building on the 4GB box is slow and unnecessary.
 
 ### Deploy Frontend
 
@@ -480,15 +486,15 @@ ssh deploy@178.156.192.117 'docker logs -f webscraper'
 
 See `backend/.env.example` for the full list. Key vars:
 
-| Variable | Description |
-|----------|-------------|
-| `SUPABASE_URL` | Supabase project URL |
-| `SUPABASE_KEY` | Supabase anon key |
-| `SUPABASE_SERVICE_ROLE_KEY` | Service role key (admin ops) |
-| `OPENAI_API_KEY` | For LLM-powered analysis |
-| `CORS_ORIGINS` | Allowed origins (set to `https://scraper.cushlabs.ai`) |
-| `ENVIRONMENT` | `production` |
-| `PORT` | `10000` (set in compose, not .env) |
+| Variable                    | Description                                            |
+| --------------------------- | ------------------------------------------------------ |
+| `SUPABASE_URL`              | Supabase project URL                                   |
+| `SUPABASE_KEY`              | Supabase anon key                                      |
+| `SUPABASE_SERVICE_ROLE_KEY` | Service role key (admin ops)                           |
+| `OPENAI_API_KEY`            | For LLM-powered analysis                               |
+| `CORS_ORIGINS`              | Allowed origins (set to `https://scraper.cushlabs.ai`) |
+| `ENVIRONMENT`               | `production`                                           |
+| `PORT`                      | `10000` (set in compose, not .env)                     |
 
 ### Resource Notes
 
@@ -645,7 +651,6 @@ https://deepwiki.com/RCushmaniii/ai-resume-tailor
 
 **Last Updated**: March 28, 2026
 **Maintained By**: Claude (Anthropic) + CushLabs Team
-
 
 ## Session Log
 

@@ -4,6 +4,37 @@ Entries are newest-first. Each entry documents one Claude Code working session.
 
 ---
 
+## Session: 2026-07-01 (rate limiting activated — Upstash Redis)
+
+### Accomplished
+
+- **Found the rate limiter was completely inert in production** (PR #91). `rate_limit_middleware` keyed off `request.state.user_id`, which nothing ever set (auth lives in `contextvars`), so every request bypassed it. The Redis limiter was also a `NotImplementedError` stub → the API had no rate limiting at all.
+- **Implemented `UpstashRateLimiter`** (REST, async) with a fixed-window `INCR`+`EXPIRE` counter — distributed and restart-safe. Fixed the middleware to identify callers from the JWT `sub` claim (falls back to `X-Forwarded-For` IP behind Caddy), scoped to mutating `/api/v1` endpoints only. Fails **open** on limiter errors; feature-flagged off until Upstash env vars present.
+- **Provisioned Upstash** (Regional, us-east-1 to match the Virginia VPS). Pushed `UPSTASH_REDIS_REST_URL`/`TOKEN` into `~/apps/cushlabs-prod-server/.env.webscraper` via a `node --env-file` script (values over SSH stdin, never in chat) after copy-paste quoting mangled them twice.
+- **Deployed and verified live** on `scraper.cushlabs.ai`: 13 rapid POSTs → 10×`403` then `429` (exact 10/min boundary); 13 GETs → all `200` (reads never throttled). Confirms wiring fixed, Upstash counting, targeting correct.
+- **Corrected stale deploy docs in `CLAUDE.md`** — the box no longer builds (`--build`); CI builds → GHCR, box `docker compose pull`. This drift caused most of the friction this session.
+
+### Decisions Made
+
+- Upstash over local Redis container: user chose it for fleet consistency + zero ops/RAM on the 4GB VPS (accepted the per-request REST round-trip, mitigated by only limiting writes).
+- Scope to writes only (no GET throttling): avoids false 429s on SPA navigation and skips a remote round-trip on read traffic.
+- Fail-open: a limiter/Upstash outage degrades to "allow", never a lockout.
+
+### Immediate Next Steps
+
+- [ ] Implement real `get_tier_from_user()` (still hardcoded FREE) when billing/Stripe lands — PRO/ENTERPRISE limits already defined in `rate_limits.py`.
+
+### Technical Debt
+
+- Monthly-crawl / concurrent-crawl limit helpers in `rate_limiter.py` are still stubbed (`current_count = 0`); monthly cap is DB-enforced via `FREE_CRAWL_LIMIT` for now.
+- The secrets-guard hook repeatedly blocked benign `echo`/`git check-ignore` lines that merely mentioned `.env.webscraper`; workable but noisy.
+
+### Open Questions / Blockers
+
+- None.
+
+---
+
 ## Session: 2026-06-30 (PM — outage recovery + report authenticity)
 
 ### Accomplished
