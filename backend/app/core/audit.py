@@ -14,9 +14,28 @@ import logging
 from typing import Optional
 from uuid import UUID
 
-from app.db.supabase import supabase_client
+from supabase import create_client, Client
+
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+
+# The shared app.db.supabase singleton is built with the ANON key, so its
+# inserts are subject to RLS — which is why audit writes were failing with
+# "new row violates row-level security policy for table audit_log" (42501).
+# Audit logging must bypass RLS, so use a dedicated service-role client
+# (same pattern as worker.py / storage.py). Lazily created so importing this
+# module never requires the service key to be present (e.g. in tests).
+_service_client: Optional[Client] = None
+
+
+def _get_service_client() -> Client:
+    global _service_client
+    if _service_client is None:
+        _service_client = create_client(
+            settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY
+        )
+    return _service_client
 
 
 def log_audit_event(
@@ -52,7 +71,7 @@ def log_audit_event(
             row["ip_address"] = ip_address
 
         # Use service-role client to bypass RLS
-        supabase_client.table("audit_log").insert(row).execute()
+        _get_service_client().table("audit_log").insert(row).execute()
         logger.debug(f"Audit log: {action} on {entity_type}/{entity_id} by {user_id}")
     except Exception as e:
         # Audit logging should never break the main operation

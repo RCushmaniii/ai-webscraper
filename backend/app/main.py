@@ -11,12 +11,15 @@ import sentry_sdk
 
 from app.api.api import api_router
 from app.core.config import settings
+from app.core.sentry_filtering import before_send, is_transient_network_error
 
 sentry_sdk.init(
     dsn=os.environ.get("SENTRY_DSN"),
     send_default_pii=True,
     environment=os.environ.get("ENVIRONMENT", "development"),
     traces_sample_rate=0.2,
+    # Drop transient network/DNS blips so the error stream stays actionable.
+    before_send=before_send,
 )
 from app.services.crawl_monitor import check_and_fix_stale_crawls
 from app.services.storage import cleanup_old_storage
@@ -33,33 +36,71 @@ logger = logging.getLogger(__name__)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
 
-# Background task for monitoring stale crawls
+# Escalate to a single Sentry event only after this many consecutive
+# transient (network/DNS) failures — i.e. treat it as a real outage.
+_OUTAGE_ALERT_AFTER = 3
+
+
+async def _guarded_periodic(name: str, work, interval_seconds: int):
+    """
+    Run ``work()`` every ``interval_seconds`` in a resilient loop.
+
+    Failure handling is tuned to keep Sentry precise:
+    - Transient network/DNS failures are logged at WARNING (breadcrumb only,
+      never an event) so a brief blip doesn't create noise. If they persist
+      for _OUTAGE_ALERT_AFTER consecutive runs, a single plain-text
+      logger.error fires ONE Sentry event (it carries no exc_info, so the
+      before_send filter lets it through), and recovery is logged.
+    - Any non-transient exception is a real bug and is reported immediately
+      with a traceback.
+    """
+    consecutive_transient = 0
+    outage_reported = False
+    while True:
+        try:
+            work()
+            if consecutive_transient or outage_reported:
+                logger.info(
+                    f"{name}: recovered after {consecutive_transient} "
+                    f"transient failure(s)"
+                )
+            consecutive_transient = 0
+            outage_reported = False
+        except Exception as e:
+            if is_transient_network_error(e):
+                consecutive_transient += 1
+                logger.warning(
+                    f"{name}: transient network failure "
+                    f"#{consecutive_transient} (not an app bug): {e}"
+                )
+                if consecutive_transient >= _OUTAGE_ALERT_AFTER and not outage_reported:
+                    logger.error(
+                        f"{name} has failed {consecutive_transient} consecutive "
+                        f"times due to network/DNS errors — likely an outage."
+                    )
+                    outage_reported = True
+            else:
+                # Real application error — report with full traceback.
+                logger.exception(f"{name}: unexpected error")
+
+        await asyncio.sleep(interval_seconds)
+
+
+def _storage_cleanup_once():
+    """Run one storage-cleanup pass and log freed space when non-trivial."""
+    result = cleanup_old_storage(max_age_days=90)
+    if result["crawls_cleaned"] > 0:
+        logger.info(f"Storage cleanup freed {result['bytes_freed'] / 1024:.1f} KB")
+
+
+# Background task for monitoring stale crawls (every 10 minutes)
 async def monitor_stale_crawls():
-    """Background task that runs every 10 minutes to check for stale crawls"""
-    while True:
-        try:
-            logger.info("Running stale crawl check...")
-            check_and_fix_stale_crawls()
-            logger.info("Stale crawl check completed")
-        except Exception as e:
-            logger.error(f"Error in stale crawl monitor: {e}")
-        
-        # Wait 10 minutes before next check
-        await asyncio.sleep(600)
+    await _guarded_periodic("Stale crawl monitor", check_and_fix_stale_crawls, 600)
 
 
+# Background task to purge storage older than 90 days (once daily)
 async def daily_storage_cleanup():
-    """Background task that runs once daily to purge storage older than 90 days"""
-    while True:
-        try:
-            result = cleanup_old_storage(max_age_days=90)
-            if result["crawls_cleaned"] > 0:
-                logger.info(f"Storage cleanup freed {result['bytes_freed'] / 1024:.1f} KB")
-        except Exception as e:
-            logger.error(f"Error in storage cleanup: {e}")
-
-        # Run once every 24 hours
-        await asyncio.sleep(86400)
+    await _guarded_periodic("Storage cleanup", _storage_cleanup_once, 86400)
 
 
 @asynccontextmanager
@@ -70,7 +111,10 @@ async def lifespan(app: FastAPI):
     try:
         check_and_fix_stale_crawls()
     except Exception as e:
-        logger.error(f"Error in initial stale crawl check: {e}")
+        if is_transient_network_error(e):
+            logger.warning(f"Initial stale crawl check skipped (transient network): {e}")
+        else:
+            logger.exception("Initial stale crawl check failed")
     
     # Start background monitoring task
     task = asyncio.create_task(monitor_stale_crawls())
