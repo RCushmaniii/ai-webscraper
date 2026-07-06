@@ -468,8 +468,23 @@ async def delete_crawl(
         
         # Delete the crawl and related data
         # Note: In a real implementation with proper foreign keys, this would cascade
-        tables = ["pages", "links", "seo_metadata", "issues", "summaries"]
-        
+
+        # seo_metadata is keyed by page_id (not crawl_id), so it must be
+        # deleted via the crawl's pages BEFORE the pages themselves are removed.
+        # Deleting it by crawl_id previously raised 42703 ("column
+        # seo_metadata.crawl_id does not exist") on every crawl deletion.
+        try:
+            page_rows = auth_client.table("pages").select("id").eq("crawl_id", str(crawl_id)).execute()
+            page_ids = [p["id"] for p in (page_rows.data or [])]
+            if page_ids:
+                auth_client.table("seo_metadata").delete().in_("page_id", page_ids).execute()
+                logger.info(f"Deleted seo_metadata for {len(page_ids)} pages")
+        except Exception as seo_error:
+            logger.warning(f"Non-fatal: could not delete seo_metadata: {seo_error}")
+
+        # Remaining child tables are keyed by crawl_id.
+        tables = ["pages", "links", "issues", "summaries"]
+
         for table in tables:
             try:
                 logger.info(f"Deleting from table: {table}")
