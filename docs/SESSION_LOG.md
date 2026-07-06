@@ -4,6 +4,39 @@ Entries are newest-first. Each entry documents one Claude Code working session.
 
 ---
 
+## Session: 2026-07-06 (Sentry wiring verified + noise reduction)
+
+### Accomplished
+
+- **Verified both Sentry projects end-to-end.** Backend (`backend-cushlabs-ai-webscraper`, id `4511164689022976`): fired a `capture_message` from the container → landed. Frontend (`frontent-cushlabs-ai-scraper`, id `4511164603170816`): drove the live site with Playwright, threw an uncaught error → SDK POSTed to the correct project, HTTP 200, no CSP block. Both DSNs confirmed correct in local `.env`, prod `.env.webscraper`, and the deployed bundle.
+- **Clarified `SENTRY_SECURITY_TOKEN` is unused** — it's Sentry's legacy CSP token, not the DSN; error reporting was already correctly wired via DSN.
+- **Shipped PR #92 (merged, deployed, verified live)** — Sentry noise reduction + two bug fixes:
+  - `before_send` filter drops transient network/DNS errors; background loops rewritten (`_guarded_periodic`) so blips log at WARNING and a sustained outage emits exactly ONE event (fixes the 851-event `Name or service not known` flood, `BACKEND-…-4`).
+  - Audit writes now use a service-role client instead of the anon-key singleton (`audit.py`), fixing RLS `42501` (`BACKEND-…-9`) — verified live with a self-cleaning insert.
+  - Crawl deletion deletes `seo_metadata` by `page_id` not `crawl_id`, fixing `42703` (`BACKEND-…-A`) — verified live.
+  - New `tests/test_sentry_filtering.py` (8 tests); full suite 111 passed.
+- **Enabled Auto-Resolve (30d) on both projects and cleared stale issues** (Robert, dashboard).
+
+### Decisions Made
+
+- Filter transient net/DNS errors rather than tune sample rates: the noise was error-events from `logger.error` in loops, not tracing volume.
+- Sustained outages still surface (1 gated event, no `exc_info` so it passes `before_send`) — infra visibility kept without per-loop spam.
+
+### Immediate Next Steps
+
+- [ ] Rotate or remove the dead `SENTRY_AUTH_TOKEN` in `backend/.env`/`frontend/.env` (returns 401 "Invalid org token"; unused since the build uploads no source maps).
+- [ ] Fix pre-existing frontend TS error failing CI type-check: `frontend/src/pages/CrawlDetailPage.tsx:576` (`'desc'` vs `'asc'` comparison, no overlap).
+
+### Technical Debt
+
+- Connected Sentry MCP is scoped to `cushlabs-marketsignal`, not this app — can't query/resolve ai-webscraper issues via MCP; use the dashboard or a valid user auth token.
+
+### Open Questions / Blockers
+
+- None.
+
+---
+
 ## Session: 2026-07-01 (rate limiting activated — Upstash Redis)
 
 ### Accomplished
