@@ -25,7 +25,7 @@ upstash-redis>=1.2.0,<2
 
 # File handling and utilities
 aiofiles==23.2.1
-Pillow==12.2.0  # security: critical (<10.2.0) + high + medium advisories; transitive via reportlab, no direct use
+Pillow==12.3.0  # security: critical (<10.2.0) + high + medium advisories; transitive via reportlab, no direct use
 reportlab>=4.0.0
 
 # JWT and authentication
