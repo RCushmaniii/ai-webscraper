@@ -14,6 +14,13 @@ on:
     - cron: "17 7 */2 * *" # every 2 days at 07:17 UTC (well inside the ~7-day window)
   workflow_dispatch: {} # allow manual runs from the Actions tab
 
+concurrency:
+  # A superseded push should stop costing money. Without this, pushing twice to
+  # an open PR leaves the first run burning minutes to completion for a commit
+  # nobody is waiting on any more.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   ping:
     runs-on: ubuntu-latest

@@ -6,10 +6,20 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  # A superseded push should stop costing money. Without this, pushing twice to
+  # an open PR leaves the first run burning minutes to completion for a commit
+  # nobody is waiting on any more.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   backend-tests:
     name: Backend Tests
     runs-on: ubuntu-latest
+    # Default is 360 minutes. One hung job would eat a fifth of the
+    # monthly allowance before anyone noticed.
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
       - name: Set up Python 3.12
@@ -34,6 +44,9 @@ jobs:
   frontend-typecheck:
     name: Frontend Type Check
     runs-on: ubuntu-latest
+    # Default is 360 minutes. One hung job would eat a fifth of the
+    # monthly allowance before anyone noticed.
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
       - name: Set up Node.js 18
