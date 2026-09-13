@@ -5,7 +5,7 @@
 portfolio_enabled: true
 portfolio_priority: 18
 portfolio_featured: false
-portfolio_last_reviewed: "2026-06-29"
+portfolio_last_reviewed: "2026-09-13"
 
 title: "AI-Powered Web Scraper & SEO Analyzer"
 tagline: "Crawl websites, detect SEO issues, and generate AI-powered analysis reports"
@@ -56,6 +56,16 @@ demo_video_poster: "/images/portfolio/ai-webscraper-brief-poster.webp"
 live_url: "https://scraper.cushlabs.ai"
 demo_url: "https://scraper.cushlabs.ai"
 case_study_url: ""
+
+problem: "Organizations need to understand their website health — broken links, missing SEO metadata, thin content, accessibility gaps — but enterprise tools cost thousands per year and manual audits do not scale."
+
+solution: "Automates the crawl, the analysis and the report as one pipeline, then adds AI-written insight on top, at a fraction of what the enterprise suites charge. Point it at a domain and it returns the issues, grouped and prioritized, with an executive summary a non-technical owner can act on."
+
+metrics:
+  - "1,150+ pages crawled and analyzed per session, sub-2s per-page processing"
+  - "11 SEO issue categories detected automatically across every crawl"
+  - "GPT-4 reports with executive summaries and actionable recommendations"
+  - "Tier-based access system ready for SaaS monetization"
 
 problem_solved: |
   Organizations need to understand their website health — broken links, missing SEO metadata,
