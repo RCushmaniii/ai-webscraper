@@ -85,10 +85,6 @@ const CrawlDetailPage: React.FC = () => {
   const [linkSortDir, setLinkSortDir] = useState<'asc' | 'desc'>('asc');
   const [imageSort, setImageSort] = useState<string>('has_alt');
   const [imageSortDir, setImageSortDir] = useState<'asc' | 'desc'>('asc');
-  // eslint-disable-next-line prefer-const
-  let issueSort: string = 'severity';
-  // eslint-disable-next-line prefer-const
-  let issueSortDir: 'asc' | 'desc' = 'desc';
   const [issueSeverityFilter, setIssueSeverityFilter] = useState<'all' | 'critical' | 'high' | 'medium' | 'low'>('all');
   const [expandedIssueCards, setExpandedIssueCards] = useState<Set<string>>(new Set());
   const [lightboxImage, setLightboxImage] = useState<Image | null>(null);
@@ -567,15 +563,10 @@ const CrawlDetailPage: React.FC = () => {
       filtered = filtered.filter(issue => issue.severity === issueSeverityFilter);
     }
 
-    // If no sort column selected, return filtered without sorting
-    if (!issueSort) {
-      return filtered;
-    }
-
-    const sorted = [...filtered];
-    const multiplier = issueSortDir === 'asc' ? 1 : -1;
-
-    // Severity order for sorting
+    // Issues always sort by severity, most severe first. The column and
+    // direction controls this table once had were removed; the generic sorter
+    // they drove is removed with them rather than left as unreachable branches
+    // driven by two constants.
     const severityOrder: { [key: string]: number } = {
       'critical': 4,
       'high': 3,
@@ -583,19 +574,10 @@ const CrawlDetailPage: React.FC = () => {
       'low': 1
     };
 
-    switch (issueSort) {
-      case 'severity':
-        return sorted.sort((a, b) => multiplier * ((severityOrder[a.severity] || 0) - (severityOrder[b.severity] || 0)));
-      case 'type':
-        return sorted.sort((a, b) => multiplier * a.type.localeCompare(b.type));
-      case 'message':
-        return sorted.sort((a, b) => multiplier * a.message.localeCompare(b.message));
-      case 'context':
-        return sorted.sort((a, b) => multiplier * (a.context || '').localeCompare(b.context || ''));
-      default:
-        return sorted;
-    }
-  }, [issues, issueSeverityFilter, issueSort, issueSortDir]);
+    return [...filtered].sort(
+      (a, b) => (severityOrder[b.severity] || 0) - (severityOrder[a.severity] || 0)
+    );
+  }, [issues, issueSeverityFilter]);
 
   const SortIcon = ({ column, currentSort, currentDir }: { column: string; currentSort: string; currentDir: 'asc' | 'desc' }) => {
     if (column !== currentSort) return null;
