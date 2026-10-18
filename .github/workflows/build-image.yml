@@ -1,9 +1,9 @@
 name: Build & push image
 
 # Builds the production image in CI and pushes it to GHCR so the shared Hetzner
-# box pulls a prebuilt image instead of building on-box (the Playwright base is
-# ~2 GB — far better pulled than built on the box). The deployable service lives
-# in ./backend (FastAPI + Playwright). See cushlabs-prod-server for the compose
+# box pulls a prebuilt image instead of building on-box. (The image was a ~4 GB
+# Playwright base until 2026-10-18; it is python:3.12-slim now.) The deployable
+# service lives in ./backend (FastAPI). See cushlabs-prod-server for the compose
 # that consumes it. Deploy: docker compose pull webscraper &&
 # docker compose up -d webscraper.
 
@@ -59,3 +59,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          # Stamped into APP_VERSION so /api/v1/health/ reports what is
+          # running; the production smoke test compares it against main.
+          build-args: |
+            GIT_SHA=${{ github.sha }}

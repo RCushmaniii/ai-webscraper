@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException
 
+from app.core.config import settings
 from app.db.supabase import supabase_client
 
 router = APIRouter()
@@ -7,7 +8,20 @@ router = APIRouter()
 
 @router.get("/")
 async def health_check():
-    return {"status": "ok", "message": "API is running"}
+    """
+    Liveness probe. Used by the compose healthcheck, the production smoke test
+    (.github/workflows/production-smoke.yml) and the deploy scripts.
+
+    `version` is the git SHA baked into the image at build time (Dockerfile
+    ARG GIT_SHA → APP_VERSION). The smoke test compares it with `main` to warn
+    when a merge has not been pulled onto the VPS yet.
+    """
+    return {
+        "status": "ok",
+        "message": "API is running",
+        "version": settings.APP_VERSION,
+        "environment": settings.ENVIRONMENT,
+    }
 
 
 @router.get("/supabase")

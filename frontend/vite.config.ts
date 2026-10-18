@@ -27,5 +27,14 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: "./src/setupTests.ts",
     css: true,
+    // src/lib/supabase.ts throws at import time without these. Locally they
+    // come from the developer's env file; CI has none, so the first run of
+    // `npm test` in CI (2026-10-18) died with "supabaseUrl is required".
+    // Placeholders keep the suite hermetic -- every test mocks the client.
+    env: {
+      REACT_APP_SUPABASE_URL: "https://placeholder.supabase.co",
+      REACT_APP_SUPABASE_ANON_KEY: "placeholder",
+      REACT_APP_API_URL: "http://localhost:8000/api/v1",
+    },
   },
 });

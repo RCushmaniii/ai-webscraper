@@ -42,8 +42,8 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
       button: 'bg-orange-600 hover:bg-orange-700 text-white',
     },
     info: {
-      icon: 'bg-blue-100 text-blue-600',
-      button: 'bg-blue-600 hover:bg-blue-700 text-white',
+      icon: 'bg-secondary-100 text-secondary-700',
+      button: 'bg-secondary-500 hover:bg-secondary-600 text-white',
     },
   };
 

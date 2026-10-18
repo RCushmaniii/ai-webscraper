@@ -1,5 +1,9 @@
 name: CI
 
+# Pre-publish gate. Nothing merges to main unless the backend suite (unit +
+# HTTP smoke via TestClient), the frontend unit tests, the type check and the
+# production build all pass. The post-publish gate is production-smoke.yml.
+
 on:
   push:
     branches: [main]
@@ -25,8 +29,8 @@ jobs:
       - name: Set up Python 3.12
         uses: actions/setup-python@v6
         with:
-          python-version: '3.12'
-          cache: 'pip'
+          python-version: "3.12"
+          cache: "pip"
           cache-dependency-path: backend/requirements.txt
       - name: Install dependencies
         run: |
@@ -41,8 +45,8 @@ jobs:
           SUPABASE_KEY: placeholder
           SUPABASE_SERVICE_ROLE_KEY: placeholder
 
-  frontend-typecheck:
-    name: Frontend Type Check
+  frontend:
+    name: Frontend Tests, Type Check & Build
     runs-on: ubuntu-latest
     # Default is 360 minutes. One hung job would eat a fifth of the
     # monthly allowance before anyone noticed.
@@ -52,8 +56,8 @@ jobs:
       - name: Set up Node.js 22
         uses: actions/setup-node@v6
         with:
-          node-version: '22'
-          cache: 'npm'
+          node-version: "22"
+          cache: "npm"
           cache-dependency-path: frontend/package-lock.json
       - name: Install dependencies
         run: |
@@ -63,6 +67,11 @@ jobs:
         run: |
           cd frontend
           npx tsc --noEmit
+      - name: Unit tests
+        # 35 Vitest specs existed for months without ever running in CI.
+        run: |
+          cd frontend
+          npm test
       - name: Build
         run: |
           cd frontend
@@ -71,3 +80,4 @@ jobs:
           REACT_APP_API_URL: https://api.placeholder.com/api/v1
           REACT_APP_SUPABASE_URL: https://placeholder.supabase.co
           REACT_APP_SUPABASE_ANON_KEY: placeholder
+          VITE_APP_VERSION: ${{ github.sha }}

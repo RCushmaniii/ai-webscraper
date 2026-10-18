@@ -1,0 +1,44 @@
+name: Production smoke
+
+# Post-publish gate for https://scraper.cushlabs.ai. CI proves the code is
+# sound before merge; this proves the deployed system is actually serving.
+#
+# Runs twice a day and on demand. Each run is ~20 s, so the schedule costs
+# roughly 20 Actions-minutes a month. A failure here means production is
+# down or misconfigured — GitHub emails the repo owner on the first failure.
+#
+# The same checks run locally right after every deploy via
+# scripts/deploy-backend.sh and scripts/deploy-frontend.sh, which call
+# scripts/smoke-prod.sh directly.
+#
+# Version drift (main merged but the VPS has not pulled yet) is reported as a
+# warning annotation, not a failure: the pull is a deliberate manual step.
+
+on:
+  schedule:
+    - cron: "41 13 * * *" # 13:41 UTC = 07:41 Guadalajara
+    - cron: "41 1 * * *" # 01:41 UTC = 19:41 Guadalajara
+  workflow_dispatch: {}
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Only the smoke script is needed, but a checkout also gives us the
+          # current main SHA for the drift comparison.
+          fetch-depth: 1
+      - name: Smoke test scraper.cushlabs.ai
+        env:
+          EXPECTED_VERSION: ${{ github.sha }}
+          DRIFT_IS_WARNING: "1"
+        run: bash scripts/smoke-prod.sh https://scraper.cushlabs.ai

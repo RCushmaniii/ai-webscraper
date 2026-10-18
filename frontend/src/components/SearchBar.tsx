@@ -79,7 +79,7 @@ export default function SearchBar({ crawlId, onResultsChange }: SearchBarProps) 
         </div>
         <input
           type="text"
-          className="block w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+          className="block w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-secondary-500 focus:border-secondary-500 bg-white"
           placeholder="Search pages, links, images..."
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -134,7 +134,7 @@ export default function SearchBar({ crawlId, onResultsChange }: SearchBarProps) 
                             setShowResults(false);
                           }}
                         >
-                          <div className="text-blue-600 hover:underline font-medium">
+                          <div className="text-secondary-700 hover:underline font-medium">
                             {page.title || 'Untitled'}
                           </div>
                           <p className="text-gray-500 text-xs truncate">{page.url}</p>

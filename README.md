@@ -7,9 +7,11 @@
 [![Version](https://img.shields.io/badge/version-1.3.0-blue?style=for-the-badge)](https://github.com/RCushmaniii/ai-webscraper)
 [![License](https://img.shields.io/badge/license-Proprietary-red?style=for-the-badge)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
-[![Python](https://img.shields.io/badge/Python-3.11+-blue?style=for-the-badge&logo=python)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/Python-3.12-blue?style=for-the-badge&logo=python)](https://www.python.org/)
+[![CI](https://github.com/RCushmaniii/ai-webscraper/actions/workflows/ci.yml/badge.svg)](https://github.com/RCushmaniii/ai-webscraper/actions/workflows/ci.yml)
+[![Production smoke](https://github.com/RCushmaniii/ai-webscraper/actions/workflows/production-smoke.yml/badge.svg)](https://github.com/RCushmaniii/ai-webscraper/actions/workflows/production-smoke.yml)
 
-[**Documentation**](docs/) · [**Report Bug**](https://github.com/RCushmaniii/ai-webscraper/issues) · [**API Docs**](http://localhost:8000/docs)
+[**Live app**](https://scraper.cushlabs.ai) · [**Documentation**](docs/) · [**Report Bug**](https://github.com/RCushmaniii/ai-webscraper/issues)
 
 | Login | AI Analysis Report |
 |:-----:|:------------------:|
@@ -43,12 +45,15 @@ AI WebScraper crawls websites, extracts SEO metadata, detects technical issues, 
 | **AI-Powered Reports** | GPT-4 generated summaries with actionable recommendations |
 | **Image Accessibility** | Automatic alt text detection for WCAG compliance |
 | **Link Analysis** | Internal/external categorization with broken link detection |
-| **JavaScript Rendering** | Playwright-based rendering for dynamic content |
+| **JavaScript Rendering** | Firecrawl fallback for SPA pages that need a browser |
 
 ### Technical Highlights
 
-- **Production-ready architecture** with Celery task queue and Redis
+- **Single-container backend** - crawls run as in-process async tasks, no queue or broker to operate
 - **Row Level Security (RLS)** on all database tables
+- **Distributed rate limiting** (Upstash Redis) on every mutating endpoint
+- **Error monitoring** with Sentry on both frontend and backend
+- **Two test gates**: CI before merge, a scheduled production smoke test after deploy
 - **Tier-based access control** with free tier limits (3 crawls for free users)
 - **Real-time monitoring** with automatic stale crawl detection
 
@@ -56,10 +61,9 @@ AI WebScraper crawls websites, extracts SEO metadata, detects technical issues, 
 
 ## Prerequisites
 
-- **Node.js** 18.17+ (check: `node -v`)
-- **Python** 3.11+ (check: `python --version`)
-- **Redis** server running locally or Upstash account
-- **Supabase** account (free tier available)
+- **Node.js** 22 (check: `node -v`, see `.nvmrc`)
+- **Python** 3.12 (check: `python --version`)
+- **Supabase** account (free tier available) and the Supabase CLI for migrations
 - **OpenAI API key** for AI features
 
 ---
@@ -100,11 +104,10 @@ Required backend variables:
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_KEY=your_supabase_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
-OPENAI_API_KEY=sk-...
-CELERY_BROKER_URL=redis://localhost:6379/0
-CELERY_RESULT_BACKEND=redis://localhost:6379/0
-BACKEND_CORS_ORIGINS=["http://localhost:3000"]
+OPENAI_API_KEY=__YOUR_OPENAI_KEY__
 ```
+
+Everything else (Upstash rate limiting, Sentry, Firecrawl, feature flags) is optional locally; see `backend/.env.example` for the full list.
 
 ```powershell
 # Create frontend environment file
@@ -123,9 +126,17 @@ REACT_APP_SUPABASE_ANON_KEY=your_supabase_anon_key
 ### 3. Database Setup
 
 1. Create a [Supabase](https://supabase.com) project
-2. Run migrations in the Supabase SQL editor:
-   - `database/migrations/PRODUCTION_READY_MIGRATION.sql`
-   - `database/migrations/fix_all_rls_policies.sql`
+2. Link the project and push the migrations with the Supabase CLI:
+
+```powershell
+supabase link --project-ref __YOUR_PROJECT_REF__
+```
+
+```powershell
+supabase db push
+```
+
+Migrations live in `supabase/migrations/`; `database/migrations/` holds the original base schema for reference.
 
 ### 4. Run Development Servers
 
@@ -133,21 +144,16 @@ REACT_APP_SUPABASE_ANON_KEY=your_supabase_anon_key
 # Option A: Use startup script (recommended)
 .\start.bat
 
-# Option B: Manual startup (3 terminals)
+# Option B: Manual startup (2 terminals)
 
-# Terminal 1 - Backend API
+# Terminal 1 - Backend API (crawls run in-process as background tasks)
 cd backend
 .\venv\Scripts\activate
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
-# Terminal 2 - Celery Worker
-cd backend
-.\venv\Scripts\activate
-celery -A app.services.worker.celery_app worker --loglevel=info --pool=solo
-
-# Terminal 3 - Frontend
+# Terminal 2 - Frontend (Vite)
 cd frontend
-npm start
+npm run dev
 ```
 
 Access the application:
@@ -204,11 +210,13 @@ ai-webscraper/
 | `SUPABASE_KEY` | Supabase anon key | Yes |
 | `SUPABASE_SERVICE_ROLE_KEY` | Service role key (bypasses RLS) | Yes |
 | `OPENAI_API_KEY` | OpenAI API key for AI features | Yes |
-| `CELERY_BROKER_URL` | Redis connection for task queue | Yes |
-| `CELERY_RESULT_BACKEND` | Redis connection for results | Yes |
-| `BACKEND_CORS_ORIGINS` | Allowed origins (JSON array) | Yes |
-| `ENABLE_LLM_ANALYSIS` | Enable AI analysis (true/false) | No |
-| `MAX_LLM_COST_PER_CRAWL` | Budget limit per crawl (USD) | No |
+| `CORS_ORIGINS` | Comma-separated allowed origins (defaults per `ENVIRONMENT`) | No |
+| `ENVIRONMENT` | `development` / `staging` / `production` | No |
+| `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | Enables distributed rate limiting | Prod |
+| `SENTRY_DSN` | Error monitoring | Prod |
+| `FIRECRAWL_API_KEY` | JS rendering fallback for SPA pages | No |
+| `ENABLE_LLM`, `ENABLE_SEO_AUDIT`, `ENABLE_BATCH_CRAWLS` | Feature flags (true/false) | No |
+| `APP_VERSION` | Git SHA reported by `/api/v1/health/` (set by the Docker build) | No |
 
 ### Frontend Environment Variables
 
@@ -217,6 +225,8 @@ ai-webscraper/
 | `REACT_APP_API_URL` | Backend API base URL | Yes |
 | `REACT_APP_SUPABASE_URL` | Supabase project URL | Yes |
 | `REACT_APP_SUPABASE_ANON_KEY` | Supabase anon key | Yes |
+| `REACT_APP_SENTRY_DSN` | Frontend error monitoring | Prod |
+| `VITE_APP_VERSION` | Build-time git SHA stamped into `<meta name="app-version">` | Build |
 
 ---
 
@@ -261,59 +271,63 @@ Free users see their remaining crawls in the UI with an upgrade path.
 
 ## Testing
 
+Two gates. CI (`.github/workflows/ci.yml`) runs on every PR and push to `main`; nothing merges without it. The production smoke test (`.github/workflows/production-smoke.yml`) runs twice a day against the live site and after every deploy.
+
+**Before merge (CI):**
+
+| Job | What it proves |
+|-----|----------------|
+| Backend tests | 125 pytest specs - crawler core, security (SSRF/blacklist), issue detector, models, Sentry filtering, plus HTTP smoke tests that boot the real app and assert health, security headers, the auth gate and CORS |
+| Frontend | `tsc --noEmit`, 35 Vitest specs, and a production Vite build |
+
+**After deploy (production smoke, `scripts/smoke-prod.sh`):** API health and version, hardening headers, anonymous access refused, frontend served with CSP and a loading bundle, and a drift check that warns when `main` has not been pulled onto the VPS yet.
+
+Run locally:
+
 ```powershell
-# Backend tests
-cd backend
-pytest tests/ -v
+cd backend; python -m pytest tests/ -q
+```
 
-# Frontend tests
-cd frontend
-npm test
+```powershell
+cd frontend; npm test
+```
 
-# Type checking
-cd frontend
-npx tsc --noEmit
+```powershell
+cd frontend; npx tsc --noEmit
 ```
 
 ---
 
 ## Deployment
 
-### Backend (Railway/Render)
+Production runs on a Hetzner VPS behind Caddy at https://scraper.cushlabs.ai. There is no Vercel, Railway or Render in the loop.
 
-1. Connect GitHub repository
-2. Set environment variables
-3. Deploy with Python 3.11+ runtime
-4. Configure Redis add-on for Celery
+- **Backend**: merging to `main` triggers `.github/workflows/build-image.yml`, which builds `backend/Dockerfile` (python:3.12-slim) and pushes `ghcr.io/rcushmaniii/ai-webscraper:latest`. The VPS pulls that image; it never builds.
+- **Frontend**: built locally with Vite and copied to the Caddy static root.
+- **Database**: Supabase; migrations are applied with `supabase db push`.
 
-### Frontend (Vercel)
+Both deploy scripts end by running the production smoke test with the SHA they just shipped, so a deploy that did not actually land fails loudly. They are bash scripts run from Git Bash (or by Claude):
 
 ```powershell
-# Install Vercel CLI
-npm i -g vercel
-
-# Deploy
-cd frontend
-vercel --prod
+bash scripts/deploy-backend.sh
 ```
 
-Set environment variables in Vercel dashboard.
+```powershell
+bash scripts/deploy-frontend.sh
+```
 
-### Database (Supabase)
-
-1. Run all migrations in production database
-2. Verify RLS policies are active
-3. Update CORS origins for production domains
+Full host details (paths, container name, Caddy config, logs) are in [CLAUDE.md](CLAUDE.md#deployment--hetzner-vps).
 
 ---
 
 ## Documentation
 
-- **[CLAUDE.md](CLAUDE.md)** - AI assistant context and conventions
-- **[CHANGELOG.md](CHANGELOG.md)** - Version history
+- **[CLAUDE.md](CLAUDE.md)** - AI assistant context, conventions and the Hetzner deployment runbook
+- **[docs/SESSION_LOG.md](docs/SESSION_LOG.md)** - Working-session history
 - **[docs/LLM_SERVICE.md](docs/LLM_SERVICE.md)** - AI analysis features
-- **[docs/DEPLOYMENT_PLAN.md](docs/DEPLOYMENT_PLAN.md)** - Deployment guide
+- **[docs/AI_REPORT_ARCHITECTURE.md](docs/AI_REPORT_ARCHITECTURE.md)** - Report pipeline
 - **[database/README.md](database/README.md)** - Database schema
+- **[docs/archive/](docs/archive/)** - Historical setup guides from the Render/Vercel era
 
 ---
 

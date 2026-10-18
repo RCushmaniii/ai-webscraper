@@ -146,7 +146,7 @@ const ContentBrandTab: React.FC<ContentBrandTabProps> = ({ report }) => {
                       pageAnalysis.purpose === 'lead_generation' ? 'bg-orange-100 text-orange-800' :
                       pageAnalysis.purpose === 'homepage' ? 'bg-blue-100 text-blue-800' :
                       pageAnalysis.purpose === 'services' ? 'bg-green-100 text-green-800' :
-                      pageAnalysis.purpose === 'educational' ? 'bg-teal-100 text-teal-800' :
+                      pageAnalysis.purpose === 'educational' ? 'bg-secondary-100 text-secondary-800' :
                       pageAnalysis.purpose === 'portfolio' ? 'bg-indigo-100 text-indigo-800' :
                       pageAnalysis.purpose === 'brand_story' ? 'bg-pink-100 text-pink-800' :
                       'bg-gray-100 text-gray-800'

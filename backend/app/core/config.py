@@ -81,6 +81,10 @@ class Settings(BaseSettings):
     # Environment (development, staging, production)
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
 
+    # Git SHA of the running build. Set by the Dockerfile (ARG GIT_SHA →
+    # ENV APP_VERSION) so /api/v1/health/ can report what is deployed.
+    APP_VERSION: str = os.getenv("APP_VERSION", "dev")
+
     # CORS Origins - CRITICAL: Lock down for production!
     # In production, ONLY allow your actual frontend domain(s)
     # NEVER use "*" wildcard in production - it defeats CORS security
