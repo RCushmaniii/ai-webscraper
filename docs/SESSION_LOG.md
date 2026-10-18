@@ -8,6 +8,7 @@ Entries are newest-first. Each entry documents one Claude Code working session.
 
 ### Accomplished
 
+- **Deployed and verified:** b900aac live on both tiers; `scripts/deploy-backend.sh` + `deploy-frontend.sh` both ended in a passing smoke, the manual `production-smoke.yml` run passed, image is 577 MB on the box (was 4.13 GB), container 126 MB RSS.
 - **Audited the live system first.** scraper.cushlabs.ai healthy (container up 3 months, 0 restarts, no errors in 48h of logs, 145 MB RSS), production matched `main`, Sentry + Upstash rate limiting wired. The gaps were in the harness and the hygiene, not the runtime.
 - **Pre-publish gate fixed:** CI never ran the 35 Vitest specs (type-check + build only). Added `npm test` to the frontend job and `backend/tests/test_api_smoke.py` (14 specs that boot the real app with TestClient: health payload, security headers, HSTS gating, 413 body cap, anonymous refusal on five endpoints, bad bearer -> 401, CORS allow/deny). Suite is 125 green.
 - **Post-publish gate added:** `scripts/smoke-prod.sh` (health + version, hardening headers, auth gate, frontend CSP + bundle + `app-version` meta, drift vs `main`). Runs twice daily from `.github/workflows/production-smoke.yml` (drift = warning) and at the end of both new deploy scripts (`scripts/deploy-backend.sh`, `scripts/deploy-frontend.sh`; drift = failure).
@@ -27,7 +28,8 @@ Entries are newest-first. Each entry documents one Claude Code working session.
 
 ### Immediate Next Steps
 
-- [ ] Decide on React Router 7 (only remaining runtime advisory, major upgrade).
+- [ ] Replace python-jose with PyJWT. After the merge Dependabot raised a CRITICAL with no patched version (python-jose <= 3.5.0, algorithm-confusion guard bypass via DER public keys). Verified not reachable here: the only `jwt.decode` in `core/auth.py` pins `algorithms=["ES256", "RS256"]` (no HMAC), and the kid-miss fallback validates server-side via `supabase_client.auth.get_user`. Still an unpatched critical on a public repo; swap the library in its own PR with the API smoke tests as the gate.
+- [ ] Decide on React Router 7 (remaining runtime advisory, major upgrade).
 - [ ] Report tabs / CrawlDetail / Dashboard still use blue + purple as category colors; single-accent pass if the kit's rule is meant to reach inside the app.
 - [ ] Rotate or remove the dead Sentry org auth credential in local env files (carried over from 2026-07-06).
 
