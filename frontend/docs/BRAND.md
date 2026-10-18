@@ -20,39 +20,50 @@
 
 ---
 
-## 2. Visual Design System (The "Plush" Look)
+## 2. Visual Design System
 
-_A sophisticated "Deep Slate & Orange" theme. This replaces harsh contrasts with a calming, professional palette that feels expensive and reduces eye strain._
+> **Superseded 2026-10-18.** Color and type now come from the CushLabs brand kit
+> (`operating-system/cushlabs/brand-kit.md`; canonical source `cushlabs/src/styles/global.css`).
+> The "Deep Slate & Orange" palette that used to live here is retired. If this section and the
+> kit disagree, the kit wins.
 
-### Color Palette
+### Values as implemented (`frontend/tailwind.config.cjs`)
 
-| Usage                          | Color Name       | Hex Code  | Tailwind Equivalent |
-| :----------------------------- | :--------------- | :-------- | :------------------ |
-| **Brand Primary** (Header/Nav) | **Deep Slate**   | `#1E293B` | `slate-800`         |
-| **Primary Action** (Buttons)   | **Warm Orange**  | `#F97316` | `orange-500`        |
-| **Action Hover**               | **Deep Orange**  | `#EA580C` | `orange-600`        |
-| **App Background**             | **Pale Cloud**   | `#F8FAFC` | `slate-50`          |
-| **Content Panels**             | **Pure White**   | `#FFFFFF` | `white`             |
-| **Primary Text**               | **Charcoal**     | `#1F2937` | `gray-800`          |
-| **Secondary Text**             | **Steel Gray**   | `#64748B` | `slate-500`         |
-| **Status: Error**              | **Soft Red**     | `#EF4444` | `red-500`           |
-| **Status: Success**            | **Emerald**      | `#10B981` | `emerald-500`       |
+| Role | Class scale | Value | Notes |
+| :--- | :---------- | :---- | :---- |
+| **Accent** (buttons, rings, emphasis) | `secondary-500` | `#FF6A3D` | The one accent. `secondary-600` `#FD4C00` for hover. |
+| Accent text on white (AA) | `secondary-700` | `#BA4D2D` | Use for small orange type; 500/600 are for fills. |
+| Header / footer field | `primary-900` | `#0A0A0A` | Near-black. `primary-950` is pure black. |
+| Surfaces on dark | `primary-800/700/600` | `#141414` / `#1A1A1A` / `#2A2A2A` | |
+| Sub-copy greys | `primary-500/400/300` | `#666666` / `#888888` / `#AAAAAA` | |
+| Type on light | `neutral-charcoal` | `#111111` | |
+| App background | `neutral-cloud` | `#F7F7F7` | Neutral, not blue-tinted. |
+| Status | `success-*`, `error-*` | emerald / red | Unchanged. |
+
+`primary-*` is the **neutral** scale and `secondary-*` is the **accent** scale. The names are
+historical - every page already used them - so the values were swapped underneath. Do not add a
+blue, purple or teal accent anywhere; teal in particular was retired fleet-wide in July 2026.
 
 ### Typography
 
-- **Font Family:** `Inter`, `Roboto`, or `Open Sans` (Geometric Sans-serif).
-- **Headings:** Semi-Bold (600). Deep Slate.
-- **Body:** Regular (400). Charcoal. Line-height 1.6 for readability.
+- **Display - Manrope 700** (`font-display`): headings, the wordmark line, buttons, big numbers.
+  `h1`-`h4` get it globally in `src/index.css`.
+- **Body - Inter 400** (`font-sans`): everything that is read.
+- Both are self-hosted from `public/fonts/` (same files as cushlabs.ai) so the Caddy CSP stays at
+  `font-src 'self'`.
+- Sentence case for headings.
 
-### Layout & Spacing Rules
+### The mark
 
-- **"Plush" Padding:**
-  - **Containers:** `4rem` (64px) padding on desktop.
-  - **Cards:** `2.5rem` (40px) internal padding.
-  - **Buttons:** `12px` Vertical x `24px` Horizontal.
-- **Max Width:** `1200px` centered container (prevents eye-scanning fatigue).
-- **Corner Radius:** `12px` (Soft, modern corners).
-- **Shadows:** Soft, diffused shadows for elevation.
+The chevron-C (`public/favicon.svg` on light, `public/cushlabs-mark-on-dark.svg` on dark). Masters
+and rules: `operating-system/cushlabs/brand-mark.md`. Never redraw it, never below 32px, bump the
+`?v=N` on the favicon links when the artwork changes.
+
+### Layout & Spacing Rules (unchanged)
+
+- **Containers:** `4rem` (64px) padding on desktop. **Cards:** `2.5rem` (40px).
+- **Max width:** `1200px` centered container.
+- **Corner radius:** `12px`. **Shadows:** soft, diffused.
 
 ---
 

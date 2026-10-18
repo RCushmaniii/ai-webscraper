@@ -28,7 +28,7 @@
 
 ### Frontend
 
-- **Framework**: React 18 + Create React App
+- **Framework**: React 18 + Vite (migrated from Create React App; `REACT_APP_*` env prefix kept)
 - **Language**: TypeScript
 - **Styling**: TailwindCSS + shadcn/ui components
 - **Routing**: React Router v6
@@ -37,12 +37,12 @@
 
 ### Backend
 
-- **Framework**: FastAPI (Python 3.11+)
+- **Framework**: FastAPI (Python 3.12)
 - **Server**: Uvicorn ASGI server
 - **Database**: Supabase (PostgreSQL)
 - **Auth**: Supabase Auth + Row Level Security (RLS)
 - **Background Tasks**: FastAPI BackgroundTasks (in-process, no external dependencies)
-- **Scraping**: BeautifulSoup4, Playwright (JS rendering)
+- **Scraping**: BeautifulSoup4 + trafilatura; Firecrawl API as the JS-rendering fallback (no Playwright/Selenium in the image since 2026-10-18)
 
 ---
 
@@ -121,7 +121,7 @@ Common gotchas:
 - **Batch database operations** wherever possible
 - Example: Save 100 links in ONE call, not 100 separate calls
 - **Reduce logging verbosity** for noisy libraries (httpx, httpcore)
-- **Use background tasks** (Celery) for long-running operations
+- **Use background tasks** (FastAPI BackgroundTasks / asyncio) for long-running operations
 
 ### 4. Code Organization
 
@@ -431,7 +431,7 @@ ai-webscraper/
 - **Domain:** `scraper.cushlabs.ai` (HTTPS via Caddy/Let's Encrypt)
 - **Docker service/container name:** `webscraper`
 - **Internal port:** `10000` (bound to `127.0.0.1`, set via `PORT=10000` in compose environment)
-- **Docker image:** `mcr.microsoft.com/playwright/python:v1.50.0-noble` (~3GB, builds are slow)
+- **Docker image:** `python:3.12-slim` + curl (~400MB). Was the 4GB Playwright base until 2026-10-18; nothing imported Playwright.
 - **Database:** Supabase (external, not self-hosted) — Project: `cushlabs-site-analysis`
 - **Caddy config:** `/etc/caddy/Caddyfile` on the VPS
 
@@ -473,8 +473,15 @@ scp -r build/* deploy@178.156.192.117:~/apps/static/webscraper/
 
 ```bash
 curl https://scraper.cushlabs.ai/api/v1/health/
-# Trailing slash required
+# Trailing slash required. Returns {"status":"ok","version":"<git sha>","environment":"production"}
 ```
+
+### Test Gates (before and after publishing)
+
+- **Before merge:** `.github/workflows/ci.yml` — backend pytest (unit + `tests/test_api_smoke.py`, which boots the real app with TestClient), frontend `tsc`, Vitest, Vite build. Required green before any merge.
+- **After deploy:** `scripts/smoke-prod.sh` — health + version, security headers, auth gate, frontend CSP + bundle, version drift vs `main`. Runs twice daily from `.github/workflows/production-smoke.yml` (drift = warning) and at the end of both deploy scripts (drift = failure).
+- **Deploy scripts (bash, run via the Bash tool):** `scripts/deploy-backend.sh [sha]` waits for the GHCR build, pulls + recreates on the VPS, waits for container health, runs smoke. `scripts/deploy-frontend.sh` builds with `VITE_APP_VERSION=<sha>`, scps, runs smoke.
+- **Brand:** tokens follow `operating-system/cushlabs/brand-kit.md` — accent `#FF6A3D`, neutral greys, Manrope display / Inter body self-hosted in `frontend/public/fonts`, chevron mark. `primary-*` is the NEUTRAL scale and `secondary-*` is the ACCENT scale in `frontend/tailwind.config.cjs` (historical names, values swapped underneath). Never reintroduce teal or a blue accent.
 
 ### Logs
 
@@ -509,7 +516,7 @@ See `backend/.env.example` for the full list. Key vars:
 
 ### Deployment
 
-- `backend/Dockerfile` - Docker build (Playwright base image)
+- `backend/Dockerfile` - Docker build (python:3.12-slim, stamps `APP_VERSION` from `GIT_SHA`)
 - `backend/app/core/config.py` - CORS origins, environment config
 - `backend/.env.example` - Required backend environment variables
 - `frontend/.env.example` - Required frontend build-time variables
@@ -649,7 +656,7 @@ https://deepwiki.com/RCushmaniii/ai-resume-tailor
 
 ---
 
-**Last Updated**: March 28, 2026
+**Last Updated**: October 18, 2026
 **Maintained By**: Claude (Anthropic) + CushLabs Team
 
 ## Session Log

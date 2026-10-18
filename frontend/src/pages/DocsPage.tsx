@@ -591,7 +591,7 @@ Control what data is stored:
                             onClick={() => setActiveSection(item.id)}
                             className={`block w-full text-left p-2 rounded-md text-sm transition-colors ${
                               activeSection === item.id
-                                ? 'bg-blue-50 text-blue-700 font-medium'
+                                ? 'bg-secondary-50 text-secondary-700 font-medium'
                                 : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                             }`}
                           >

@@ -6,7 +6,8 @@ Comprehensive documentation for the AI WebScraper project.
 
 ### Deployment & Operations
 
-- **[DEPLOYMENT_PLAN.md](DEPLOYMENT_PLAN.md)** - Complete deployment guide with pre/post-deployment checklists
+- **[../CLAUDE.md](../CLAUDE.md#deployment--hetzner-vps)** - Current deployment runbook (Hetzner VPS, GHCR image, Caddy)
+- **[DEPLOYMENT_PLAN.md](DEPLOYMENT_PLAN.md)** - Original deployment plan (historical)
 - **[MIGRATION_INSTRUCTIONS.md](MIGRATION_INSTRUCTIONS.md)** - Database migration instructions
 
 ### Design & Branding
@@ -18,7 +19,8 @@ Comprehensive documentation for the AI WebScraper project.
 
 - **[../database/README.md](../database/README.md)** - Database schema and migrations
 - **[../scripts/README.md](../scripts/README.md)** - Utility scripts documentation
-- **[../CHANGELOG.md](../CHANGELOG.md)** - Version history and release notes
+- **[SESSION_LOG.md](SESSION_LOG.md)** - Working-session history
+- **[archive/](archive/)** - Historical setup guides (OAuth, SSL, security hardening) from the Render/Vercel era
 
 ### Screenshots
 

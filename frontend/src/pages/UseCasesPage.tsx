@@ -198,7 +198,7 @@ const UseCasesPage: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div>
-              <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-100 text-blue-700 rounded-full text-sm font-medium mb-4">
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-secondary-100 text-secondary-700 rounded-full text-sm font-medium mb-4">
                 SEO Agency
               </div>
               <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-6">
@@ -213,7 +213,7 @@ const UseCasesPage: React.FC = () => {
 
               <div className="space-y-4 mb-8">
                 <div className="flex items-start gap-3">
-                  <Clock className="w-6 h-6 text-blue-600 flex-shrink-0 mt-1" />
+                  <Clock className="w-6 h-6 text-secondary-700 flex-shrink-0 mt-1" />
                   <div>
                     <h3 className="font-semibold text-gray-900 mb-1">
                       The Bottleneck
@@ -228,7 +228,7 @@ const UseCasesPage: React.FC = () => {
                 </div>
 
                 <div className="flex items-start gap-3">
-                  <Zap className="w-6 h-6 text-blue-600 flex-shrink-0 mt-1" />
+                  <Zap className="w-6 h-6 text-secondary-700 flex-shrink-0 mt-1" />
                   <div>
                     <h3 className="font-semibold text-gray-900 mb-1">
                       With AI WebScraper
@@ -243,7 +243,7 @@ const UseCasesPage: React.FC = () => {
                 </div>
 
                 <div className="flex items-start gap-3">
-                  <TrendingUp className="w-6 h-6 text-blue-600 flex-shrink-0 mt-1" />
+                  <TrendingUp className="w-6 h-6 text-secondary-700 flex-shrink-0 mt-1" />
                   <div>
                     <h3 className="font-semibold text-gray-900 mb-1">
                       The Upside
@@ -257,21 +257,21 @@ const UseCasesPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-                <div className="text-sm font-medium text-blue-700 mb-3">
+              <div className="bg-secondary-50 border border-secondary-200 rounded-lg p-6">
+                <div className="text-sm font-medium text-secondary-700 mb-3">
                   Potential Impact
                 </div>
                 <ul className="space-y-2 text-sm text-gray-700">
                   <li className="flex items-start gap-2">
-                    <CheckCircle className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
+                    <CheckCircle className="w-4 h-4 text-secondary-700 flex-shrink-0 mt-0.5" />
                     <span>Reduce per-audit time from days to hours</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <CheckCircle className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
+                    <CheckCircle className="w-4 h-4 text-secondary-700 flex-shrink-0 mt-0.5" />
                     <span>Handle more clients without additional hires</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <CheckCircle className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
+                    <CheckCircle className="w-4 h-4 text-secondary-700 flex-shrink-0 mt-0.5" />
                     <span>
                       Deliver AI-enhanced reports clients can act on immediately
                     </span>
@@ -280,7 +280,7 @@ const UseCasesPage: React.FC = () => {
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-8 border border-blue-200">
+            <div className="bg-gradient-to-br from-secondary-50 to-secondary-50 rounded-2xl p-8 border border-secondary-200">
               <h3 className="text-xl font-semibold text-gray-900 mb-6">
                 Hypothetical: Before vs After
               </h3>
@@ -301,7 +301,7 @@ const UseCasesPage: React.FC = () => {
                 </div>
 
                 <div className="flex justify-center">
-                  <ArrowRight className="w-6 h-6 text-blue-600" />
+                  <ArrowRight className="w-6 h-6 text-secondary-700" />
                 </div>
 
                 <div>
@@ -524,7 +524,7 @@ const UseCasesPage: React.FC = () => {
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-green-50 to-teal-50 rounded-2xl p-8 border border-green-200">
+            <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-2xl p-8 border border-green-200">
               <h3 className="text-xl font-semibold text-gray-900 mb-6">
                 Hypothetical Workflow
               </h3>

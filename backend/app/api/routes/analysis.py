@@ -1860,7 +1860,7 @@ async def export_report_pdf(
 @router.get("/crawl/{crawl_id}/report/export/csv")
 async def export_report_csv(
     crawl_id: str,
-    export_type: str = Query("page_audits", regex="^(page_audits|findings)$"),
+    export_type: str = Query("page_audits", pattern="^(page_audits|findings)$"),
     current_user: User = Depends(get_current_user)
 ):
     """Export report data as CSV (page_audits or findings)."""

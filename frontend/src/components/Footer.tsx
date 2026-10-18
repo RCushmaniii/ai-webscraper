@@ -1,21 +1,21 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Github, Mail, Globe } from 'lucide-react';
+import { Github, Mail } from 'lucide-react';
 
 const Footer: React.FC = () => {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="bg-gray-900 text-gray-300">
+    <footer className="bg-primary-900 text-primary-300 border-t border-primary-700">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-8">
           {/* Brand Column */}
           <div className="lg:col-span-1">
             <div className="flex items-center gap-2 mb-4">
-              <Globe className="w-8 h-8 text-secondary-400" />
-              <span className="text-xl font-bold text-white">AI WebScraper</span>
+              <img src="/cushlabs-mark-on-dark.svg" alt="" width={32} height={32} className="w-8 h-8" />
+              <span className="font-display text-xl font-bold text-white">AI WebScraper</span>
             </div>
-            <p className="text-gray-400 mb-6 max-w-sm">
+            <p className="text-primary-400 mb-6 max-w-sm">
               Transform websites into actionable intelligence with AI-powered site analysis,
               SEO recommendations, and accessibility insights.
             </p>
@@ -24,14 +24,14 @@ const Footer: React.FC = () => {
                 href="https://github.com/RCushmaniii/ai-webscraper"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-10 h-10 bg-gray-800 hover:bg-gray-700 rounded-lg flex items-center justify-center transition-colors"
+                className="w-10 h-10 bg-primary-800 hover:bg-primary-700 rounded-lg flex items-center justify-center transition-colors"
                 aria-label="GitHub"
               >
                 <Github className="w-5 h-5" />
               </a>
               <a
                 href="mailto:info@cushlabs.ai"
-                className="w-10 h-10 bg-gray-800 hover:bg-gray-700 rounded-lg flex items-center justify-center transition-colors"
+                className="w-10 h-10 bg-primary-800 hover:bg-primary-700 rounded-lg flex items-center justify-center transition-colors"
                 aria-label="Email"
               >
                 <Mail className="w-5 h-5" />
@@ -117,15 +117,15 @@ const Footer: React.FC = () => {
         </div>
 
         {/* Bottom Bar */}
-        <div className="pt-8 border-t border-gray-800">
+        <div className="pt-8 border-t border-primary-700">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-            <div className="text-sm text-gray-400">
+            <div className="text-sm text-primary-400">
               &copy; {currentYear}{' '}
               <a
                 href="https://cushlabs.ai"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-secondary-400 hover:text-secondary-300 transition-colors"
+                className="text-secondary-500 hover:text-secondary-400 transition-colors"
               >
                 CushLabs.ai
               </a>

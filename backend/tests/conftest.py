@@ -93,6 +93,18 @@ _mock_settings.HTML_SNAPSHOTS_DIR = "/tmp/test-storage/html"
 _mock_settings.DEFAULT_USER_AGENT = "TestBot/1.0"
 _mock_settings.ENVIRONMENT = "development"
 _mock_settings.BACKEND_CORS_ORIGINS = ["http://localhost:3000"]
+# Attributes app.main / the routers read at import time. A bare MagicMock here
+# would stringify into route prefixes ("<MagicMock ...>"), so pin real values.
+_mock_settings.API_V1_STR = "/api/v1"
+_mock_settings.PROJECT_NAME = "AI Web Scraper API"
+_mock_settings.APP_VERSION = "test-sha"
+_mock_settings.ENABLE_BATCH_CRAWLS = False
+_mock_settings.ENABLE_SEO_AUDIT = False
+_mock_settings.ENABLE_LLM = False
+_mock_settings.ENABLE_SELECTOR_SCRAPING = False
+_mock_settings.RATE_LIMIT_ENABLED = False
+_mock_settings.UPSTASH_REDIS_REST_URL = ""
+_mock_settings.UPSTASH_REDIS_REST_TOKEN = ""
 
 # Mock the config module before anything imports it
 _mock_config_module = MagicMock()

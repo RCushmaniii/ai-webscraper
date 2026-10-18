@@ -4,6 +4,44 @@ Entries are newest-first. Each entry documents one Claude Code working session.
 
 ---
 
+## Session: 2026-10-18 (production hardening, test gates, brand alignment)
+
+### Accomplished
+
+- **Audited the live system first.** scraper.cushlabs.ai healthy (container up 3 months, 0 restarts, no errors in 48h of logs, 145 MB RSS), production matched `main`, Sentry + Upstash rate limiting wired. The gaps were in the harness and the hygiene, not the runtime.
+- **Pre-publish gate fixed:** CI never ran the 35 Vitest specs (type-check + build only). Added `npm test` to the frontend job and `backend/tests/test_api_smoke.py` (14 specs that boot the real app with TestClient: health payload, security headers, HSTS gating, 413 body cap, anonymous refusal on five endpoints, bad bearer -> 401, CORS allow/deny). Suite is 125 green.
+- **Post-publish gate added:** `scripts/smoke-prod.sh` (health + version, hardening headers, auth gate, frontend CSP + bundle + `app-version` meta, drift vs `main`). Runs twice daily from `.github/workflows/production-smoke.yml` (drift = warning) and at the end of both new deploy scripts (`scripts/deploy-backend.sh`, `scripts/deploy-frontend.sh`; drift = failure).
+- **Version stamping:** Dockerfile `ARG GIT_SHA` -> `APP_VERSION`, reported by `/api/v1/health/`; CI passes `github.sha`. Frontend stamps `VITE_APP_VERSION` into `<meta name="app-version">`.
+- **Image went from 4.13 GB Playwright base to python:3.12-slim + curl.** Nothing in `app/` imported Playwright/Selenium (JS rendering is Firecrawl since c66fccf); `crawler_backup.py`, the dead `app/api/api_v1` + `app/scrapers` packages, and `selenium`/`webdriver-manager`/`playwright`/`asyncpg`/`passlib`/`validators` requirements removed. curl kept because the compose healthcheck shells to it.
+- **Backend deps:** FastAPI 0.104.1 (Oct 2023) -> 0.146.0, uvicorn 0.54, pydantic-settings 2.16, Pillow >=12.3.0 (clears 12 Dependabot advisories). Pydantic `class Config` -> `ConfigDict` (15 models), `Query(regex=)` -> `pattern=`. Booted the real app against the local config to confirm.
+- **Frontend deps:** axios 1.20, react-router-dom 6.30.6, transitive bumps via `npx npm@latest update` (bundled npm 10.9.9 crashes with `edgesOut` on full installs; memory note saved). Audit 19 -> 10; the rest are Tailwind 3's dev-watcher chain and React Router 7 (major).
+- **Brand kit alignment** (operating-system/cushlabs/brand-kit.md): accent `#FF6A3D` (hover `#FD4C00`), neutral grey scale replaces slate, shadcn `--primary`/`--ring` off the default blue, Manrope + Inter self-hosted (`public/fonts`, same files as cushlabs.ai; Inter was never actually loaded before), chevron mark in header/footer/favicon/apple-touch/OG image (rendered via Playwright), teal removed, public pages (home, docs, use cases, search, modal) moved to the single accent, muddy orange-to-grey hero gradient replaced. Verified with Playwright screenshots + computed-style checks.
+- **Hygiene:** deleted `railway.json`, `render.yaml`, `frontend/vercel.json`, `.windsurf/`, three stray `=0.7.0`-style pip artifacts, six loose backend scripts, 18 one-off migration/RLS scripts (incl. `completely_disable_users_rls.py`, `get_db_password.py`) from a public repo; archived four Render-era guides to `docs/archive/`. README, CLAUDE.md, PORTFOLIO.md, scripts/README, frontend BRAND.md rewritten for the real stack (Vite, no Celery, Hetzner).
+
+### Decisions Made
+
+- One bundled PR per Robert's request; this app deploys to Hetzner via GHCR, so Vercel limits do not apply.
+- Swapped the values under the historical `primary`/`secondary` names rather than renaming 480 class references; `primary-*` = neutrals, `secondary-*` = accent (documented in CLAUDE.md and BRAND.md).
+- Drift is a warning on the schedule (VPS pull is deliberately manual) but a failure inside the deploy scripts.
+- Authenticated-app report tabs keep blue/purple category colors for now; a visual-semantics change inside the report deserves its own pass.
+
+### Immediate Next Steps
+
+- [ ] Decide on React Router 7 (only remaining runtime advisory, major upgrade).
+- [ ] Report tabs / CrawlDetail / Dashboard still use blue + purple as category colors; single-accent pass if the kit's rule is meant to reach inside the app.
+- [ ] Rotate or remove the dead Sentry org auth credential in local env files (carried over from 2026-07-06).
+
+### Technical Debt
+
+- `backend/CLAUDE_BACKEND.md` and `frontend/CLAUDE_FRONTEND.md` were not re-audited this session.
+- Caddy CSP still lives only on the VPS.
+
+### Open Questions / Blockers
+
+- None.
+
+---
+
 ## Session: 2026-07-06 (Sentry wiring verified + noise reduction)
 
 ### Accomplished

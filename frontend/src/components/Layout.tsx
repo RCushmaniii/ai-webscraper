@@ -34,20 +34,27 @@ const Layout: React.FC = () => {
   const navLinkClass = (path: string) =>
     `px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
       isActive(path)
-        ? "bg-primary-700 text-white"
-        : "text-primary-100 hover:bg-primary-700/50 hover:text-white"
+        ? "bg-primary-600 text-white"
+        : "text-primary-200 hover:bg-primary-700 hover:text-white"
     }`;
 
   return (
     <div className="min-h-screen flex flex-col bg-neutral-cloud">
-      {/* Navigation Bar - 80px height, Deep Slate background */}
-      <header className="bg-primary-800 text-white shadow-soft-lg">
+      {/* Navigation bar - 80px, near-black field per the CushLabs brand kit */}
+      <header className="bg-primary-900 text-white shadow-soft-lg border-b border-primary-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center" style={{ height: '80px' }}>
             {/* Logo & Branding */}
-            <Link to="/" className="flex items-center space-x-2">
-              <span className="text-xl font-semibold">AI WebScraper</span>
-              <span className="text-secondary-500 text-sm">| by CushLabs.ai</span>
+            <Link to="/" className="flex items-center gap-3">
+              <img
+                src="/cushlabs-mark-on-dark.svg"
+                alt=""
+                width={32}
+                height={32}
+                className="w-8 h-8"
+              />
+              <span className="font-display font-bold text-xl tracking-tight">AI WebScraper</span>
+              <span className="hidden sm:inline text-secondary-500 text-sm">by CushLabs.ai</span>
             </Link>
 
             {/* Navigation Links */}
@@ -76,7 +83,7 @@ const Layout: React.FC = () => {
                 <div className="relative" ref={dropdownRef}>
                   <button
                     onClick={() => setDropdownOpen(!dropdownOpen)}
-                    className="flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium text-primary-100 hover:bg-primary-700/50 hover:text-white transition-colors"
+                    className="flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium text-primary-200 hover:bg-primary-700 hover:text-white transition-colors"
                   >
                     <div className="w-2 h-2 bg-success-500 rounded-full"></div>
                     <span className="hidden sm:inline">{user.email}</span>
@@ -121,7 +128,7 @@ const Layout: React.FC = () => {
               ) : (
                 <Link
                   to="/login"
-                  className="px-4 py-2 text-sm font-medium text-white bg-secondary-500 hover:bg-secondary-hover rounded-lg shadow-soft transition-colors"
+                  className="px-4 py-2 text-sm font-medium text-white bg-secondary-500 hover:bg-secondary-600 rounded-lg shadow-soft transition-colors"
                 >
                   Sign In
                 </Link>
@@ -131,7 +138,7 @@ const Layout: React.FC = () => {
         </div>
       </header>
 
-      {/* Main Content - Pale Cloud background */}
+      {/* Main content */}
       <main className="flex-1">
         <Outlet />
       </main>

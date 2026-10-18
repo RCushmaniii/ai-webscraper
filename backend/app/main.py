@@ -188,9 +188,10 @@ async def limit_request_body_size(request: Request, call_next):
         )
     return await call_next(request)
 
-# 4. Rate Limiting Middleware - Apply rate limits based on subscription tier
-# NOTE: Currently using in-memory limiter for development
-# TODO: Switch to Redis-based limiter for production (see rate_limiter.py)
+# 4. Rate Limiting Middleware - Apply rate limits based on subscription tier.
+# Distributed Upstash Redis limiter when UPSTASH_REDIS_REST_URL/TOKEN are set
+# (production, verified live 2026-07-01); in-memory fallback for local dev.
+# Scoped to mutating /api/v1 requests, fails OPEN. See middleware/rate_limiter.py.
 app.middleware("http")(rate_limit_middleware)
 
 # 5. Request Logging Middleware - Log all requests for monitoring
@@ -238,9 +239,12 @@ async def root():
 
 @app.get("/health")
 async def health_check():
+    # Legacy root probe (Caddy proxies /health* here). The canonical probe is
+    # /api/v1/health/ which also reports the deployed version.
     return {
         "status": "healthy",
-        "monitoring": "stale_crawl_check_active"
+        "version": settings.APP_VERSION,
+        "monitoring": "stale_crawl_check_active",
     }
 
 if __name__ == "__main__":

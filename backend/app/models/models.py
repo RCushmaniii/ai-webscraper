@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import List, Optional, Dict, Any, Union
 from uuid import UUID, uuid4
-from pydantic import BaseModel, EmailStr, Field, HttpUrl, field_validator, validator
+from pydantic import BaseModel, EmailStr, Field, HttpUrl, field_validator, validator, ConfigDict
 
 
 class UserBase(BaseModel):
@@ -26,8 +26,7 @@ class UserInDB(UserBase):
     updated_at: Optional[datetime] = None
     full_name: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class User(UserBase):
@@ -36,8 +35,7 @@ class User(UserBase):
     updated_at: Optional[datetime] = None
     full_name: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class UserResponse(BaseModel):
@@ -49,8 +47,7 @@ class UserResponse(BaseModel):
     updated_at: Optional[datetime] = None
     full_name: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CrawlBase(BaseModel):
@@ -107,8 +104,7 @@ class CrawlInDB(CrawlBase):
     updated_at: datetime
     completed_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class Crawl(CrawlInDB):
@@ -125,8 +121,7 @@ class CrawlResponse(CrawlBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class PageBase(BaseModel):
@@ -172,8 +167,7 @@ class PageInDB(PageBase):
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class Page(PageInDB):
@@ -212,8 +206,7 @@ class SEOMetadataInDB(SEOMetadataBase):
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class SEOMetadata(SEOMetadataInDB):
@@ -249,8 +242,7 @@ class LinkInDB(LinkBase):
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class Link(LinkInDB):
@@ -281,8 +273,7 @@ class IssueInDB(IssueBase):
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class Issue(IssueInDB):
@@ -310,8 +301,7 @@ class SummaryInDB(SummaryBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class Summary(SummaryInDB):
@@ -339,8 +329,7 @@ class BatchInDB(BatchBase):
     updated_at: datetime
     completed_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class Batch(BatchInDB):
@@ -358,8 +347,7 @@ class BatchResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class BatchSiteBase(BaseModel):
@@ -383,8 +371,7 @@ class BatchSiteInDB(BatchSiteBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class BatchSite(BatchSiteInDB):
@@ -403,8 +390,7 @@ class AuditLogInDB(AuditLogCreate):
     id: UUID = Field(default_factory=uuid4)
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AuditLog(AuditLogInDB):
@@ -434,8 +420,7 @@ class GooglePlaceInDB(GooglePlaceBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class GooglePlace(GooglePlaceInDB):

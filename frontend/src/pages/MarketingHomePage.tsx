@@ -57,7 +57,7 @@ const MarketingHomePage: React.FC = () => {
 
             <h1 className="text-3xl sm:text-5xl md:text-7xl font-bold text-gray-900 mb-6 leading-tight">
               Other Tools Tell You What's Broken.
-              <span className="block text-transparent bg-clip-text bg-gradient-to-r from-secondary-600 to-primary-600">
+              <span className="block text-secondary-600">
                 I Tell You How to Fix It.
               </span>
             </h1>
@@ -714,7 +714,7 @@ const MarketingHomePage: React.FC = () => {
                     </span>
                   </li>
                   <li className="flex items-start gap-3 text-sm">
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700 flex-shrink-0 mt-0.5">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-secondary-100 text-secondary-700 flex-shrink-0 mt-0.5">
                       Quick Win
                     </span>
                     <span className="text-gray-700">
@@ -740,7 +740,7 @@ const MarketingHomePage: React.FC = () => {
                     <div className="text-xs text-gray-400">~3 hrs total</div>
                   </div>
                   <div>
-                    <div className="text-2xl font-bold text-blue-600">1</div>
+                    <div className="text-2xl font-bold text-secondary-700">1</div>
                     <div className="text-xs text-gray-500">Strategic</div>
                     <div className="text-xs text-gray-400">Ongoing</div>
                   </div>
@@ -752,7 +752,7 @@ const MarketingHomePage: React.FC = () => {
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 bg-gradient-to-br from-secondary-600 to-primary-600 text-white">
+      <section className="py-20 bg-primary-900 text-white">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-6">
             Stop Guessing. Start Fixing.
@@ -767,7 +767,7 @@ const MarketingHomePage: React.FC = () => {
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <button
               onClick={handleGetStarted}
-              className="px-8 py-4 bg-white text-secondary-600 rounded-lg font-semibold text-lg hover:bg-gray-100 transition-all shadow-lg"
+              className="px-8 py-4 bg-secondary-500 text-white rounded-lg font-semibold text-lg hover:bg-secondary-600 transition-all shadow-lg"
             >
               {user ? "Go to Dashboard" : "Start Your Free Audit"}
             </button>
