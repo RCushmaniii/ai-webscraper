@@ -4,6 +4,43 @@ Entries are newest-first. Each entry documents one Claude Code working session.
 
 ---
 
+## Session: 2026-10-19 (crawler politeness: robots.txt, backoff, honest bot identity; Google sign-in restored)
+
+### Accomplished
+
+- **PR #110 merged and deployed (026a922), smoke green on both tiers.** Robert asked whether the crawler avoids getting the VPS IP blocked; the review found it did not, and he asked for the fixes at no added cost (no proxy, no extra paid API).
+- **New `app/services/politeness.py`**, wired into the crawler at the single chokepoint in `Crawler._crawl()`: robots.txt `Disallow` + `Crawl-delay` (floor on the request interval, capped 30s) + `Sitemap`, one fetch per host, fail-open on 4xx/5xx/error. The old "respect robots.txt" option only read Sitemap lines. Free users can no longer switch it off; admins may for sites they own.
+- **Backoff**: 429, 503 and CDN challenge pages (Cloudflare `cf-mitigated`, "Just a moment", Incapsula, PerimeterX, DataDome, Akamai markers) penalise the HOST bucket with Retry-After or exponential delay, retry a URL at most twice, stop the crawl after 3 consecutive blocks; reason lands in `crawls.error` (detail page already renders it as an amber banner). A plain 403 is still recorded as a page.
+- **Per-host pacing shared across crawls** (`politeness.host_buckets`); `RateLimiter` re-exported from `crawler.py` so the old tests still pass; 0 req/s no longer divides by zero (the route was also storing `rate_limit` as int, so 0.5 became 0).
+- **Link probes**: one HEAD per unique normalised URL per crawl, capped at 200; skipped for robots-disallowed URLs and once the site has pushed back.
+- **Identity**: `CushLabsBot/1.0 (+https://scraper.cushlabs.ai/bot.html)`; browser-impersonating agents refused with 422; the fake Chrome string in config and the example.com placeholder are gone. `frontend/public/bot.html` explains the bot and how to block it; `scripts/smoke-prod.sh` checks it.
+- **Route fix**: `create_crawl`'s catch-all was turning every `HTTPException` (the free-tier 403, the new 422) into a 500. Now re-raised.
+- **Tests**: 54 new in `tests/test_politeness.py` (unit + crawler integration with real `httpx.Response` objects + the route through TestClient with dependency overrides). Backend 191 green; frontend tsc / vitest 35 / build green.
+- **Google sign-in restored** (no repo change): `deleted_client` was the GCP OAuth client being gone; Robert created a new Web client in `cushlabs-1774756152745`, first attempt hit `redirect_uri_mismatch` (callback URI mistyped), fixed. Verified from the outside that Supabase sends `https://kbltwyiowkbxzhhhozxf.supabase.co/auth/v1/callback` and a client id from project number 459730729117 by reading the `/auth/v1/authorize?provider=google` redirect without following it.
+
+### Decisions Made
+
+- Robots enforcement happens at queue-pop time, not at link-discovery time, so sitemap entries, nav-detected links and external hosts all go through one gate.
+- 503 counts as push-back even without challenge markers: an overloaded origin and a WAF both want us to slow down.
+- Crawl-delay is capped at 30s so a 50-page crawl still finishes inside the 1h runtime; the user's rate limit can only slow, never speed past it.
+- `_should_crawl_url` was NOT added to the chokepoint: its extension filter would drop PDFs discovered via links, which the product records on purpose.
+
+### Immediate Next Steps
+
+- [ ] First production crawl of a site with a real `Crawl-delay` or a 429 is the only path not exercised live (the agent has no user account); look for "backing off" / "robots.txt disallows" in `docker logs webscraper` after Robert's next crawl.
+
+### Technical Debt
+
+- The VPS IP is still a datacenter address with no proxy; CDN bot management that challenges datacenter ranges regardless of politeness is a cost decision (Firecrawl for more pages, or a residential proxy), explicitly deferred by Robert.
+- `_is_private_ip` SSRF checks run only for sitemap URLs, not for links discovered on pages. Pre-existing; noted during this review, left for a focused change.
+- GitHub Actions was in "degraded performance" during this session; the CI run showed as queued for 25+ minutes while the jobs had actually finished in under a minute. Trust `gh api .../jobs` over `gh pr checks` when that happens.
+
+### Open Questions / Blockers
+
+- None.
+
+---
+
 ## Session: 2026-10-19 (Dependabot sweep: PyJWT, React Router 7)
 
 ### Accomplished
