@@ -4,6 +4,35 @@ Entries are newest-first. Each entry documents one Claude Code working session.
 
 ---
 
+## Session: 2026-10-19 (Dependabot sweep: PyJWT, React Router 7)
+
+### Accomplished
+
+- **PR #109 merged and deployed (092d11e), smoke green on both tiers.** Zero open Dependabot alerts afterwards (was critical 1 / high 1 / medium 3).
+- **python-jose -> PyJWT** in `core/auth.py` and `middleware/rate_limiter.py`. ES256/RS256 allowlist, JWKS lookup and the unknown-kid Supabase fallback preserved. New `tests/test_auth_jwt.py` (12 specs): valid ES256 accepted; HS256 forged with the server public key, tampered payload, expired, missing kid, wrong key all refused; unknown kid -> fallback; limiter sub bucketing. Suite is 137 green. Verified PyJWK builds an `ECPublicKey` from the LIVE Supabase JWKS entry (ES256).
+- **React Router 6.30.6 -> 7.18.4.** App already ran with the v7 future flags; only change was removing the `future` prop. Playwright: client-side nav, protected-route redirect and 404 all fine.
+- **postcss-selector-parser** forced to 7.1.6 via npm `overrides` under Tailwind 3 (build + tests green).
+- **braces** (high, no patched version, dev-only via tailwind 3 file watching) dismissed on GitHub as tolerable risk with a dated comment; revisit on Tailwind 4.
+
+### Decisions Made
+
+- Keep the asymmetric allowlist as the primary defence regardless of library; the PyJWT swap removes the unmaintained dependency rather than relying on its guard.
+- Dismiss rather than chase `braces`: nothing to upgrade to, never reaches the browser.
+
+### Immediate Next Steps
+
+- [ ] First real login after this deploy is the only path not exercised locally (the agent has no user account to sign in with); if a 401 appears, look for "JWT verification failed" in `docker logs webscraper` to see the cause.
+
+### Technical Debt
+
+- Tailwind 3 pins the braces/micromatch/chokidar chain; a Tailwind 4 migration clears it (read ~/.claude/reference/tailwind-4-migration.md first).
+
+### Open Questions / Blockers
+
+- None.
+
+---
+
 ## Session: 2026-10-18 (production hardening, test gates, brand alignment)
 
 ### Accomplished
