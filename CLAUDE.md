@@ -205,6 +205,14 @@ All authenticated routes use the `ProtectedRoute` wrapper:
 - Stops ad networks
 - Always check `is_domain_blacklisted(url)` before following external links
 
+**Politeness layer**: `backend/app/services/politeness.py` (since 2026-10-19). Every crawl leaves from the one VPS IP, so:
+
+- robots.txt `Disallow` + `Crawl-delay` are enforced at the single chokepoint in `Crawler._crawl()` (`self.robots`); `Crawl-delay` raises the limiter floor (capped 30s). Free users cannot switch it off (`crawls.py` forces `respect_robots_txt=True`; admins may override).
+- 429 / 503 / CDN challenge pages -> `_handle_block()`: Retry-After or exponential backoff on the **host** bucket, up to 2 retries per URL, crawl stops after 3 consecutive blocks with `crawler.blocked_reason` surfaced in `crawls.error`.
+- `RateLimiter` (re-exported from `crawler.py`) shares one bucket per host across all running crawls (`politeness.host_buckets`).
+- Broken-link HEAD probes: one per unique URL, `MAX_LINK_CHECKS_PER_CRAWL = 200`.
+- User agent is `BOT_USER_AGENT` (`CushLabsBot/1.0 (+https://scraper.cushlabs.ai/bot.html)`); browser-impersonating strings are rejected with 422. The bot page is `frontend/public/bot.html` and the prod smoke test checks it.
+
 ### 2. User Tier System
 
 **Users have tier-based access**:

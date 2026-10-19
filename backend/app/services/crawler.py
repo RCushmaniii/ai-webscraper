@@ -18,8 +18,24 @@ from app.services.storage import store_html_snapshot
 from app.services.content_extractor import SmartContentExtractor
 from app.core.domain_blacklist import is_domain_blacklisted, get_blacklist_reason
 from app.services.nav_detector import NavDetector
+from app.services.politeness import (
+    BOT_USER_AGENT,
+    MAX_CONSECUTIVE_BLOCKS,
+    MAX_RETRIES_PER_URL,
+    RateLimiter,  # re-exported: older code and tests import it from here
+    RobotsPolicy,
+    backoff_seconds,
+    detect_block,
+    is_browser_impersonating,
+)
 
 logger = logging.getLogger(__name__)
+
+# Broken-link HEAD checks per crawl. Internal links beyond the depth limit used
+# to be HEAD-checked every time they appeared on a page (a 40-link footer on a
+# 50-page crawl = ~2,000 extra requests). Now each URL is checked once and the
+# whole crawl stops checking after this many.
+MAX_LINK_CHECKS_PER_CRAWL = 200
 
 class Crawler:
     """
@@ -39,6 +55,11 @@ class Crawler:
         # these to mark the crawl failed/degraded instead of falsely complete.
         self.pages_saved = 0
         self.pages_save_failed = 0
+        self.domain = urlparse(self.crawl.url).netloc
+        # The API refuses browser-impersonating agents; a stale DB row could
+        # still carry one, so fall back to the bot identity rather than send it.
+        requested_ua = (self.crawl.user_agent or "").strip()
+        self.user_agent = requested_ua if requested_ua and not is_browser_impersonating(requested_ua) else BOT_USER_AGENT
         self.client = httpx.AsyncClient(
             follow_redirects=True,
             max_redirects=10,
@@ -46,8 +67,19 @@ class Crawler:
             limits=httpx.Limits(max_keepalive_connections=20, max_connections=50),
             headers=self._get_headers()
         )
-        self.rate_limiter = RateLimiter(self.crawl.rate_limit)
-        self.domain = urlparse(self.crawl.url).netloc
+        # Pacing is keyed by host and shared across every crawl in the process.
+        self.rate_limiter = RateLimiter(self.crawl.rate_limit, host=self.domain)
+        self.robots = RobotsPolicy(self.user_agent, enabled=bool(self.crawl.respect_robots_txt))
+        # Push-back tracking: consecutive 429/503/challenge responses, per-URL
+        # retries, and the reason we stopped early (surfaced on the crawl row).
+        self.consecutive_blocks = 0
+        self.block_retries: Dict[str, int] = {}
+        self.blocked_reason: Optional[str] = None
+        self.pending_retry: Optional[str] = None  # URL to re-queue after a backoff
+        self.skipped_by_robots = 0
+        # Broken-link checks: one HEAD per unique URL, capped per crawl.
+        self.link_status_cache: Dict[str, Tuple[Optional[int], Optional[int], Optional[str]]] = {}
+        self.link_checks_done = 0
         # Use provided db_client (service role) or fall back to default (anon)
         self.db = db_client if db_client is not None else supabase_client
         self.crawl_deleted = False  # Track if crawl was deleted during processing
@@ -60,10 +92,8 @@ class Crawler:
         
     def _get_headers(self) -> Dict[str, str]:
         """Get HTTP headers based on the crawl's user agent setting."""
-        default_user_agent = "AAA-WebScraper/1.0 (+https://example.com/bot)"
-        
         return {
-            "User-Agent": self.crawl.user_agent or default_user_agent,
+            "User-Agent": self.user_agent,
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
             "Accept-Language": "en-US,en;q=0.5",
             "Connection": "keep-alive",
@@ -79,6 +109,15 @@ class Crawler:
         if not await self._verify_crawl_exists():
             logger.warning(f"Crawl {self.crawl.id} was deleted before starting. Exiting gracefully.")
             return
+
+        # robots.txt first: its Disallow rules gate every fetch below and its
+        # Crawl-delay raises the floor on our request interval before the
+        # first page goes out.
+        await self.robots.ensure_loaded(self.client, self.crawl.url, self.rate_limiter)
+        crawl_delay = self.robots.crawl_delay(self.domain)
+        if crawl_delay:
+            self.rate_limiter.raise_floor(crawl_delay)
+            logger.info(f"robots.txt Crawl-delay {crawl_delay}s -> request interval {self.rate_limiter.delay:.1f}s")
 
         # ALWAYS run navigation detection on the homepage first
         # This ensures we detect main nav links even if crawl starts from a subpage
@@ -128,6 +167,11 @@ class Crawler:
             # Construct homepage URL from the domain
             parsed = urlparse(self.crawl.url)
             homepage_url = f"{parsed.scheme}://{parsed.netloc}/"
+
+            if not self.robots.is_allowed(homepage_url):
+                logger.info(f"robots.txt disallows the homepage for {self.robots.token}; skipping nav detection")
+                self.nav_detection_done = True
+                return
 
             logger.info(f"Running navigation detection on homepage: {homepage_url}")
 
@@ -563,31 +607,16 @@ class Crawler:
             logger.error(f"Error saving SEO metadata: {e}", exc_info=True)
     
     async def _process_robots_and_sitemaps(self) -> None:
-        """Process robots.txt and sitemaps to respect crawling rules and discover URLs."""
-        parsed_url = urlparse(self.crawl.url)
-        robots_url = f"{parsed_url.scheme}://{parsed_url.netloc}/robots.txt"
-        
+        """Discover URLs from the sitemaps robots.txt advertises.
+
+        robots.txt itself (Disallow, Crawl-delay) was fetched and parsed by
+        ``self.robots`` in ``start()``; this only walks its Sitemap lines.
+        """
         try:
-            # Fetch robots.txt
-            await self.rate_limiter.wait()
-            response = await self.client.get(robots_url)
-            
-            if response.status_code == 200:
-                # Parse robots.txt (simplified)
-                robots_content = response.text
-                sitemap_urls = []
-                
-                for line in robots_content.split('\n'):
-                    if line.lower().startswith('sitemap:'):
-                        sitemap_url = line.split(':', 1)[1].strip()
-                        sitemap_urls.append(sitemap_url)
-                
-                # Process sitemaps
-                for sitemap_url in sitemap_urls:
-                    await self._process_sitemap(sitemap_url)
-        
+            for sitemap_url in self.robots.sitemaps(self.domain):
+                await self._process_sitemap(sitemap_url)
         except Exception as e:
-            logger.error(f"Error processing robots.txt: {e}")
+            logger.error(f"Error processing sitemaps: {e}")
     
     async def _process_sitemap(self, sitemap_url: str) -> None:
         """Process a sitemap to discover URLs."""
@@ -658,9 +687,31 @@ class Crawler:
 
             self.visited_urls.add(normalized_url)
 
+            # robots.txt gate. Every URL funnels through here (start URL,
+            # sitemap entries, discovered links, external domains), so this is
+            # the one place Disallow is enforced. External hosts get their
+            # robots.txt fetched on first sight.
+            await self.robots.ensure_loaded(self.client, url, self.rate_limiter)
+            if not self.robots.is_allowed(url):
+                self.skipped_by_robots += 1
+                logger.info(f"robots.txt disallows {url} for {self.robots.token}; skipping")
+                continue
+
             # Crawl the URL
             try:
                 result = await self._crawl_url(url, depth, source_url)
+                if self.blocked_reason:
+                    logger.warning(
+                        f"Stopping crawl of {self.domain} after {self.pages_crawled} pages: {self.blocked_reason}"
+                    )
+                    break
+                if self.pending_retry == url:
+                    # The site pushed back once; give it one more go after the
+                    # penalty window instead of marking the URL done.
+                    self.pending_retry = None
+                    self.visited_urls.discard(normalized_url)
+                    self.url_queue.insert(0, queue_item)
+                    continue
                 if result and len(result) == 5:
                     page, seo_metadata, soup, extracted_data, status_code = result
 
@@ -687,6 +738,27 @@ class Crawler:
                 logger.error(f"Error crawling {url}: {e}")
                 # Don't increment pages_crawled for failed pages
     
+    def _handle_block(self, url: str, reason: str, headers) -> None:
+        """Record a 429/503/challenge response and decide: retry later or stop.
+
+        The penalty goes on the HOST bucket, so every crawl in this process
+        that targets the same site slows down, not just this one.
+        """
+        self.consecutive_blocks += 1
+        delay = backoff_seconds(headers, self.consecutive_blocks)
+        self.rate_limiter.penalize(delay, url)
+        logger.warning(
+            f"{reason} from {url}; backing off {delay:.0f}s "
+            f"({self.consecutive_blocks}/{MAX_CONSECUTIVE_BLOCKS} consecutive)"
+        )
+        if self.consecutive_blocks >= MAX_CONSECUTIVE_BLOCKS:
+            self.blocked_reason = reason
+            return
+        retries = self.block_retries.get(url, 0)
+        if retries < MAX_RETRIES_PER_URL:
+            self.block_retries[url] = retries + 1
+            self.pending_retry = url
+
     async def _crawl_url(self, url: str, depth: int, source_url: Optional[str]) -> Tuple[Optional[Page], Optional[SEOMetadata]]:
         """Crawl a single URL."""
         logger.info(f"Crawling {url} at depth {depth}")
@@ -703,6 +775,21 @@ class Crawler:
             final_url = str(response.url)
             status_code = response.status_code
             content_type = response.headers.get("content-type", "")
+
+            # Site pushing back? Back off, retry once or twice, and stop the
+            # crawl if it keeps happening. Before 2026-10-19 a 429 was stored
+            # as a "page" and the crawl carried on at full speed, which is how
+            # a temporary rate limit turns into a permanent IP ban.
+            if status_code in (403, 429, 503):
+                try:
+                    body_sample = response.text[:8192]
+                except Exception:
+                    body_sample = ""
+                block_reason = detect_block(status_code, response.headers, body_sample)
+                if block_reason:
+                    self._handle_block(url, block_reason, response.headers)
+                    return None
+            self.consecutive_blocks = 0
 
             # Response size limit: skip responses > 10MB to prevent memory issues
             MAX_RESPONSE_BYTES = 10 * 1024 * 1024
@@ -1273,43 +1360,63 @@ class Crawler:
             logger.error(f"Error batch saving links: {e}")
 
     async def _check_and_save_link(self, link_data: Dict) -> None:
-        """Check link status and save to database."""
+        """Save a link with its HTTP status, probing each unique URL at most once per crawl.
+
+        The probe is skipped (status left NULL, not marked broken) when the
+        per-crawl cap is reached, robots.txt disallows the URL, or the site
+        has already asked us to stop.
+        """
         try:
-            await self.rate_limiter.wait()
-            start_time = time.time()
+            target = link_data['target_url']
+            cache_key = self._normalize_url(target)
+            cached = self.link_status_cache.get(cache_key)
+            if cached is None:
+                if (
+                    self.blocked_reason
+                    or self.link_checks_done >= MAX_LINK_CHECKS_PER_CRAWL
+                    or not self.robots.is_allowed(target)
+                ):
+                    link_data['status_code'] = None
+                    link_data['is_broken'] = False
+                    await self._save_link(link_data)
+                    return
+                cached = await self._probe_link(target)
+                self.link_status_cache[cache_key] = cached
+                self.link_checks_done += 1
 
-            # Try HEAD request first
-            try:
-                response = await self.client.head(
-                    link_data['target_url'],
-                    follow_redirects=True,
-                    timeout=10.0
-                )
-                link_data['status_code'] = response.status_code
-                link_data['latency_ms'] = int((time.time() - start_time) * 1000)
-            except Exception:
-                # If HEAD fails, try GET
-                try:
-                    response = await self.client.get(
-                        link_data['target_url'],
-                        follow_redirects=True,
-                        timeout=10.0
-                    )
-                    link_data['status_code'] = response.status_code
-                    link_data['latency_ms'] = int((time.time() - start_time) * 1000)
-                except Exception as e:
-                    link_data['status_code'] = 0
-                    link_data['error'] = str(e)[:500]  # Limit error length
-                    link_data['latency_ms'] = int((time.time() - start_time) * 1000)
+            status_code, latency_ms, error = cached
+            link_data['status_code'] = status_code
+            link_data['latency_ms'] = latency_ms
+            link_data['error'] = error
+            # Broken if status >= 400 or the request failed entirely
+            link_data['is_broken'] = (status_code or 0) >= 400 or status_code == 0
 
-            # Mark broken if status >= 400 or request failed entirely
-            link_data['is_broken'] = (link_data.get('status_code') or 0) >= 400 or link_data.get('status_code') == 0
-
-            # Save the link with status info
             await self._save_link(link_data)
 
         except Exception as e:
             logger.error(f"Error checking and saving link: {e}")
+
+    async def _probe_link(self, target: str) -> Tuple[Optional[int], Optional[int], Optional[str]]:
+        """HEAD (GET on failure) one URL through the host throttle. Returns (status, latency_ms, error)."""
+        await self.rate_limiter.wait(target)
+        start_time = time.time()
+        try:
+            response = await self.client.head(target, follow_redirects=True, timeout=10.0)
+        except Exception:
+            try:
+                response = await self.client.get(target, follow_redirects=True, timeout=10.0)
+            except Exception as e:
+                return 0, int((time.time() - start_time) * 1000), str(e)[:500]
+
+        latency_ms = int((time.time() - start_time) * 1000)
+        block_reason = detect_block(response.status_code, response.headers, "")
+        if block_reason:
+            # A link probe tripping the WAF counts the same as a page fetch.
+            self._handle_block(target, block_reason, response.headers)
+            self.pending_retry = None  # probes are not retried
+        else:
+            self.consecutive_blocks = 0
+        return response.status_code, latency_ms, None
 
     async def _extract_and_save_images(
         self,
@@ -2002,22 +2109,3 @@ class Crawler:
                 
         except Exception as e:
             logger.error(f"Error updating crawl progress: {e}")
-
-
-class RateLimiter:
-    """Rate limiter to control request frequency."""
-
-    def __init__(self, requests_per_second: float):
-        self.delay = 1.0 / requests_per_second
-        self.last_request_time = 0.0
-
-    async def wait(self) -> None:
-        """Wait if needed to maintain the rate limit."""
-        now = time.monotonic()
-        elapsed = now - self.last_request_time
-        sleep_time = self.delay - elapsed
-
-        if sleep_time > 0:
-            await asyncio.sleep(sleep_time)
-
-        self.last_request_time = time.monotonic()

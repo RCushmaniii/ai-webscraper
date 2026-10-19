@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { toast } from 'sonner';
-import { ArrowLeft, Loader2, Plus, AlertTriangle, Info } from 'lucide-react';
-import { apiService, CrawlCreate } from '../services/api';
-import { usePageTitle } from '../hooks/usePageTitle';
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
+import { ArrowLeft, Loader2, Plus, AlertTriangle, Info } from "lucide-react";
+import { apiService, CrawlCreate } from "../services/api";
+import { usePageTitle } from "../hooks/usePageTitle";
 
 interface UsageInfo {
   current_count: number;
@@ -13,18 +13,18 @@ interface UsageInfo {
 }
 
 const CrawlNewPage: React.FC = () => {
-  usePageTitle('New Crawl');
+  usePageTitle("New Crawl");
   const navigate = useNavigate();
   const [formData, setFormData] = useState<CrawlCreate>({
-    url: '',
-    name: '',
+    url: "",
+    name: "",
     max_depth: 2,
     max_pages: 10,
     respect_robots_txt: true,
     follow_external_links: false,
-    js_rendering: false,  // kept for API compat but auto-detected on backend
+    js_rendering: false, // kept for API compat but auto-detected on backend
     rate_limit: 1,
-    user_agent: 'AI WebScraper Bot'
+    user_agent: "CushLabsBot/1.0 (+https://scraper.cushlabs.ai/bot.html)",
   });
   const [formSubmitting, setFormSubmitting] = useState(false);
   const [usage, setUsage] = useState<UsageInfo | null>(null);
@@ -39,46 +39,49 @@ const CrawlNewPage: React.FC = () => {
       const data = await apiService.getUsage();
       setUsage(data);
     } catch (err) {
-      console.error('Error fetching usage:', err);
+      console.error("Error fetching usage:", err);
     } finally {
       setUsageLoading(false);
     }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+  ) => {
     const { name, value, type } = e.target as HTMLInputElement;
 
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: type === 'checkbox'
-        ? (e.target as HTMLInputElement).checked
-        : type === 'number'
-          ? Number(value)
-          : value
+      [name]:
+        type === "checkbox"
+          ? (e.target as HTMLInputElement).checked
+          : type === "number"
+            ? Number(value)
+            : value,
     }));
   };
 
   const validateForm = (): string | null => {
     try {
       const parsed = new URL(formData.url);
-      if (!['http:', 'https:'].includes(parsed.protocol)) {
-        return 'URL must start with http:// or https://';
+      if (!["http:", "https:"].includes(parsed.protocol)) {
+        return "URL must start with http:// or https://";
       }
     } catch {
-      return 'Please enter a valid URL';
+      return "Please enter a valid URL";
     }
     if (!formData.name || formData.name.trim().length === 0) {
-      return 'Please enter a crawl name';
+      return "Please enter a crawl name";
     }
     if (formData.max_depth < 1 || formData.max_depth > 10) {
-      return 'Max depth must be between 1 and 10';
+      return "Max depth must be between 1 and 10";
     }
     const maxPagesLimit = usage?.is_unlimited ? 100 : 50;
     if (formData.max_pages < 1 || formData.max_pages > maxPagesLimit) {
       return `Max pages must be between 1 and ${maxPagesLimit}`;
     }
     if (formData.rate_limit < 0.1 || formData.rate_limit > 10) {
-      return 'Rate limit must be between 0.1 and 10 requests per second';
+      return "Rate limit must be between 0.1 and 10 requests per second";
     }
     return null;
   };
@@ -98,20 +101,25 @@ const CrawlNewPage: React.FC = () => {
 
     try {
       await apiService.createCrawl(formData);
-      toast.success('Crawl created successfully');
-      navigate('/crawls');
+      toast.success("Crawl created successfully");
+      navigate("/crawls");
     } catch (err: any) {
-      console.error('Error creating crawl:', err);
+      console.error("Error creating crawl:", err);
       const detail = err?.response?.data?.detail;
 
       // Handle crawl limit reached error
-      if (detail?.error === 'crawl_limit_reached') {
-        toast.error(`Free tier limit reached. You have used all ${detail.limit} free crawls.`);
+      if (detail?.error === "crawl_limit_reached") {
+        toast.error(
+          `Free tier limit reached. You have used all ${detail.limit} free crawls.`,
+        );
         // Refresh usage to update the UI
         fetchUsage();
       } else {
-        const errorMessage = typeof detail === 'string' ? detail : detail?.message || err?.message || 'Failed to create crawl';
-        toast.error(errorMessage, { id: 'crawl-form-error' });
+        const errorMessage =
+          typeof detail === "string"
+            ? detail
+            : detail?.message || err?.message || "Failed to create crawl";
+        toast.error(errorMessage, { id: "crawl-form-error" });
       }
     } finally {
       setFormSubmitting(false);
@@ -119,17 +127,19 @@ const CrawlNewPage: React.FC = () => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto" style={{ padding: '4rem 2rem' }}>
+    <div className="max-w-4xl mx-auto" style={{ padding: "4rem 2rem" }}>
       {/* Header */}
       <div className="mb-8">
         <button
-          onClick={() => navigate('/crawls')}
+          onClick={() => navigate("/crawls")}
           className="inline-flex items-center gap-2 mb-4 text-sm font-medium text-neutral-steel hover:text-secondary-600 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to Crawls
         </button>
-        <h1 className="text-3xl font-semibold text-neutral-charcoal">Create New Crawl</h1>
+        <h1 className="text-3xl font-semibold text-neutral-charcoal">
+          Create New Crawl
+        </h1>
         <p className="mt-2 text-base text-neutral-steel leading-comfortable">
           Configure your website crawl settings
         </p>
@@ -142,9 +152,12 @@ const CrawlNewPage: React.FC = () => {
             <div className="mb-6 bg-error-50 border border-error-200 rounded-lg p-4 flex items-start gap-3">
               <AlertTriangle className="w-5 h-5 text-error-600 flex-shrink-0 mt-0.5" />
               <div>
-                <h3 className="text-sm font-semibold text-error-700">Free Tier Limit Reached</h3>
+                <h3 className="text-sm font-semibold text-error-700">
+                  Free Tier Limit Reached
+                </h3>
                 <p className="text-sm text-error-600 mt-1">
-                  You have used all {usage.limit} free crawls. Upgrade to Pro to create unlimited crawls and unlock premium features.
+                  You have used all {usage.limit} free crawls. Upgrade to Pro to
+                  create unlimited crawls and unlock premium features.
                 </p>
                 <button
                   type="button"
@@ -160,8 +173,10 @@ const CrawlNewPage: React.FC = () => {
               <Info className="w-5 h-5 text-secondary-600 flex-shrink-0 mt-0.5" />
               <div>
                 <p className="text-sm text-secondary-700">
-                  <span className="font-semibold">{usage.remaining} of {usage.limit} free crawls remaining.</span>
-                  {' '}Upgrade to Pro for unlimited crawls.
+                  <span className="font-semibold">
+                    {usage.remaining} of {usage.limit} free crawls remaining.
+                  </span>{" "}
+                  Upgrade to Pro for unlimited crawls.
                 </p>
               </div>
             </div>
@@ -170,11 +185,16 @@ const CrawlNewPage: React.FC = () => {
       )}
 
       {/* Form */}
-      <div className={`bg-white rounded-lg shadow-soft-lg border border-primary-100 overflow-hidden ${usage && !usage.is_unlimited && usage.remaining === 0 ? 'opacity-50 pointer-events-none' : ''}`}>
-        <form onSubmit={handleSubmit} style={{ padding: '2.5rem' }}>
+      <div
+        className={`bg-white rounded-lg shadow-soft-lg border border-primary-100 overflow-hidden ${usage && !usage.is_unlimited && usage.remaining === 0 ? "opacity-50 pointer-events-none" : ""}`}
+      >
+        <form onSubmit={handleSubmit} style={{ padding: "2.5rem" }}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label htmlFor="name" className="block text-sm font-semibold text-neutral-charcoal mb-2">
+              <label
+                htmlFor="name"
+                className="block text-sm font-semibold text-neutral-charcoal mb-2"
+              >
                 Crawl Name<span className="text-red-500 ml-1">*</span>
               </label>
               <input
@@ -191,7 +211,10 @@ const CrawlNewPage: React.FC = () => {
             </div>
 
             <div>
-              <label htmlFor="url" className="block text-sm font-semibold text-neutral-charcoal mb-2">
+              <label
+                htmlFor="url"
+                className="block text-sm font-semibold text-neutral-charcoal mb-2"
+              >
                 Start URL<span className="text-red-500 ml-1">*</span>
               </label>
               <input
@@ -208,7 +231,10 @@ const CrawlNewPage: React.FC = () => {
             </div>
 
             <div>
-              <label htmlFor="max_depth" className="block text-sm font-semibold text-neutral-charcoal mb-2">
+              <label
+                htmlFor="max_depth"
+                className="block text-sm font-semibold text-neutral-charcoal mb-2"
+              >
                 Max Depth
               </label>
               <input
@@ -222,11 +248,16 @@ const CrawlNewPage: React.FC = () => {
                 onChange={handleInputChange}
                 className="block w-full px-4 py-3 border border-primary-200 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-secondary-500 text-sm text-neutral-charcoal"
               />
-              <p className="mt-1.5 text-xs text-neutral-steel">How many levels deep to crawl (1-10)</p>
+              <p className="mt-1.5 text-xs text-neutral-steel">
+                How many levels deep to crawl (1-10)
+              </p>
             </div>
 
             <div>
-              <label htmlFor="max_pages" className="block text-sm font-semibold text-neutral-charcoal mb-2">
+              <label
+                htmlFor="max_pages"
+                className="block text-sm font-semibold text-neutral-charcoal mb-2"
+              >
                 Max Pages
               </label>
               <input
@@ -240,11 +271,17 @@ const CrawlNewPage: React.FC = () => {
                 onChange={handleInputChange}
                 className="block w-full px-4 py-3 border border-primary-200 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-secondary-500 text-sm text-neutral-charcoal"
               />
-              <p className="mt-1.5 text-xs text-neutral-steel">Maximum number of pages to crawl (1-{usage?.is_unlimited ? 100 : 50})</p>
+              <p className="mt-1.5 text-xs text-neutral-steel">
+                Maximum number of pages to crawl (1-
+                {usage?.is_unlimited ? 100 : 50})
+              </p>
             </div>
 
             <div>
-              <label htmlFor="rate_limit" className="block text-sm font-semibold text-neutral-charcoal mb-2">
+              <label
+                htmlFor="rate_limit"
+                className="block text-sm font-semibold text-neutral-charcoal mb-2"
+              >
                 Rate Limit
               </label>
               <input
@@ -259,22 +296,30 @@ const CrawlNewPage: React.FC = () => {
                 onChange={handleInputChange}
                 className="block w-full px-4 py-3 border border-primary-200 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-secondary-500 text-sm text-neutral-charcoal"
               />
-              <p className="mt-1.5 text-xs text-neutral-steel">Requests per second (0.1-10)</p>
+              <p className="mt-1.5 text-xs text-neutral-steel">
+                Requests per second (0.1-10)
+              </p>
             </div>
 
             <div>
-              <label htmlFor="user_agent" className="block text-sm font-semibold text-neutral-charcoal mb-2">
+              <label
+                htmlFor="user_agent"
+                className="block text-sm font-semibold text-neutral-charcoal mb-2"
+              >
                 User Agent
               </label>
               <input
                 type="text"
                 name="user_agent"
                 id="user_agent"
-                value={formData.user_agent || ''}
+                value={formData.user_agent || ""}
                 onChange={handleInputChange}
                 className="block w-full px-4 py-3 border border-primary-200 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-secondary-500 text-sm text-neutral-charcoal"
               />
-              <p className="mt-1.5 text-xs text-neutral-steel">Custom user agent string</p>
+              <p className="mt-1.5 text-xs text-neutral-steel">
+                Must identify a bot. Browser strings (Mozilla, Chrome, Safari)
+                are rejected.
+              </p>
             </div>
           </div>
 
@@ -288,13 +333,18 @@ const CrawlNewPage: React.FC = () => {
                 onChange={handleInputChange}
                 className="w-4 h-4 text-secondary-500 border-primary-300 rounded focus:ring-secondary-500"
               />
-              <label htmlFor="respect_robots_txt" className="ml-3 text-sm text-neutral-charcoal">
+              <label
+                htmlFor="respect_robots_txt"
+                className="ml-3 text-sm text-neutral-charcoal"
+              >
                 Respect robots.txt
               </label>
               <span className="ml-2 group relative">
                 <Info className="w-4 h-4 text-neutral-steel cursor-help" />
                 <span className="invisible group-hover:visible absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-56 px-3 py-2 text-xs text-white bg-gray-900 rounded-lg shadow-lg z-10">
-                  Obey the site's robots.txt rules, which tell crawlers which pages to skip
+                  Obey the site's robots.txt rules (Disallow and Crawl-delay).
+                  Always on for free accounts; admins can override for sites
+                  they own.
                 </span>
               </span>
             </div>
@@ -308,7 +358,10 @@ const CrawlNewPage: React.FC = () => {
                 onChange={handleInputChange}
                 className="w-4 h-4 text-secondary-500 border-primary-300 rounded focus:ring-secondary-500"
               />
-              <label htmlFor="follow_external_links" className="ml-3 text-sm text-neutral-charcoal">
+              <label
+                htmlFor="follow_external_links"
+                className="ml-3 text-sm text-neutral-charcoal"
+              >
                 Follow external links
               </label>
               <span className="ml-2 group relative">
@@ -342,7 +395,7 @@ const CrawlNewPage: React.FC = () => {
             </button>
             <button
               type="button"
-              onClick={() => navigate('/crawls')}
+              onClick={() => navigate("/crawls")}
               disabled={formSubmitting}
               className="inline-flex items-center gap-2 px-6 py-3 text-sm font-medium text-neutral-steel bg-white hover:bg-primary-50 border border-primary-200 rounded-lg shadow-soft transition-colors disabled:opacity-50"
             >

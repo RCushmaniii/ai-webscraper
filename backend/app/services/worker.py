@@ -85,9 +85,12 @@ async def crawl_site(crawl_id: str) -> Dict[str, Any]:
         pages_fetched = crawler.pages_crawled
         pages_saved = crawler.pages_saved
         pages_save_failed = crawler.pages_save_failed
+        blocked_reason = crawler.blocked_reason
+        skipped_by_robots = crawler.skipped_by_robots
         logger.info(
             f"Crawl finished for {crawl_id}. Fetched: {pages_fetched}, "
-            f"saved: {pages_saved}, save-failed: {pages_save_failed}"
+            f"saved: {pages_saved}, save-failed: {pages_save_failed}, "
+            f"robots-skipped: {skipped_by_robots}, blocked: {blocked_reason or 'no'}"
         )
 
         # 5. Update crawl status and final metrics in database.
@@ -105,11 +108,22 @@ async def crawl_site(crawl_id: str) -> Dict[str, Any]:
                     f"backend logs. No viewable pages were stored."
                 )
                 logger.error(f"Crawl {crawl_id}: {pages_fetched} fetched, 0 saved - marking as failed")
+            elif blocked_reason:
+                error_msg = (
+                    f"The site refused automated access before any page was saved "
+                    f"({blocked_reason}). Wait a while and retry with a lower rate limit."
+                )
+                logger.warning(f"Crawl {crawl_id} blocked with 0 pages: {blocked_reason}")
+            elif skipped_by_robots > 0:
+                error_msg = (
+                    f"robots.txt disallows {crawler.robots.token} on every page we found "
+                    f"({skipped_by_robots} skipped). The site owner has asked crawlers to stay out."
+                )
+                logger.warning(f"Crawl {crawl_id}: every URL disallowed by robots.txt")
             else:
                 error_msg = (
                     "Crawl completed but no pages were successfully crawled. This "
-                    "could be due to: robots.txt blocking, connection issues, or "
-                    "invalid URL."
+                    "could be due to: connection issues or an invalid URL."
                 )
                 logger.warning(f"Crawl {crawl_id} completed with 0 pages - marking as failed")
             final_update = {
@@ -141,6 +155,15 @@ async def crawl_site(crawl_id: str) -> Dict[str, Any]:
                     f"Crawl {crawl_id} completed with partial save: "
                     f"{pages_saved} saved, {pages_save_failed} failed"
                 )
+            elif blocked_reason:
+                # Stopped early because the site pushed back. The pages we did
+                # get are valid; say why the crawl is shorter than requested.
+                final_update["error"] = (
+                    f"Stopped early after {pages_saved} page(s): {blocked_reason}. "
+                    f"The site asked us to slow down or blocked automated access; "
+                    f"wait a while and retry with a lower rate limit."
+                )
+                logger.warning(f"Crawl {crawl_id} stopped early: {blocked_reason}")
             else:
                 # Clean run — clear any stale error from a prior re-run attempt.
                 final_update["error"] = None

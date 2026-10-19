@@ -13,8 +13,8 @@
 
 [**Live app**](https://scraper.cushlabs.ai) · [**Documentation**](docs/) · [**Report Bug**](https://github.com/RCushmaniii/ai-webscraper/issues)
 
-| Login | AI Analysis Report |
-|:-----:|:------------------:|
+|                  Login                   |                 AI Analysis Report                  |
+| :--------------------------------------: | :-------------------------------------------------: |
 | ![Login](.github/assets/ai-ws-login.jpg) | ![Report](.github/assets/ai-ws-analysis-report.jpg) |
 
 </div>
@@ -38,14 +38,15 @@ AI WebScraper crawls websites, extracts SEO metadata, detects technical issues, 
 
 ### Core Capabilities
 
-| Feature | Benefit |
-|---------|---------|
-| **Intelligent Crawling** | Depth control, rate limiting, robots.txt compliance |
-| **SEO Issue Detection** | 9 categories including missing titles, thin content, broken links |
-| **AI-Powered Reports** | GPT-4 generated summaries with actionable recommendations |
-| **Image Accessibility** | Automatic alt text detection for WCAG compliance |
-| **Link Analysis** | Internal/external categorization with broken link detection |
-| **JavaScript Rendering** | Firecrawl fallback for SPA pages that need a browser |
+| Feature                  | Benefit                                                                                                                            |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| **Intelligent Crawling** | Depth control, rate limiting, robots.txt compliance                                                                                |
+| **Polite by Design**     | Honest `CushLabsBot` identity, Crawl-delay honoured, backs off on 429/503 and bot challenges, per-host pacing shared across crawls |
+| **SEO Issue Detection**  | 9 categories including missing titles, thin content, broken links                                                                  |
+| **AI-Powered Reports**   | GPT-4 generated summaries with actionable recommendations                                                                          |
+| **Image Accessibility**  | Automatic alt text detection for WCAG compliance                                                                                   |
+| **Link Analysis**        | Internal/external categorization with broken link detection                                                                        |
+| **JavaScript Rendering** | Firecrawl fallback for SPA pages that need a browser                                                                               |
 
 ### Technical Highlights
 
@@ -204,29 +205,29 @@ ai-webscraper/
 
 ### Backend Environment Variables
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `SUPABASE_URL` | Supabase project URL | Yes |
-| `SUPABASE_KEY` | Supabase anon key | Yes |
-| `SUPABASE_SERVICE_ROLE_KEY` | Service role key (bypasses RLS) | Yes |
-| `OPENAI_API_KEY` | OpenAI API key for AI features | Yes |
-| `CORS_ORIGINS` | Comma-separated allowed origins (defaults per `ENVIRONMENT`) | No |
-| `ENVIRONMENT` | `development` / `staging` / `production` | No |
-| `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | Enables distributed rate limiting | Prod |
-| `SENTRY_DSN` | Error monitoring | Prod |
-| `FIRECRAWL_API_KEY` | JS rendering fallback for SPA pages | No |
-| `ENABLE_LLM`, `ENABLE_SEO_AUDIT`, `ENABLE_BATCH_CRAWLS` | Feature flags (true/false) | No |
-| `APP_VERSION` | Git SHA reported by `/api/v1/health/` (set by the Docker build) | No |
+| Variable                                                | Description                                                     | Required |
+| ------------------------------------------------------- | --------------------------------------------------------------- | -------- |
+| `SUPABASE_URL`                                          | Supabase project URL                                            | Yes      |
+| `SUPABASE_KEY`                                          | Supabase anon key                                               | Yes      |
+| `SUPABASE_SERVICE_ROLE_KEY`                             | Service role key (bypasses RLS)                                 | Yes      |
+| `OPENAI_API_KEY`                                        | OpenAI API key for AI features                                  | Yes      |
+| `CORS_ORIGINS`                                          | Comma-separated allowed origins (defaults per `ENVIRONMENT`)    | No       |
+| `ENVIRONMENT`                                           | `development` / `staging` / `production`                        | No       |
+| `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`   | Enables distributed rate limiting                               | Prod     |
+| `SENTRY_DSN`                                            | Error monitoring                                                | Prod     |
+| `FIRECRAWL_API_KEY`                                     | JS rendering fallback for SPA pages                             | No       |
+| `ENABLE_LLM`, `ENABLE_SEO_AUDIT`, `ENABLE_BATCH_CRAWLS` | Feature flags (true/false)                                      | No       |
+| `APP_VERSION`                                           | Git SHA reported by `/api/v1/health/` (set by the Docker build) | No       |
 
 ### Frontend Environment Variables
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `REACT_APP_API_URL` | Backend API base URL | Yes |
-| `REACT_APP_SUPABASE_URL` | Supabase project URL | Yes |
-| `REACT_APP_SUPABASE_ANON_KEY` | Supabase anon key | Yes |
-| `REACT_APP_SENTRY_DSN` | Frontend error monitoring | Prod |
-| `VITE_APP_VERSION` | Build-time git SHA stamped into `<meta name="app-version">` | Build |
+| Variable                      | Description                                                 | Required |
+| ----------------------------- | ----------------------------------------------------------- | -------- |
+| `REACT_APP_API_URL`           | Backend API base URL                                        | Yes      |
+| `REACT_APP_SUPABASE_URL`      | Supabase project URL                                        | Yes      |
+| `REACT_APP_SUPABASE_ANON_KEY` | Supabase anon key                                           | Yes      |
+| `REACT_APP_SENTRY_DSN`        | Frontend error monitoring                                   | Prod     |
+| `VITE_APP_VERSION`            | Build-time git SHA stamped into `<meta name="app-version">` | Build    |
 
 ---
 
@@ -234,13 +235,13 @@ ai-webscraper/
 
 Measured on production workloads:
 
-| Metric | Value |
-|--------|-------|
-| Pages per crawl | 1,150+ verified |
-| Links extracted | 292+ per site |
-| Images processed | 187+ with metadata |
-| Issue detection | 15-30 issues per crawl |
-| Crawl speed | 10-15x improvement after optimization |
+| Metric           | Value                                 |
+| ---------------- | ------------------------------------- |
+| Pages per crawl  | 1,150+ verified                       |
+| Links extracted  | 292+ per site                         |
+| Images processed | 187+ with metadata                    |
+| Issue detection  | 15-30 issues per crawl                |
+| Crawl speed      | 10-15x improvement after optimization |
 
 ---
 
@@ -258,12 +259,12 @@ Measured on production workloads:
 
 ## User Tiers
 
-| Feature | Free Tier | Admin |
-|---------|-----------|-------|
-| Crawls | 3 total | Unlimited |
-| Pages per crawl | 100 | 1,000 |
-| AI Reports | Yes | Yes |
-| User Management | No | Yes |
+| Feature         | Free Tier | Admin     |
+| --------------- | --------- | --------- |
+| Crawls          | 3 total   | Unlimited |
+| Pages per crawl | 100       | 1,000     |
+| AI Reports      | Yes       | Yes       |
+| User Management | No        | Yes       |
 
 Free users see their remaining crawls in the UI with an upgrade path.
 
@@ -275,10 +276,10 @@ Two gates. CI (`.github/workflows/ci.yml`) runs on every PR and push to `main`; 
 
 **Before merge (CI):**
 
-| Job | What it proves |
-|-----|----------------|
+| Job           | What it proves                                                                                                                                                                                                 |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Backend tests | 125 pytest specs - crawler core, security (SSRF/blacklist), issue detector, models, Sentry filtering, plus HTTP smoke tests that boot the real app and assert health, security headers, the auth gate and CORS |
-| Frontend | `tsc --noEmit`, 35 Vitest specs, and a production Vite build |
+| Frontend      | `tsc --noEmit`, 35 Vitest specs, and a production Vite build                                                                                                                                                   |
 
 **After deploy (production smoke, `scripts/smoke-prod.sh`):** API health and version, hardening headers, anonymous access refused, frontend served with CSP and a loading bundle, and a drift check that warns when `main` has not been pulled onto the VPS yet.
 
@@ -381,4 +382,4 @@ info@cushlabs.ai
 
 ---
 
-*Last Updated: 2026-03-10*
+_Last Updated: 2026-03-10_

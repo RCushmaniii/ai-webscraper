@@ -1,6 +1,15 @@
-import React, { useState } from 'react';
-import { Book, Code, Settings, Shield, BarChart3, Layers, ChevronRight, ChevronDown } from 'lucide-react';
-import { usePageTitle } from '../hooks/usePageTitle';
+import React, { useState } from "react";
+import {
+  Book,
+  Code,
+  Settings,
+  Shield,
+  BarChart3,
+  Layers,
+  ChevronRight,
+  ChevronDown,
+} from "lucide-react";
+import { usePageTitle } from "../hooks/usePageTitle";
 
 interface DocSection {
   id: string;
@@ -16,9 +25,14 @@ interface DocItem {
 }
 
 const DocsPage: React.FC = () => {
-  usePageTitle('Documentation', 'Complete documentation for AI WebScraper — crawl configuration, SEO issue detection, AI analysis reports, and API reference.');
-  const [activeSection, setActiveSection] = useState<string>('overview');  // Auto-load Platform Overview
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['introduction']));
+  usePageTitle(
+    "Documentation",
+    "Complete documentation for AI WebScraper — crawl configuration, SEO issue detection, AI analysis reports, and API reference.",
+  );
+  const [activeSection, setActiveSection] = useState<string>("overview"); // Auto-load Platform Overview
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(
+    new Set(["introduction"]),
+  );
 
   const toggleSection = (sectionId: string) => {
     const newExpanded = new Set(expandedSections);
@@ -32,13 +46,13 @@ const DocsPage: React.FC = () => {
 
   const docSections: DocSection[] = [
     {
-      id: 'introduction',
-      title: 'Introduction',
+      id: "introduction",
+      title: "Introduction",
       icon: <Book className="h-4 w-4" />,
       items: [
         {
-          id: 'overview',
-          title: 'Platform Overview',
+          id: "overview",
+          title: "Platform Overview",
           content: `
 # CushLabs Site Analysis (v1)
 
@@ -55,11 +69,11 @@ CushLabs Site Analysis is an **internal, admin-only** site analysis tool.
 - Client-facing reports or exports
 - Real-time dashboards / WebSockets
 - AI-driven scoring
-          `
+          `,
         },
         {
-          id: 'getting-started',
-          title: 'Getting Started',
+          id: "getting-started",
+          title: "Getting Started",
           content: `
 # Getting Started
 
@@ -95,18 +109,18 @@ CushLabs Site Analysis is an **internal, admin-only** site analysis tool.
 2. Create a new crawl with a starting URL
 3. Wait for the crawl to complete
 4. Inspect Pages, Links, and Issues for the crawl
-          `
-        }
-      ]
+          `,
+        },
+      ],
     },
     {
-      id: 'architecture',
-      title: 'Architecture & Tech Stack',
+      id: "architecture",
+      title: "Architecture & Tech Stack",
       icon: <Layers className="h-4 w-4" />,
       items: [
         {
-          id: 'system-architecture',
-          title: 'System Architecture',
+          id: "system-architecture",
+          title: "System Architecture",
           content: `
 # System Architecture
 
@@ -149,11 +163,11 @@ CushLabs Site Analysis is an **internal, admin-only** site analysis tool.
                         │ • Web Scraping  │
                         └─────────────────┘
 \`\`\`
-          `
+          `,
         },
         {
-          id: 'design-principles',
-          title: 'Design Principles',
+          id: "design-principles",
+          title: "Design Principles",
           content: `
 # Design Principles
 
@@ -177,18 +191,18 @@ CushLabs Site Analysis is an **internal, admin-only** site analysis tool.
 - **Efficient data fetching** with proper caching
 - **Background job processing** with Celery
 - **Database indexing** for optimal query performance
-          `
-        }
-      ]
+          `,
+        },
+      ],
     },
     {
-      id: 'api',
-      title: 'API Documentation',
+      id: "api",
+      title: "API Documentation",
       icon: <Code className="h-4 w-4" />,
       items: [
         {
-          id: 'api-overview',
-          title: 'API Overview',
+          id: "api-overview",
+          title: "API Overview",
           content: `
 # API Documentation
 
@@ -234,11 +248,11 @@ POST /api/v1/crawls
   "created_at": "2024-01-15T10:30:00Z"
 }
 \`\`\`
-          `
+          `,
         },
         {
-          id: 'api-endpoints',
-          title: 'API Endpoints',
+          id: "api-endpoints",
+          title: "API Endpoints",
           content: `
 # API Endpoints Reference
 
@@ -257,18 +271,18 @@ List links discovered for the crawl.
 
 ### GET /api/v1/crawls/{crawl_id}/issues
 List detected issues for the crawl.
-          `
-        }
-      ]
+          `,
+        },
+      ],
     },
     {
-      id: 'features',
-      title: 'Features & Usage',
+      id: "features",
+      title: "Features & Usage",
       icon: <BarChart3 className="h-4 w-4" />,
       items: [
         {
-          id: 'web-scraping',
-          title: 'Web Scraping',
+          id: "web-scraping",
+          title: "Web Scraping",
           content: `
 # Web Scraping Features
 
@@ -296,11 +310,11 @@ List detected issues for the crawl.
 - Page titles and meta descriptions
 - Header tags (H1, H2, H3, etc.)
 - Internal and external links
-          `
+          `,
         },
         {
-          id: 'seo-analysis',
-          title: 'SEO Analysis',
+          id: "seo-analysis",
+          title: "SEO Analysis",
           content: `
 # SEO Analysis Features
 
@@ -318,18 +332,18 @@ v1 focuses on **high-signal issue detection** and **lightweight heuristics**, no
 
 ## Reporting
 No client-facing reports or exports in v1.
-          `
-        }
-      ]
+          `,
+        },
+      ],
     },
     {
-      id: 'security',
-      title: 'Security & Access',
+      id: "security",
+      title: "Security & Access",
       icon: <Shield className="h-4 w-4" />,
       items: [
         {
-          id: 'authentication',
-          title: 'Authentication',
+          id: "authentication",
+          title: "Authentication",
           content: `
 # Authentication & Security
 
@@ -365,11 +379,11 @@ FOR ALL USING (auth.uid() IN (
 - **Environment Variables**: Sensitive data in environment variables
 - **API Key Management**: Secure API key storage and rotation
 - **Input Sanitization**: All user inputs validated and sanitized
-          `
+          `,
         },
         {
-          id: 'user-management',
-          title: 'User Management',
+          id: "user-management",
+          title: "User Management",
           content: `
 # User Management
 
@@ -402,18 +416,18 @@ Since this is an admin-only platform, users must be manually created:
 - **Activity Monitoring**: Track user actions and access
 - **Access Logging**: Comprehensive audit trails
 - **Regular Reviews**: Periodic access reviews and cleanup
-          `
-        }
-      ]
+          `,
+        },
+      ],
     },
     {
-      id: 'configuration',
-      title: 'Configuration',
+      id: "configuration",
+      title: "Configuration",
       icon: <Settings className="h-4 w-4" />,
       items: [
         {
-          id: 'environment-setup',
-          title: 'Environment Setup',
+          id: "environment-setup",
+          title: "Environment Setup",
           content: `
 # Environment Configuration
 
@@ -462,11 +476,11 @@ STORAGE_DIR=./storage
 2. **Run Migrations**: Execute SQL files in \`db_sql/\` directory
 3. **Enable RLS**: Ensure Row Level Security is enabled
 4. **Create Policies**: Apply security policies for admin access
-          `
+          `,
         },
         {
-          id: 'crawl-settings',
-          title: 'Crawl Settings',
+          id: "crawl-settings",
+          title: "Crawl Settings",
           content: `
 # Crawl Configuration
 
@@ -478,9 +492,18 @@ Configure default crawl parameters in the backend:
 DEFAULT_MAX_DEPTH = 3
 DEFAULT_MAX_PAGES = 100
 DEFAULT_CRAWL_DELAY = 1  # seconds
-DEFAULT_USER_AGENT = "AAA-WebScraper/1.0"
+DEFAULT_USER_AGENT = "CushLabsBot/1.0 (+https://scraper.cushlabs.ai/bot.html)"
 DEFAULT_TIMEOUT = 30     # seconds
 \`\`\`
+
+## Politeness
+Every crawl leaves from CushLabs' own servers, so the crawler is built to stay welcome:
+
+- **robots.txt** Disallow and Crawl-delay are honoured (Crawl-delay raises the request interval; the user's rate limit never lowers it)
+- **One request at a time per site**, shared across all running crawls of that site
+- **429 / 503 / bot challenges** trigger a back-off (Retry-After is respected); after three in a row the crawl stops early and says why
+- **Broken-link checks** probe each URL once per crawl, capped at 200
+- **User agents must name a bot**; browser-impersonating strings are rejected. Site owners can read about the bot at https://scraper.cushlabs.ai/bot.html
 
 ## Per-Crawl Settings
 Each crawl can be customized with:
@@ -489,10 +512,10 @@ Each crawl can be customized with:
 - **Max Depth**: How many levels deep to follow links
 - **Max Pages**: Maximum number of pages to crawl
 - **Include External**: Whether to follow external links
-- **JavaScript Enabled**: Use Playwright for JS rendering
-- **Crawl Delay**: Time between requests (be respectful)
-- **Respect Robots**: Honor robots.txt directives
-- **User Agent**: Custom user agent string
+- **JavaScript Rendering**: Auto-detected; JS-only pages are re-fetched through Firecrawl
+- **Rate Limit**: Requests per second (a site's Crawl-delay can slow this further)
+- **Respect Robots**: Honor robots.txt directives (always on for free accounts)
+- **User Agent**: Must identify a bot; defaults to CushLabsBot
 
 ## Storage Settings
 Control what data is stored:
@@ -507,50 +530,85 @@ Control what data is stored:
 - **Rate Limiting**: Requests per second limits
 - **Memory Limits**: Maximum memory usage per crawl
 - **Timeout Settings**: Request and total crawl timeouts
-          `
-        }
-      ]
-    }
+          `,
+        },
+      ],
+    },
   ];
 
   const getActiveContent = () => {
     for (const section of docSections) {
-      const item = section.items.find(item => item.id === activeSection);
+      const item = section.items.find((item) => item.id === activeSection);
       if (item) return item.content;
     }
-    return '';
+    return "";
   };
 
   const renderMarkdown = (content: string) => {
     // Simple markdown rendering - in a real app, use a proper markdown parser
-    return content.split('\n').map((line, index) => {
-      if (line.startsWith('# ')) {
-        return <h1 key={index} className="text-3xl font-bold mt-8 mb-4 text-gray-900">{line.slice(2)}</h1>;
+    return content.split("\n").map((line, index) => {
+      if (line.startsWith("# ")) {
+        return (
+          <h1
+            key={index}
+            className="text-3xl font-bold mt-8 mb-4 text-gray-900"
+          >
+            {line.slice(2)}
+          </h1>
+        );
       }
-      if (line.startsWith('## ')) {
-        return <h2 key={index} className="text-2xl font-bold mt-6 mb-3 text-gray-800">{line.slice(3)}</h2>;
+      if (line.startsWith("## ")) {
+        return (
+          <h2
+            key={index}
+            className="text-2xl font-bold mt-6 mb-3 text-gray-800"
+          >
+            {line.slice(3)}
+          </h2>
+        );
       }
-      if (line.startsWith('### ')) {
-        return <h3 key={index} className="text-xl font-bold mt-4 mb-2 text-gray-700">{line.slice(4)}</h3>;
+      if (line.startsWith("### ")) {
+        return (
+          <h3 key={index} className="text-xl font-bold mt-4 mb-2 text-gray-700">
+            {line.slice(4)}
+          </h3>
+        );
       }
-      if (line.startsWith('```')) {
-        return <div key={index} className="bg-gray-100 p-4 rounded-md font-mono text-sm my-4 overflow-x-auto border">{line.slice(3)}</div>;
+      if (line.startsWith("```")) {
+        return (
+          <div
+            key={index}
+            className="bg-gray-100 p-4 rounded-md font-mono text-sm my-4 overflow-x-auto border"
+          >
+            {line.slice(3)}
+          </div>
+        );
       }
-      if (line.startsWith('- ')) {
-        return <li key={index} className="ml-6 mb-1 text-gray-700">{line.slice(2)}</li>;
+      if (line.startsWith("- ")) {
+        return (
+          <li key={index} className="ml-6 mb-1 text-gray-700">
+            {line.slice(2)}
+          </li>
+        );
       }
-      if (line.includes('**') && line.includes('**')) {
-        const parts = line.split('**');
+      if (line.includes("**") && line.includes("**")) {
+        const parts = line.split("**");
         return (
           <p key={index} className="mb-3 text-gray-700 leading-relaxed">
-            {parts.map((part, i) => i % 2 === 1 ? <strong key={i}>{part}</strong> : part)}
+            {parts.map((part, i) =>
+              i % 2 === 1 ? <strong key={i}>{part}</strong> : part,
+            )}
           </p>
         );
       }
-      if (line.trim() === '') {
+      if (line.trim() === "") {
         return <br key={index} />;
       }
-      return <p key={index} className="mb-3 text-gray-700 leading-relaxed">{line}</p>;
+      return (
+        <p key={index} className="mb-3 text-gray-700 leading-relaxed">
+          {line}
+        </p>
+      );
     });
   };
 
@@ -559,8 +617,12 @@ Control what data is stored:
       <div className="flex-grow">
         <div className="max-w-7xl mx-auto px-4 py-8">
           <div className="mb-8">
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">Documentation</h1>
-            <p className="text-xl text-gray-600">Guide to the AI WebScraper by CushLabs.ai</p>
+            <h1 className="text-4xl font-bold text-gray-900 mb-2">
+              Documentation
+            </h1>
+            <p className="text-xl text-gray-600">
+              Guide to the AI WebScraper by CushLabs.ai
+            </p>
           </div>
 
           <div className="flex gap-8">
@@ -575,12 +637,15 @@ Control what data is stored:
                     >
                       <div className="flex items-center gap-3">
                         {section.icon}
-                        <span className="font-medium text-gray-900">{section.title}</span>
+                        <span className="font-medium text-gray-900">
+                          {section.title}
+                        </span>
                       </div>
-                      {expandedSections.has(section.id) ?
-                        <ChevronDown className="h-4 w-4 text-gray-500" /> :
+                      {expandedSections.has(section.id) ? (
+                        <ChevronDown className="h-4 w-4 text-gray-500" />
+                      ) : (
                         <ChevronRight className="h-4 w-4 text-gray-500" />
-                      }
+                      )}
                     </button>
 
                     {expandedSections.has(section.id) && (
@@ -591,8 +656,8 @@ Control what data is stored:
                             onClick={() => setActiveSection(item.id)}
                             className={`block w-full text-left p-2 rounded-md text-sm transition-colors ${
                               activeSection === item.id
-                                ? 'bg-secondary-50 text-secondary-700 font-medium'
-                                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                                ? "bg-secondary-50 text-secondary-700 font-medium"
+                                : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                             }`}
                           >
                             {item.title}
@@ -614,7 +679,6 @@ Control what data is stored:
           </div>
         </div>
       </div>
-
     </div>
   );
 };

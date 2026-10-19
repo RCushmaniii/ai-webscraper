@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>About CushLabsBot</title>
+    <meta
+      name="description"
+      content="What CushLabsBot is, how it behaves on your site, and how to block it."
+    />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <style>
+      /* Same self-hosted variable fonts the app uses (see src/index.css). */
+      @font-face {
+        font-family: "Manrope";
+        font-weight: 500 800;
+        font-display: swap;
+        src: url("/fonts/manrope-latin-v1.woff2") format("woff2");
+      }
+      @font-face {
+        font-family: "Inter";
+        font-weight: 400 700;
+        font-display: swap;
+        src: url("/fonts/inter-latin-v1.woff2") format("woff2");
+      }
+      :root {
+        --accent: #ff6a3d;
+        --accent-hover: #fd4c00;
+        --ink: #1a1a1a;
+        --steel: #5c5c5c;
+        --line: #e5e5e5;
+        --paper: #ffffff;
+        --wash: #f7f7f7;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--paper);
+        color: var(--ink);
+        font-family:
+          "Inter",
+          system-ui,
+          -apple-system,
+          "Segoe UI",
+          sans-serif;
+        font-size: 17px;
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+      }
+      header {
+        border-bottom: 1px solid var(--line);
+      }
+      .wrap {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 0 16px;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 20px 0;
+        color: var(--ink);
+        text-decoration: none;
+        font-family: "Manrope", "Inter", sans-serif;
+        font-weight: 700;
+        font-size: 18px;
+      }
+      .brand svg {
+        width: 28px;
+        height: 28px;
+      }
+      main {
+        padding: 48px 0 64px;
+      }
+      h1,
+      h2 {
+        font-family: "Manrope", "Inter", sans-serif;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+        line-height: 1.2;
+      }
+      h1 {
+        font-size: 40px;
+        margin: 0 0 12px;
+      }
+      h2 {
+        font-size: 22px;
+        margin: 40px 0 10px;
+      }
+      p {
+        margin: 0 0 16px;
+      }
+      .lede {
+        font-size: 20px;
+        color: var(--steel);
+      }
+      ul {
+        padding-left: 22px;
+        margin: 0 0 16px;
+      }
+      li {
+        margin-bottom: 8px;
+      }
+      code,
+      pre {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 15px;
+      }
+      code {
+        background: var(--wash);
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        padding: 1px 6px;
+      }
+      pre {
+        background: var(--wash);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 16px;
+        overflow-x: auto;
+        margin: 0 0 16px;
+      }
+      pre code {
+        background: none;
+        border: 0;
+        padding: 0;
+      }
+      a {
+        color: var(--accent);
+        text-decoration: none;
+        font-weight: 600;
+      }
+      a:hover {
+        color: var(--accent-hover);
+        text-decoration: underline;
+      }
+      dl {
+        display: grid;
+        grid-template-columns: max-content 1fr;
+        gap: 8px 24px;
+        margin: 0 0 16px;
+      }
+      dt {
+        font-weight: 600;
+      }
+      dd {
+        margin: 0;
+        color: var(--steel);
+      }
+      footer {
+        border-top: 1px solid var(--line);
+        color: var(--steel);
+        font-size: 14px;
+        padding: 20px 0;
+      }
+      @media (max-width: 600px) {
+        h1 {
+          font-size: 30px;
+        }
+        dl {
+          grid-template-columns: 1fr;
+          gap: 2px;
+        }
+        dd {
+          margin-bottom: 10px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="wrap">
+        <a
+          class="brand"
+          href="https://scraper.cushlabs.ai/"
+          aria-label="CushLabs AI Web Scraper"
+        >
+          <svg viewBox="0 0 64 64" fill="none" aria-hidden="true">
+            <path
+              d="M44 14 L26 32 L44 50"
+              stroke="#FF6A3D"
+              stroke-width="10"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+          CushLabs
+        </a>
+      </div>
+    </header>
+
+    <main>
+      <div class="wrap">
+        <h1>About CushLabsBot</h1>
+        <p class="lede">
+          If you found <code>CushLabsBot</code> in your server logs, this page
+          explains what it is, how it behaves, and how to turn it away.
+        </p>
+
+        <h2>What it is</h2>
+        <p>
+          CushLabsBot is the crawler behind the
+          <a href="https://scraper.cushlabs.ai/">CushLabs AI Web Scraper</a>, a
+          site-analysis tool. Someone asked it to review a site, usually their
+          own or one they are advising on, and it reads a limited number of
+          pages to report on SEO and technical issues. It does not harvest email
+          addresses, copy content for republication, or feed a search index.
+        </p>
+        <p>It identifies itself on every request:</p>
+        <pre><code>User-Agent: CushLabsBot/1.0 (+https://scraper.cushlabs.ai/bot.html)</code></pre>
+
+        <h2>How it behaves</h2>
+        <ul>
+          <li>
+            <strong>robots.txt is honoured.</strong> <code>Disallow</code> rules
+            for <code>CushLabsBot</code> or <code>*</code> are respected, and
+            <code>Crawl-delay</code> slows the crawler down.
+          </li>
+          <li>
+            <strong>One request at a time.</strong> Requests to a site go out
+            one after another, never in parallel, at a default of one request
+            per second or slower.
+          </li>
+          <li>
+            <strong>It backs off when asked.</strong> A <code>429</code> or
+            <code>503</code> response, or a bot challenge, pauses the crawler.
+            <code>Retry-After</code> is respected. After three in a row it stops
+            the crawl.
+          </li>
+          <li>
+            <strong>It stays small.</strong> Crawls are capped in pages and in
+            time, and link checks are limited to a few hundred per crawl.
+          </li>
+          <li>
+            <strong
+              >It does not log in, fill forms, or run your JavaScript.</strong
+            >
+            It reads what an anonymous visitor could read.
+          </li>
+        </ul>
+
+        <h2>How to block it</h2>
+        <p>
+          Add this to your <code>robots.txt</code>. The crawler checks it before
+          fetching any page.
+        </p>
+        <pre><code>User-agent: CushLabsBot
+Disallow: /</code></pre>
+        <p>To slow it down instead of blocking it:</p>
+        <pre><code>User-agent: CushLabsBot
+Crawl-delay: 10</code></pre>
+
+        <h2>Contact</h2>
+        <dl>
+          <dt>Operator</dt>
+          <dd>CushLabs AI Services, Guadalajara, Mexico</dd>
+          <dt>Email</dt>
+          <dd><a href="mailto:info@cushlabs.ai">info@cushlabs.ai</a></dd>
+        </dl>
+        <p>
+          If the crawler ever behaves differently from what this page describes,
+          email us with the time, your domain, and the IP address you saw. We
+          will look into it.
+        </p>
+      </div>
+    </main>
+
+    <footer>
+      <div class="wrap">CushLabs AI Services</div>
+    </footer>
+  </body>
+</html>

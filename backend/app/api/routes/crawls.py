@@ -11,6 +11,7 @@ from app.core.auth import get_current_user, get_auth_client
 from app.core.audit import log_audit_event
 from app.core.config import settings
 from app.models.models import Crawl, CrawlCreate, CrawlUpdate, CrawlResponse, User
+from app.services.politeness import resolve_user_agent
 from app.services.worker import crawl_site
 from app.services.storage import get_file_content
 from app.db.supabase import supabase_client
@@ -55,6 +56,19 @@ async def create_crawl(
             if raw_data.get("max_pages", 10) > FREE_MAX_PAGES:
                 raw_data["max_pages"] = FREE_MAX_PAGES
 
+        # Every crawl leaves from CushLabs' own IP, so a site owner's robots.txt
+        # is honoured for everyone. Admins may override for sites they own
+        # (e.g. an authorised audit of a client site that disallows all bots).
+        respect_robots = True if not current_user.is_admin else bool(raw_data.get("respect_robots_txt", True))
+
+        # Browser-impersonating user agents are refused: a polite audit tool
+        # that claims to be Chrome is indistinguishable from a scraper in the
+        # target's logs, and that reputation attaches to our IP.
+        try:
+            user_agent = resolve_user_agent(raw_data.get("user_agent"))
+        except ValueError as ua_error:
+            raise HTTPException(status_code=422, detail=str(ua_error))
+
         # Map model fields to ACTUAL database column names (based on existing schema)
         crawl_data = {
             "id": str(crawl_id),
@@ -62,11 +76,12 @@ async def create_crawl(
             "url": raw_data["url"],  # Database uses 'url' column
             "max_depth": int(raw_data.get("max_depth", 2)),
             "max_pages": int(raw_data.get("max_pages", 10)),
-            "respect_robots_txt": raw_data.get("respect_robots_txt", True),
+            "respect_robots_txt": respect_robots,
             "follow_external_links": raw_data.get("follow_external_links", False),
             "js_rendering": raw_data.get("js_rendering", False),
-            "rate_limit": int(raw_data.get("rate_limit", 2)),
-            "user_agent": raw_data.get("user_agent") or "AI WebScraper Bot",
+            # float: int() turned 0.5 req/s into 0 and the limiter divided by zero
+            "rate_limit": float(raw_data.get("rate_limit", 2)),
+            "user_agent": user_agent,
             "concurrency": 5,
             "status": "queued",
             "created_at": now.isoformat(),
@@ -144,7 +159,12 @@ async def create_crawl(
             raise HTTPException(status_code=500, detail="Crawl created but failed to retrieve.")
 
         return CrawlResponse(**fetch_response.data)
-        
+
+    except HTTPException:
+        # Deliberate responses (422 bad user agent, 403 free-tier limit) must
+        # reach the client as-is; the catch-all below used to turn them into
+        # a 500 "unexpected error", hiding the structured limit message.
+        raise
     except Exception as e:
         logger.exception(f"An unexpected error occurred in create_crawl for crawl_id {crawl_id}")
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
