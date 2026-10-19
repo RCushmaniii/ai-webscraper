@@ -3,7 +3,13 @@ from typing import Optional
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import httpx
-from jose import jwt, JWTError, jwk
+import jwt
+from jwt import PyJWK, PyJWTError
+
+# python-jose was replaced by PyJWT on 2026-10-19: python-jose <= 3.5.0 carries
+# an unpatched CRITICAL (algorithm-confusion guard bypass via DER public keys)
+# and has no maintained release. Call sites keep the JWTError name.
+JWTError = PyJWTError
 from functools import lru_cache
 import time
 import hashlib
@@ -92,11 +98,13 @@ async def verify_jwt_token(token: str) -> dict:
 
         logger.info(f"Found matching key with kid: {kid}, type: {key_data.get('kty')}, alg: {key_data.get('alg')}")
 
-        # Convert JWK to PEM format (critical step!)
-        signing_key = jwk.construct(key_data).to_pem()
-        logger.info("Successfully converted JWK to PEM format")
+        # Build the verification key from the JWK. PyJWK derives the algorithm
+        # from kty/crv when the JWKS entry omits "alg".
+        signing_key = PyJWK.from_dict(key_data).key
 
-        # Verify the token
+        # Verify the token. The asymmetric allowlist is the real defence
+        # against algorithm confusion: an HS* token is rejected before any key
+        # material is touched, whatever library sits underneath.
         payload = jwt.decode(
             token,
             signing_key,

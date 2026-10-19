@@ -16,7 +16,7 @@ from typing import Optional, Dict, Tuple
 from functools import wraps
 from fastapi import Request, HTTPException, status
 from fastapi.responses import JSONResponse
-from jose import jwt
+import jwt
 
 from app.core.config import settings
 from app.core.rate_limits import (
@@ -242,7 +242,7 @@ def _identity_from_request(request: Request) -> Tuple[str, Optional[str]]:
     if auth_header.lower().startswith("bearer "):
         token = auth_header[7:].strip()
         try:
-            sub = jwt.get_unverified_claims(token).get("sub")
+            sub = jwt.decode(token, options={"verify_signature": False}).get("sub")
             if sub:
                 return (f"user:{sub}", sub)
         except Exception:

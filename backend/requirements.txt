@@ -28,7 +28,7 @@ Pillow>=12.3.0,<13  # security: 12 advisories fixed in 12.3.0; transitive via re
 reportlab>=4.0.0
 
 # JWT and authentication (Supabase JWKS validation — see core/auth.py)
-python-jose[cryptography]==3.5.0
+PyJWT[crypto]>=2.10.1,<3  # replaced python-jose 2026-10-19 (unpatched critical GHSA, unmaintained)
 pydantic-settings==2.16.0
 
 # LLM and AI (optional - for content analysis)

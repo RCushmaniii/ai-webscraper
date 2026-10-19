@@ -29,12 +29,9 @@ const root = ReactDOM.createRoot(
 
 root.render(
   <React.StrictMode>
-    <BrowserRouter
-      future={{
-        v7_startTransition: true,
-        v7_relativeSplatPath: true,
-      }}
-    >
+    {/* React Router 7 (2026-10-19): the v7_* future flags the app ran with
+        under v6 are now the defaults, so the prop is gone. */}
+    <BrowserRouter>
       <QueryClientProvider client={queryClient}>
         <App />
       </QueryClientProvider>
