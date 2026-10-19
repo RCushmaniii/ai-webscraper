@@ -21,6 +21,8 @@ Entries are newest-first. Each entry documents one Claude Code working session.
 
 ### Immediate Next Steps
 
+- [x] **Live login verified:** GitHub sign-in worked for Robert after the deploy, so the PyJWT path is confirmed in production.
+- [ ] **Google sign-in is broken at Google, not here:** `Error 401: deleted_client` ("The OAuth client was deleted"). The dedicated "AI WebScraper" GCP project from the archived setup guide no longer exists (not among the 7 active projects; the 2026-08-27 cleanup's 30-day undo expired 2026-09-26). Fix is a new Web OAuth client in `cushlabs-1774756152745` with redirect `https://kbltwyiowkbxzhhhozxf.supabase.co/auth/v1/callback`, then Client ID + client secret into Supabase Auth -> Providers -> Google. Dashboard-only: no gcloud/API exists for creating OAuth clients, and the Supabase CLI's management token is not stored where a script can use it on this machine.
 - [ ] First real login after this deploy is the only path not exercised locally (the agent has no user account to sign in with); if a 401 appears, look for "JWT verification failed" in `docker logs webscraper` to see the cause.
 
 ### Technical Debt
