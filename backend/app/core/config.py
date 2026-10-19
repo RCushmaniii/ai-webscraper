@@ -5,6 +5,8 @@ from pathlib import Path
 from pydantic_settings import BaseSettings
 from dotenv import load_dotenv
 
+from app.services.politeness import BOT_USER_AGENT
+
 load_dotenv()
 
 logger = logging.getLogger(__name__)
@@ -135,8 +137,9 @@ class Settings(BaseSettings):
         else:  # development
             return self._DEV_CORS_ORIGINS
     
-    # Scraping settings
-    DEFAULT_USER_AGENT: str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    # Scraping settings. The crawler identifies itself honestly; the single
+    # source for the string is app.services.politeness.BOT_USER_AGENT.
+    DEFAULT_USER_AGENT: str = BOT_USER_AGENT
     REQUEST_TIMEOUT: int = 30  # seconds
 
     # Firecrawl API (JS rendering fallback for SPA pages)

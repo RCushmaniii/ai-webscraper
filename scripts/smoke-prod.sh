@@ -89,6 +89,16 @@ else
 fi
 rm -f "$TMPIDX" "$TMPIDX.h"
 
+# 5b. Bot info page -----------------------------------------------------------
+# The crawler's User-Agent points site owners here; a 404 would make us look
+# like an anonymous scraper to anyone who checks.
+bot_body="$(curl -s --max-time 20 "$BASE/bot.html" || true)"
+if printf '%s' "$bot_body" | grep -q 'CushLabsBot'; then
+  pass "bot.html explains CushLabsBot"
+else
+  fail "$BASE/bot.html missing or does not mention CushLabsBot"
+fi
+
 # 6. Drift --------------------------------------------------------------------
 if [ -n "${EXPECTED_VERSION:-}" ]; then
   for pair in "backend:$backend_version" "frontend:$frontend_version"; do
