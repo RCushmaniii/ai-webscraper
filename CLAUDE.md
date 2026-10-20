@@ -222,6 +222,10 @@ Since 2026-10-20 (before that, the report called a 97/100 Lighthouse site "criti
 - **Server response time = median TTFB**, measured against the final URL with redirects timed separately (`pages.ttfb_ms`, `redirect_ms`, `ttfb_samples`, `final_url`), re-sampled twice at the end of the crawl with the link checker idle (`Crawler._resample_response_times`). Graded on Google's TTFB bands in `backend/app/core/performance.py` (pass < 800 ms, slow < 1800 ms, poor above); severity never above medium; findings say "measured from our US-East server". `pages.response_time` (whole fetch) is kept only as the fallback for old rows.
 - The apex and its `www.` form, plus wherever the start URL redirects, are one site (`Crawler.internal_hosts`); links resolve against `final_url`. A start URL that redirects produces one low-severity finding, not a per-page penalty.
 
+### 1c. The messaging review (Content & Brand tab) is an AI reading, not a score
+
+Since 2026-10-20 the strategy analysis stores and shows **no scores** (six unlike pages used to get the identical 75/80/70; a prospect's AI assistant called it out). `backend/app/services/strategy_evidence.py` is the gate: the model must return verbatim `evidence` quotes, Python checks them against the skeleton it was given, and a page whose quotes do not verify loses its gaps/issues/suggestions/recommendation and is shown as "no verifiable note". Pricing pages have their own purpose (`pricing`) and are not graded as sales letters. Do not reintroduce a numeric content-strategy score unless it is computed from counted signals with a published rubric.
+
 ### 2. User Tier System
 
 **Users have tier-based access**:

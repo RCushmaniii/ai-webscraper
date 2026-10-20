@@ -535,6 +535,18 @@ class PageSemanticStrategy(BaseModel):
     tone_audit: TonePersonaAudit
     skim_test: SkimTestAudit
     overall_strategy_score: int = Field(..., ge=0, le=100, description="Weighted average of the three sub-scores")
+    # Scores are produced but never stored or shown (services/strategy_evidence.py).
+    # What survives is evidence: the report keeps a page's notes only when at
+    # least one quote here is really in the skeleton the model was given.
+    evidence: List[str] = Field(
+        default_factory=list,
+        max_length=4,
+        description=(
+            "VERBATIM quotes (copy exactly, no paraphrase) from the skeleton's title, meta, headings, "
+            "paragraph openers or CTA labels that your gaps, issues and top recommendation react to. "
+            "At least one is required; a note with no quote is discarded."
+        ),
+    )
     top_recommendation: str = Field(..., description="Single most impactful recommendation for this page", max_length=300)
     suggested_title: Optional[str] = Field(None, description="Suggested title rewrite (5-8 words, keyword-front-loaded)")
     suggested_meta: Optional[str] = Field(None, description="Suggested meta description (two complete sentences)")

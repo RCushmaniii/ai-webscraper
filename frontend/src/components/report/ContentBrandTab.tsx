@@ -11,26 +11,35 @@ const scoreColor = (score: number) =>
 
 type SemanticStrategy = NonNullable<NonNullable<CrawlReport['report']>['semantic_strategy']>;
 
-// Serialize the whole Strategy & Conversion Analysis into clean plain text,
-// ready to paste into an AI assistant ("evaluate my content based on this").
+// Serialize the messaging review into clean plain text, ready to paste into
+// an AI assistant. Only notes that quote real page copy are included.
 const buildStrategyText = (strategy: SemanticStrategy, siteUrl?: string): string => {
   const lines: string[] = [];
-  lines.push(`# Strategy & Conversion Analysis${siteUrl ? ` — ${siteUrl}` : ''}`);
+  lines.push(`# Messaging review (AI reading, not a score)${siteUrl ? ` — ${siteUrl}` : ''}`);
   lines.push(
-    `AI-evaluated messaging, intent alignment, and persuasion structure across ${strategy.pages_analyzed} pages.`,
+    `Headings, paragraph openers and CTA labels across ${strategy.pages_analyzed} pages. ` +
+      'Each note is kept only when the AI quotes copy that is actually on the page.',
   );
-  if (strategy.avg_strategy_score !== null && strategy.avg_strategy_score !== undefined) {
-    lines.push(`Average strategy score: ${strategy.avg_strategy_score}/100`);
-  }
   lines.push('');
 
   strategy.page_analyses.forEach((p) => {
     const a = p.analysis;
-    lines.push(`## ${p.purpose.replace(/_/g, ' ')} — ${p.url}  (Overall: ${a.overall_strategy_score}/100)`);
+    lines.push(`## ${p.purpose.replace(/_/g, ' ')} — ${p.url}`);
+    if (!a.evidence_verified) {
+      lines.push('No verifiable note: the AI quoted nothing from this page, so its opinions were dropped.');
+      lines.push('');
+      lines.push('---');
+      lines.push('');
+      return;
+    }
+    if (a.evidence?.length) {
+      lines.push('Reacting to:');
+      a.evidence.forEach((q) => lines.push(`> ${q}`));
+    }
     if (a.top_recommendation) lines.push(`Top recommendation: ${a.top_recommendation}`);
     lines.push('');
 
-    lines.push(`Intent Alignment: ${a.intent_gap.alignment_score}/100`);
+    lines.push('Intent alignment');
     if (a.intent_gap.assessment) lines.push(a.intent_gap.assessment);
     if (a.intent_gap.gaps.length) {
       lines.push('Gaps:');
@@ -38,11 +47,11 @@ const buildStrategyText = (strategy: SemanticStrategy, siteUrl?: string): string
     }
     if (a.intent_gap.suggestions.length) {
       lines.push('Suggestions:');
-      a.intent_gap.suggestions.forEach((s) => lines.push(`- ${s}`));
+      a.intent_gap.suggestions.forEach((sug) => lines.push(`- ${sug}`));
     }
     lines.push('');
 
-    lines.push(`Tone & Persona: ${a.tone_audit.tone_match_score}/100`);
+    lines.push('Tone & persona');
     if (a.tone_audit.detected_tone) lines.push(`Detected tone: ${a.tone_audit.detected_tone}`);
     if (a.tone_audit.audience_fit) lines.push(a.tone_audit.audience_fit);
     if (a.tone_audit.issues.length) {
@@ -51,7 +60,7 @@ const buildStrategyText = (strategy: SemanticStrategy, siteUrl?: string): string
     }
     lines.push('');
 
-    lines.push(`Skim Test: ${a.skim_test.skim_score}/100`);
+    lines.push('Skim test');
     if (a.skim_test.story_assessment) lines.push(a.skim_test.story_assessment);
     if (a.skim_test.missing_beats.length) {
       lines.push('Missing beats:');
@@ -59,7 +68,7 @@ const buildStrategyText = (strategy: SemanticStrategy, siteUrl?: string): string
     }
     if (a.skim_test.rewrite_suggestions.length) {
       lines.push('Heading rewrites:');
-      a.skim_test.rewrite_suggestions.forEach((s) => lines.push(`- ${s}`));
+      a.skim_test.rewrite_suggestions.forEach((sug) => lines.push(`- ${sug}`));
     }
 
     if (a.suggested_title || a.suggested_meta) {
@@ -111,39 +120,45 @@ const ContentBrandTab: React.FC<ContentBrandTabProps> = ({ report }) => {
         <p className="text-sm text-secondary-600 mb-4">AI-powered narrative analysis of your audit data</p>
       </div>
 
-      {/* Strategy & Conversion Analysis */}
+      {/* Messaging review: an AI reading with its evidence attached, never a score */}
       {r.semantic_strategy?.page_analyses && r.semantic_strategy.page_analyses.length > 0 && (
         <div className="bg-white rounded-lg border border-purple-200 p-6">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-start justify-between gap-4 mb-4">
             <div>
               <h3 className="text-lg font-semibold text-purple-900 flex items-center gap-2">
                 <Target className="w-5 h-5" />
-                Strategy & Conversion Analysis
+                Messaging Review
+                <span className="text-xs font-medium uppercase tracking-wide text-purple-700 bg-purple-100 rounded px-1.5 py-0.5">
+                  AI reading, not a score
+                </span>
               </h3>
               <p className="text-sm text-purple-600 mt-1">
-                AI-evaluated messaging, intent alignment, and persuasion structure across {r.semantic_strategy.pages_analyzed} pages
+                An AI read the headings, paragraph openers and CTA labels of {r.semantic_strategy.pages_analyzed} pages.
+                A note is shown only when it quotes copy that is actually on the page; everything else was dropped.
+                {typeof r.semantic_strategy.pages_with_evidence === 'number' && (
+                  <> {r.semantic_strategy.pages_with_evidence} of {r.semantic_strategy.pages_analyzed} pages have a note.</>
+                )}
               </p>
             </div>
-            <div className="flex items-center gap-3 flex-shrink-0">
+            <div className="flex-shrink-0">
               <CopyButton
                 text={buildStrategyText(r.semantic_strategy, r.site_url)}
                 label="Copy section"
               />
-              {r.semantic_strategy.avg_strategy_score !== null && (
-                <div className={`text-2xl font-bold ${scoreColor(r.semantic_strategy.avg_strategy_score)}`}>
-                  {r.semantic_strategy.avg_strategy_score}/100
-                </div>
-              )}
             </div>
           </div>
 
           <div className="space-y-3">
-            {r.semantic_strategy.page_analyses.map((pageAnalysis, index) => (
+            {r.semantic_strategy.page_analyses.map((pageAnalysis, index) => {
+              const a = pageAnalysis.analysis;
+              const verified = Boolean(a.evidence_verified);
+              return (
               <details key={index} className="group border border-purple-100 rounded-lg">
                 <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-purple-50 rounded-lg">
                   <div className="flex items-center gap-3 min-w-0">
                     <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
                       pageAnalysis.purpose === 'lead_generation' ? 'bg-orange-100 text-orange-800' :
+                      pageAnalysis.purpose === 'pricing' ? 'bg-amber-100 text-amber-800' :
                       pageAnalysis.purpose === 'homepage' ? 'bg-blue-100 text-blue-800' :
                       pageAnalysis.purpose === 'services' ? 'bg-green-100 text-green-800' :
                       pageAnalysis.purpose === 'educational' ? 'bg-secondary-100 text-secondary-800' :
@@ -155,135 +170,139 @@ const ContentBrandTab: React.FC<ContentBrandTabProps> = ({ report }) => {
                     </span>
                     <span className="text-sm font-medium text-gray-900 truncate">{pageAnalysis.url}</span>
                   </div>
-                  <div className="flex items-center gap-4 ml-4 flex-shrink-0">
-                    <div className="flex items-center gap-3 text-xs text-gray-500">
-                      <span title="Intent alignment">
-                        <Target className="w-3.5 h-3.5 inline mr-1" />
-                        {pageAnalysis.analysis.intent_gap.alignment_score}
+                  <div className="ml-4 flex-shrink-0 text-xs">
+                    {verified ? (
+                      <span className="text-purple-700">
+                        {a.evidence?.length} quote{a.evidence?.length === 1 ? '' : 's'} from the page
                       </span>
-                      <span title="Tone match">
-                        <MessageSquare className="w-3.5 h-3.5 inline mr-1" />
-                        {pageAnalysis.analysis.tone_audit.tone_match_score}
-                      </span>
-                      <span title="Skim test">
-                        <List className="w-3.5 h-3.5 inline mr-1" />
-                        {pageAnalysis.analysis.skim_test.skim_score}
-                      </span>
-                    </div>
-                    <span className={`text-sm font-bold ${scoreColor(pageAnalysis.analysis.overall_strategy_score)}`}>
-                      {pageAnalysis.analysis.overall_strategy_score}/100
-                    </span>
+                    ) : (
+                      <span className="text-gray-400">no verifiable note</span>
+                    )}
                   </div>
                 </summary>
 
                 <div className="px-4 pb-4 space-y-4 border-t border-purple-100 pt-4">
-                  {/* Top Recommendation */}
-                  <div className="bg-purple-50 rounded-lg p-3">
-                    <div className="text-xs font-semibold text-purple-700 uppercase tracking-wide mb-1">Top Recommendation</div>
-                    <div className="text-sm text-purple-900">{pageAnalysis.analysis.top_recommendation}</div>
-                  </div>
+                  {!verified ? (
+                    <p className="text-sm text-gray-500">
+                      The AI quoted nothing from this page, so its opinions were dropped rather than shown.
+                    </p>
+                  ) : (
+                    <>
+                      {/* Evidence: the lines the notes react to */}
+                      {a.evidence && a.evidence.length > 0 && (
+                        <div className="space-y-1">
+                          <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Reacting to</div>
+                          {a.evidence.map((quote, i) => (
+                            <blockquote key={i} className="text-sm text-gray-800 pl-3 border-l-2 border-purple-300 italic">
+                              {quote}
+                            </blockquote>
+                          ))}
+                        </div>
+                      )}
 
-                  {/* Three Analysis Columns */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {/* Intent Gap */}
-                    <div className="space-y-2">
-                      <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide flex items-center gap-1">
-                        <Target className="w-3.5 h-3.5" /> Intent Alignment
-                        <span className={`ml-auto text-sm font-bold ${scoreColor(pageAnalysis.analysis.intent_gap.alignment_score)}`}>
-                          {pageAnalysis.analysis.intent_gap.alignment_score}
-                        </span>
-                      </div>
-                      <p className="text-xs text-gray-600">{pageAnalysis.analysis.intent_gap.assessment}</p>
-                      {pageAnalysis.analysis.intent_gap.gaps.length > 0 && (
-                        <div className="space-y-1">
-                          <div className="text-xs font-medium text-red-700">Gaps:</div>
-                          {pageAnalysis.analysis.intent_gap.gaps.map((gap, i) => (
-                            <div key={i} className="text-xs text-red-600 pl-2 border-l-2 border-red-200">{gap}</div>
-                          ))}
+                      {/* Top Recommendation */}
+                      {a.top_recommendation && (
+                        <div className="bg-purple-50 rounded-lg p-3">
+                          <div className="text-xs font-semibold text-purple-700 uppercase tracking-wide mb-1">Top Recommendation</div>
+                          <div className="text-sm text-purple-900">{a.top_recommendation}</div>
                         </div>
                       )}
-                      {pageAnalysis.analysis.intent_gap.suggestions.length > 0 && (
-                        <div className="space-y-1">
-                          <div className="text-xs font-medium text-green-700">Suggestions:</div>
-                          {pageAnalysis.analysis.intent_gap.suggestions.map((sug, i) => (
-                            <div key={i} className="text-xs text-green-600 pl-2 border-l-2 border-green-200">{sug}</div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
 
-                    {/* Tone Audit */}
-                    <div className="space-y-2">
-                      <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide flex items-center gap-1">
-                        <MessageSquare className="w-3.5 h-3.5" /> Tone & Persona
-                        <span className={`ml-auto text-sm font-bold ${scoreColor(pageAnalysis.analysis.tone_audit.tone_match_score)}`}>
-                          {pageAnalysis.analysis.tone_audit.tone_match_score}
-                        </span>
-                      </div>
-                      <div className="text-xs">
-                        <span className="text-gray-500">Detected:</span>{' '}
-                        <span className="font-medium text-gray-900">{pageAnalysis.analysis.tone_audit.detected_tone}</span>
-                      </div>
-                      <p className="text-xs text-gray-600">{pageAnalysis.analysis.tone_audit.audience_fit}</p>
-                      {pageAnalysis.analysis.tone_audit.issues.length > 0 && (
-                        <div className="space-y-1">
-                          <div className="text-xs font-medium text-yellow-700">Issues:</div>
-                          {pageAnalysis.analysis.tone_audit.issues.map((issue, i) => (
-                            <div key={i} className="text-xs text-yellow-600 pl-2 border-l-2 border-yellow-200">{issue}</div>
-                          ))}
+                      {/* Three Analysis Columns */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {/* Intent Gap */}
+                        <div className="space-y-2">
+                          <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide flex items-center gap-1">
+                            <Target className="w-3.5 h-3.5" /> Intent Alignment
+                          </div>
+                          <p className="text-xs text-gray-600">{a.intent_gap.assessment}</p>
+                          {a.intent_gap.gaps.length > 0 && (
+                            <div className="space-y-1">
+                              <div className="text-xs font-medium text-red-700">Gaps:</div>
+                              {a.intent_gap.gaps.map((gap, i) => (
+                                <div key={i} className="text-xs text-red-600 pl-2 border-l-2 border-red-200">{gap}</div>
+                              ))}
+                            </div>
+                          )}
+                          {a.intent_gap.suggestions.length > 0 && (
+                            <div className="space-y-1">
+                              <div className="text-xs font-medium text-green-700">Suggestions:</div>
+                              {a.intent_gap.suggestions.map((sug, i) => (
+                                <div key={i} className="text-xs text-green-600 pl-2 border-l-2 border-green-200">{sug}</div>
+                              ))}
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
 
-                    {/* Skim Test */}
-                    <div className="space-y-2">
-                      <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide flex items-center gap-1">
-                        <List className="w-3.5 h-3.5" /> Skim Test
-                        <span className={`ml-auto text-sm font-bold ${scoreColor(pageAnalysis.analysis.skim_test.skim_score)}`}>
-                          {pageAnalysis.analysis.skim_test.skim_score}
-                        </span>
-                      </div>
-                      <p className="text-xs text-gray-600">{pageAnalysis.analysis.skim_test.story_assessment}</p>
-                      {pageAnalysis.analysis.skim_test.missing_beats.length > 0 && (
-                        <div className="space-y-1">
-                          <div className="text-xs font-medium text-orange-700">Missing beats:</div>
-                          {pageAnalysis.analysis.skim_test.missing_beats.map((beat, i) => (
-                            <div key={i} className="text-xs text-orange-600 pl-2 border-l-2 border-orange-200">{beat}</div>
-                          ))}
+                        {/* Tone Audit */}
+                        <div className="space-y-2">
+                          <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide flex items-center gap-1">
+                            <MessageSquare className="w-3.5 h-3.5" /> Tone & Persona
+                          </div>
+                          <div className="text-xs">
+                            <span className="text-gray-500">Detected:</span>{' '}
+                            <span className="font-medium text-gray-900">{a.tone_audit.detected_tone}</span>
+                          </div>
+                          <p className="text-xs text-gray-600">{a.tone_audit.audience_fit}</p>
+                          {a.tone_audit.issues.length > 0 && (
+                            <div className="space-y-1">
+                              <div className="text-xs font-medium text-yellow-700">Issues:</div>
+                              {a.tone_audit.issues.map((issue, i) => (
+                                <div key={i} className="text-xs text-yellow-600 pl-2 border-l-2 border-yellow-200">{issue}</div>
+                              ))}
+                            </div>
+                          )}
                         </div>
-                      )}
-                      {pageAnalysis.analysis.skim_test.rewrite_suggestions.length > 0 && (
-                        <div className="space-y-1">
-                          <div className="text-xs font-medium text-blue-700">Heading rewrites:</div>
-                          {pageAnalysis.analysis.skim_test.rewrite_suggestions.map((sug, i) => (
-                            <div key={i} className="text-xs text-blue-600 pl-2 border-l-2 border-blue-200">{sug}</div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
 
-                  {/* Suggested Fixes */}
-                  {(pageAnalysis.analysis.suggested_title || pageAnalysis.analysis.suggested_meta) && (
-                    <div className="bg-green-50 rounded-lg p-3 space-y-2">
-                      <div className="text-xs font-semibold text-green-700 uppercase tracking-wide">Suggested Fixes</div>
-                      {pageAnalysis.analysis.suggested_title && (
-                        <div className="text-xs">
-                          <span className="font-medium text-green-800">Title:</span>{' '}
-                          <span className="text-green-700">{pageAnalysis.analysis.suggested_title}</span>
+                        {/* Skim Test */}
+                        <div className="space-y-2">
+                          <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide flex items-center gap-1">
+                            <List className="w-3.5 h-3.5" /> Skim Test
+                          </div>
+                          <p className="text-xs text-gray-600">{a.skim_test.story_assessment}</p>
+                          {a.skim_test.missing_beats.length > 0 && (
+                            <div className="space-y-1">
+                              <div className="text-xs font-medium text-orange-700">Missing beats:</div>
+                              {a.skim_test.missing_beats.map((beat, i) => (
+                                <div key={i} className="text-xs text-orange-600 pl-2 border-l-2 border-orange-200">{beat}</div>
+                              ))}
+                            </div>
+                          )}
+                          {a.skim_test.rewrite_suggestions.length > 0 && (
+                            <div className="space-y-1">
+                              <div className="text-xs font-medium text-blue-700">Heading rewrites:</div>
+                              {a.skim_test.rewrite_suggestions.map((sug, i) => (
+                                <div key={i} className="text-xs text-blue-600 pl-2 border-l-2 border-blue-200">{sug}</div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Suggested Fixes */}
+                      {(a.suggested_title || a.suggested_meta) && (
+                        <div className="bg-green-50 rounded-lg p-3 space-y-2">
+                          <div className="text-xs font-semibold text-green-700 uppercase tracking-wide">Suggested Fixes</div>
+                          {a.suggested_title && (
+                            <div className="text-xs">
+                              <span className="font-medium text-green-800">Title:</span>{' '}
+                              <span className="text-green-700">{a.suggested_title}</span>
+                            </div>
+                          )}
+                          {a.suggested_meta && (
+                            <div className="text-xs">
+                              <span className="font-medium text-green-800">Meta:</span>{' '}
+                              <span className="text-green-700">{a.suggested_meta}</span>
+                            </div>
+                          )}
                         </div>
                       )}
-                      {pageAnalysis.analysis.suggested_meta && (
-                        <div className="text-xs">
-                          <span className="font-medium text-green-800">Meta:</span>{' '}
-                          <span className="text-green-700">{pageAnalysis.analysis.suggested_meta}</span>
-                        </div>
-                      )}
-                    </div>
+                    </>
                   )}
                 </div>
               </details>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
