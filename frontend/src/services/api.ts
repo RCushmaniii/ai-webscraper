@@ -452,6 +452,7 @@ class ApiService {
     // Handle 401 errors and retry transient failures with exponential backoff
     const MAX_RETRIES = 3;
     const RETRY_DELAY_MS = 1000;
+    const IDEMPOTENT_METHODS = new Set(["get", "head", "options"]);
 
     this.api.interceptors.response.use(
       (response) => response,
@@ -476,6 +477,15 @@ class ApiService {
         // Only retry on 5xx server errors or network errors (no response)
         const status = error.response?.status;
         if (status && status < 500) {
+          return Promise.reject(error);
+        }
+
+        // ...and only for requests that are safe to repeat. A POST that
+        // reached the server and then failed may already have done its work
+        // (a crawl row inserted, a free-tier slot used, a report queued).
+        // On 2026-10-20 a failing crawl creation was sent four times.
+        const method = (config.method || "get").toLowerCase();
+        if (!IDEMPOTENT_METHODS.has(method)) {
           return Promise.reject(error);
         }
 

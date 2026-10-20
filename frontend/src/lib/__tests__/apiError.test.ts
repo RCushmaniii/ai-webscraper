@@ -133,6 +133,27 @@ describe("getApiErrorMessage", () => {
     expect(text).not.toMatch(/502/);
   });
 
+  it("never shows a 5xx body, even when it is a string detail", () => {
+    // Seen on 2026-10-20: the route wrapped a Postgres error into detail.
+    const err = axiosErr(500, {
+      detail:
+        "An unexpected error occurred: {'message': 'invalid input syntax for type integer: \"1.0\"', 'code': '22P02'}",
+    });
+    const text = getApiErrorMessage(err, "Fallback");
+    expect(text).toMatch(/our side/);
+    expect(text).not.toMatch(/22P02|integer|unexpected/);
+  });
+
+  it("appends the server's error_id so the person can quote it", () => {
+    const err = axiosErr(500, {
+      detail: "Something went wrong on our side.",
+      error_id: "3f9a1c2e",
+    });
+    expect(getApiErrorMessage(err, "Fallback")).toBe(
+      "Something went wrong on our side. It has been logged; please try again in a moment. Reference: 3f9a1c2e.",
+    );
+  });
+
   it("maps known 4xx codes and keeps the fallback for the rest", () => {
     expect(getApiErrorMessage(axiosErr(429, {}), "Fallback")).toMatch(
       /Too many requests/,
