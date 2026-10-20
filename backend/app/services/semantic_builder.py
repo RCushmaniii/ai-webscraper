@@ -101,6 +101,32 @@ def extract_first_sentences(soup: BeautifulSoup, max_paragraphs: int = 8) -> Lis
     return sentences
 
 
+_CHROME_CONTROL_TEXT = re.compile(
+    r"^(toggle|switch|open|close|show|hide|dismiss|accept|reject|decline|allow|skip|previous|next|back|menu|search|"
+    r"play|pause|mute|unmute|copy|share|print|expand|collapse)\b|"
+    r"\b(theme|dark mode|light mode|cookie|cookies|menu|navigation|modal|dialog|language|idioma|tema)\b|"
+    r"^(x|\u00d7|\+|-|ok|okay|got it)$",
+    re.IGNORECASE,
+)
+_CHROME_CONTROL_ATTR = re.compile(r"(theme|menu|nav|burger|hamburger|modal|dialog|cookie|consent|search|carousel|slider|tab)", re.IGNORECASE)
+
+
+def _is_chrome_control(tag, text: str) -> bool:
+    """True for buttons that operate the page rather than ask for an action."""
+    if _CHROME_CONTROL_TEXT.search(text):
+        return True
+    attrs = " ".join([
+        " ".join(tag.get("class", [])),
+        str(tag.get("id") or ""),
+        str(tag.get("aria-label") or ""),
+        str(tag.get("aria-controls") or ""),
+        str(tag.get("data-action") or ""),
+    ])
+    if tag.get("aria-expanded") is not None or tag.get("aria-haspopup") is not None:
+        return True
+    return bool(_CHROME_CONTROL_ATTR.search(attrs))
+
+
 def extract_cta_buttons(soup: BeautifulSoup) -> List[str]:
     """Extract CTA button text from the page.
 
@@ -108,10 +134,12 @@ def extract_cta_buttons(soup: BeautifulSoup) -> List[str]:
     """
     cta_texts = []
 
-    # <button> elements
+    # <button> elements. Site chrome (theme toggles, menu, cookie bars,
+    # search, carousels) is not a call to action; on 2026-10-20 the About
+    # page's top recommendation was to replace its "Toggle theme" button.
     for btn in soup.find_all("button"):
         text = btn.get_text(strip=True)
-        if text and len(text) < 100:
+        if text and len(text) < 100 and not _is_chrome_control(btn, text):
             cta_texts.append(text)
 
     # <a> tags with button/cta classes
