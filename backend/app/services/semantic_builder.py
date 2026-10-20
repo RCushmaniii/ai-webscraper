@@ -15,8 +15,10 @@ from bs4 import BeautifulSoup
 # URL path → page purpose mapping
 # Order matters: more specific patterns checked first
 PAGE_PURPOSE_PATTERNS: List[tuple] = [
+    # Pricing first: it was graded as a lead-gen sales letter until 2026-10-20.
+    (r"/(pricing|plans|prices?)(/|$)", "pricing"),
     # Lead generation / conversion
-    (r"/(contact|consultation|book|booking|schedule|demo|get-started|signup|sign-up|pricing|quote|free-trial)", "lead_generation"),
+    (r"/(contact|consultation|book|booking|schedule|demo|get-started|signup|sign-up|quote|free-trial)", "lead_generation"),
     # E-commerce / product
     (r"/(shop|store|product|products|cart|checkout|buy)", "ecommerce"),
     # Educational / content

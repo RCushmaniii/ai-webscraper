@@ -324,33 +324,40 @@ export interface CrawlReport {
         url: string;
         purpose: string;
         language: string;
+        // Scores were dropped on 2026-10-20 (never measurements). A page's
+        // notes exist only when `evidence` holds quotes verified against the
+        // page copy (backend services/strategy_evidence.py).
         analysis: {
           intent_gap: {
-            alignment_score: number;
+            alignment_score?: number;
             assessment: string;
             gaps: string[];
             suggestions: string[];
           };
           tone_audit: {
-            tone_match_score: number;
+            tone_match_score?: number;
             detected_tone: string;
             audience_fit: string;
             issues: string[];
           };
           skim_test: {
-            skim_score: number;
+            skim_score?: number;
             story_assessment: string;
             missing_beats: string[];
             rewrite_suggestions: string[];
           };
-          overall_strategy_score: number;
-          top_recommendation: string;
+          overall_strategy_score?: number;
+          evidence?: string[];
+          evidence_verified?: boolean;
+          evidence_rejected_count?: number;
+          top_recommendation: string | null;
           suggested_title?: string | null;
           suggested_meta?: string | null;
         };
       }>;
       avg_strategy_score: number | null;
       pages_analyzed: number;
+      pages_with_evidence?: number;
     } | null;
     internal_linking?: {
       linking_score: number;

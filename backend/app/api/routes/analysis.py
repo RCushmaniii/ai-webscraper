@@ -28,6 +28,7 @@ from app.core.performance import (
     sample_count,
 )
 from app.services.pagespeed import headline as pagespeed_headline
+from app.services.strategy_evidence import gate_analysis
 from app.services.report_findings import (
     pagespeed_findings,
     pagespeed_summary_text,
@@ -1400,6 +1401,9 @@ async def generate_crawl_report(
                         if meta_len < 100 or meta_len > 200:
                             strategy_dict["suggested_meta"] = None
 
+                    # Evidence gate: scores dropped, notes kept only with a
+                    # verified quote (services/strategy_evidence.py).
+                    strategy_dict = gate_analysis(strategy_dict, skeleton)
                     semantic_strategy_results.append({
                         "url": skeleton["url"],
                         "purpose": skeleton["inferred_purpose"],
@@ -1409,16 +1413,20 @@ async def generate_crawl_report(
 
                 # Build strategy summary for executive summary prompt
                 if semantic_strategy_results:
+                    # No scores: the narrative may cite a recommendation only
+                    # when it survived the evidence gate, with its quote.
                     strategy_lines = []
-                    scores = [r["analysis"]["overall_strategy_score"] for r in semantic_strategy_results]
-                    avg_score = round(sum(scores) / len(scores))
-                    strategy_lines.append(f"Avg strategy score: {avg_score}/100 across {len(semantic_strategy_results)} pages")
-                    for r in semantic_strategy_results[:5]:
+                    verified = [r for r in semantic_strategy_results if r["analysis"].get("evidence_verified")]
+                    strategy_lines.append(
+                        f"Messaging review (AI reading, not a score): {len(verified)} of "
+                        f"{len(semantic_strategy_results)} pages produced a note backed by a quote from the page."
+                    )
+                    for r in verified[:5]:
                         a = r["analysis"]
+                        quote = (a.get("evidence") or [""])[0]
                         strategy_lines.append(
-                            f"  {r['url']} ({r['purpose']}): strategy {a['overall_strategy_score']}/100 — "
-                            f"intent {a['intent_gap']['alignment_score']}, tone {a['tone_audit']['tone_match_score']}, skim {a['skim_test']['skim_score']}. "
-                            f"Top rec: {a['top_recommendation'][:100]}"
+                            f"  {r['url']} ({r['purpose']}): {a['top_recommendation'][:160]} "
+                            f"(reacting to: \"{quote[:80]}\")"
                         )
                     strategy_summary_text = "\n".join(strategy_lines)
 
@@ -1477,10 +1485,10 @@ async def generate_crawl_report(
         # quality (granular & absolute). The schema/linking/strategy sub-scores
         # (computed above) are folded in so the headline pillars stay consistent
         # with the deeper report sections. See compute_health_scores().
-        avg_strategy_score = (
-            round(sum(r["analysis"]["overall_strategy_score"] for r in semantic_strategy_results) / len(semantic_strategy_results))
-            if semantic_strategy_results else None
-        )
+        # The AI strategy score no longer exists (2026-10-20): identical
+        # numbers across unlike pages were not a measurement. None here means
+        # the content pillar is computed from measured signals only.
+        avg_strategy_score = None
         computed_scores = compute_health_scores(
             summary_stats,
             site_data,
@@ -1748,10 +1756,9 @@ async def generate_crawl_report(
             # --- Semantic Strategy (CRO Analysis) ---
             "semantic_strategy": {
                 "page_analyses": semantic_strategy_results,
-                "avg_strategy_score": round(
-                    sum(r["analysis"]["overall_strategy_score"] for r in semantic_strategy_results) / len(semantic_strategy_results)
-                ) if semantic_strategy_results else None,
+                "avg_strategy_score": None,  # removed 2026-10-20; see strategy_evidence.py
                 "pages_analyzed": len(semantic_strategy_results),
+                "pages_with_evidence": len([r for r in semantic_strategy_results if r["analysis"].get("evidence_verified")]),
             } if semantic_strategy_results else None,
 
             # --- LLM Usage ---

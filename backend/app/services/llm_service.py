@@ -961,6 +961,9 @@ Evaluate THREE dimensions:
    - A homepage should orient visitors and route them to key pages
    - A services page should explain what you do, for whom, and why you're different
    - A portfolio page should prove results with specifics, not just list projects
+   - A pricing page is NOT a sales letter: its job is clarity (plans, what is included,
+     price and currency for the market), removing fear (setup fees, contracts, cancellation)
+     and one proof element near the plans. Do not ask it for narrative flow or pain points.
    NOTE: "urgency" is ONE possible tactic, not a requirement. Trust-based sites
    convert through clarity and credibility, not pressure. Score intent alignment
    based on whether the page SERVES its purpose, not whether it uses urgency.
@@ -988,7 +991,17 @@ Also:
 SCORING: Be honest, but score the EXECUTION of the site's chosen voice strategy,
 not deviation from a generic CRO template. A page with generic headings, no CTAs,
 and copy that doesn't match its purpose should score below 50. A page that nails
-all three dimensions with intentional voice choices scores 80+."""
+all three dimensions with intentional voice choices scores 80+.
+
+EVIDENCE RULES (your notes are discarded without them):
+- Fill "evidence" with VERBATIM quotes from the skeleton above (title, meta, H1, H2s,
+  paragraph openers, CTA labels). Copy the characters exactly; never paraphrase.
+- Before recommending that the page ADD something (a value proposition, a CTA, proof,
+  reassurance), check the skeleton. If it is already there, do not recommend adding it;
+  quote it and judge how well it works instead.
+- Heading rewrites must keep the page's existing capitalisation style (if headings are in
+  sentence case, write sentence case) and must not introduce urgency the site does not use.
+- Keep any currency or market mentioned in the current title/meta; never drop it."""
 
         return await self._complete_structured(
             task=LLMTask.SEMANTIC_STRATEGY,
