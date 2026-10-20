@@ -18,6 +18,7 @@ from app.services.storage import store_html_snapshot
 from app.services.content_extractor import SmartContentExtractor
 from app.core.domain_blacklist import is_domain_blacklisted, get_blacklist_reason
 from app.services.nav_detector import NavDetector
+from app.core.performance import median_ms
 from app.services.politeness import (
     BOT_USER_AGENT,
     MAX_CONSECUTIVE_BLOCKS,
@@ -36,6 +37,12 @@ logger = logging.getLogger(__name__)
 # 50-page crawl = ~2,000 extra requests). Now each URL is checked once and the
 # whole crawl stops checking after this many.
 MAX_LINK_CHECKS_PER_CRAWL = 200
+
+# End-of-crawl TTFB re-sampling (see Crawler._resample_response_times).
+RESAMPLE_MAX_PAGES = 25
+RESAMPLE_EXTRA = 2
+RESAMPLE_IDLE_S = 5
+
 
 class Crawler:
     """
@@ -56,6 +63,16 @@ class Crawler:
         self.pages_saved = 0
         self.pages_save_failed = 0
         self.domain = urlparse(self.crawl.url).netloc
+        # Hosts that count as "this site". The apex and its www form are the
+        # same site, and so is wherever the start URL redirects to (learned
+        # on the first fetch). Before 2026-10-20 only the exact start host
+        # counted, so a crawl started at https://cushlabs.ai/ kept resolving
+        # links against the pre-redirect URL and timed every page through
+        # the redirect hop.
+        self.internal_hosts = self._host_variants(self.domain)
+        # (page_id, final_url, first ttfb) for every saved page; re-sampled
+        # once the crawl is done and the link checker is idle.
+        self.page_timings: List[Dict[str, Any]] = []
         # The API refuses browser-impersonating agents; a stale DB row could
         # still carry one, so fall back to the bot identity rather than send it.
         requested_ua = (self.crawl.user_agent or "").strip()
@@ -145,8 +162,12 @@ class Crawler:
         # Start crawling
         await self._crawl()
 
-        # Post-crawl analysis: Apply small-site mode if needed
         if not self.crawl_deleted:
+            # Server response time is graded on a median of several TTFB
+            # samples, not on the one reading taken while our own link
+            # checker was hitting the host.
+            await self._resample_response_times()
+            # Post-crawl analysis: Apply small-site mode if needed
             await self._apply_small_site_mode()
 
         # Close the HTTP client
@@ -156,6 +177,115 @@ class Crawler:
             logger.info(f"Crawl {self.crawl.id} was deleted during processing. Stopped gracefully.")
         else:
             logger.info(f"Crawl completed for {self.crawl.url}")
+
+    @staticmethod
+    def _host_variants(host: str) -> set:
+        """``{"cushlabs.ai", "www.cushlabs.ai"}`` for either spelling."""
+        host = (host or "").lower().strip()
+        if not host:
+            return set()
+        bare = host[4:] if host.startswith("www.") else host
+        return {bare, f"www.{bare}"}
+
+    def _is_internal_host(self, netloc: str) -> bool:
+        return (netloc or "").lower() in self.internal_hosts
+
+    def _learn_internal_host(self, final_url: str) -> None:
+        """The start URL's redirect target is the site the user asked for."""
+        host = urlparse(final_url).netloc
+        if host and not self._is_internal_host(host):
+            logger.info(f"Start URL redirects to {host}; treating it as this site")
+            self.internal_hosts |= self._host_variants(host)
+
+    @staticmethod
+    def _redirect_ms(response: httpx.Response) -> int:
+        total = 0
+        for hop in response.history:
+            try:
+                total += int(hop.elapsed.total_seconds() * 1000)
+            except Exception:  # elapsed is unset until a response is closed
+                pass
+        return total
+
+    async def _timed_get(self, url: str) -> Tuple[httpx.Response, Dict[str, int]]:
+        """GET with the timing split the report needs.
+
+        ``ttfb_ms``: from sending the request to receiving the headers of the
+        FINAL response (connection setup included, as a visitor pays it too),
+        minus ``redirect_ms``, the time spent on redirect hops. ``total_ms``
+        adds the body download. Measured with a streaming send so the
+        headers-arrived instant is observable; the body is then read in full
+        so callers can use ``response.text`` as before.
+        """
+        started = time.monotonic()
+        request = self.client.build_request("GET", url)
+        response = await self.client.send(request, stream=True)
+        headers_at = time.monotonic()
+        try:
+            await response.aread()
+        finally:
+            await response.aclose()
+        finished = time.monotonic()
+        redirect_ms = self._redirect_ms(response)
+        return response, {
+            "ttfb_ms": max(0, int((headers_at - started) * 1000) - redirect_ms),
+            "redirect_ms": redirect_ms,
+            "total_ms": int((finished - started) * 1000),
+        }
+
+    async def _ttfb_only(self, url: str) -> Optional[int]:
+        """One more TTFB sample for ``url`` without downloading the body.
+        Returns None if the site pushes back (and stops further sampling)."""
+        started = time.monotonic()
+        request = self.client.build_request("GET", url)
+        response = await self.client.send(request, stream=True)
+        headers_at = time.monotonic()
+        try:
+            if detect_block(response.status_code, response.headers, ""):
+                self.blocked_reason = self.blocked_reason or f"HTTP {response.status_code} while re-sampling"
+                return None
+        finally:
+            await response.aclose()
+        return max(0, int((headers_at - started) * 1000) - self._redirect_ms(response))
+
+    async def _resample_response_times(self) -> None:
+        """Take RESAMPLE_EXTRA more TTFB samples for the slowest pages once
+        the crawl (and its link probing) is over, and store the median.
+
+        Why: the single reading taken mid-crawl is taken while our own link
+        checker is hitting the same host; on 2026-10-20 that turned a site
+        Lighthouse scores in the 90s into seven "slow" findings.
+        """
+        if self.blocked_reason or not self.page_timings:
+            return
+        candidates = sorted(self.page_timings, key=lambda t: -t["ttfb_ms"])[:RESAMPLE_MAX_PAGES]
+        await asyncio.sleep(RESAMPLE_IDLE_S)
+        updated = 0
+        for entry in candidates:
+            samples = [entry["ttfb_ms"]]
+            for _ in range(RESAMPLE_EXTRA):
+                if self.blocked_reason:
+                    break
+                try:
+                    await self.rate_limiter.wait(entry["url"])
+                    sample = await self._ttfb_only(entry["url"])
+                except Exception as e:
+                    logger.debug(f"TTFB re-sample failed for {entry['url']}: {e}")
+                    sample = None
+                if sample is None:
+                    break
+                samples.append(sample)
+            if len(samples) < 2:
+                continue
+            try:
+                self.db.table("pages").update({
+                    "ttfb_ms": median_ms(samples),
+                    "ttfb_samples": samples,
+                }).eq("id", entry["page_id"]).execute()
+                updated += 1
+            except Exception as e:
+                logger.warning(f"Could not store TTFB samples for {entry['url']}: {e}")
+        logger.info(f"Re-sampled server response time for {updated} page(s) with the crawl idle")
 
     async def _detect_navigation_from_homepage(self) -> None:
         """
@@ -409,7 +539,14 @@ class Crawler:
                 "issues": {},  # Issues are saved to separate table
                 "nav_score": nav_score,  # Navigation importance score from link
                 "is_primary": False,  # Set by _finalize_primary_pages at end of crawl
-                "depth": depth  # Crawl depth (0 = starting, 1 = linked from start, etc.)
+                "depth": depth,  # Crawl depth (0 = starting, 1 = linked from start, etc.)
+                # Timing split (migration 20261020160000): where the fetch
+                # landed, TTFB of that final response, redirect cost. The
+                # samples list grows in _resample_response_times.
+                "final_url": page.final_url,
+                "ttfb_ms": page.ttfb_ms,
+                "redirect_ms": page.redirect_ms,
+                "ttfb_samples": [page.ttfb_ms] if page.ttfb_ms else [],
             }
 
             # Insert page (removed full_content - doesn't exist in schema)
@@ -419,6 +556,12 @@ class Crawler:
             else:
                 saved = True
                 logger.info(f"Saved page {page.url} to database with title: {title[:50]}")
+                if page.status_code == 200 and page.ttfb_ms:
+                    self.page_timings.append({
+                        "page_id": str(page.id),
+                        "url": page.final_url or page.url,
+                        "ttfb_ms": page.ttfb_ms,
+                    })
 
             if saved:
                 self.pages_saved += 1
@@ -725,7 +868,11 @@ class Crawler:
                     # THEN save images and links (now page exists in DB for foreign key)
                     # Only extract links/images for HTML pages (soup will be None for PDFs, images, etc.)
                     if status_code == 200 and soup is not None:
-                        await self._extract_and_process_links(soup, url, depth, page.id)
+                        # Resolve relative links against the URL the page was
+                        # served from, not the one we asked for: after an
+                        # apex->www redirect the two differ and every link
+                        # would inherit the redirecting host.
+                        await self._extract_and_process_links(soup, page.final_url or url, depth, page.id)
                         images_count = await self._extract_and_save_images(soup, url, page.id)
 
                         # Update page with actual image count
@@ -770,11 +917,14 @@ class Crawler:
         method = "html"
         
         try:
-            # First try with regular HTTP request
-            response = await self.client.get(url)
+            # First try with regular HTTP request, timing TTFB and redirects
+            # separately from the body download.
+            response, timing = await self._timed_get(url)
             final_url = str(response.url)
             status_code = response.status_code
             content_type = response.headers.get("content-type", "")
+            if depth == 0:
+                self._learn_internal_host(final_url)
 
             # Site pushing back? Back off, retry once or twice, and stop the
             # crawl if it keeps happening. Before 2026-10-19 a 429 was stored
@@ -815,6 +965,8 @@ class Crawler:
                     status_code=status_code,
                     method="http",
                     render_ms=render_time,
+                    ttfb_ms=timing["ttfb_ms"],
+                    redirect_ms=timing["redirect_ms"],
                     content_hash=None,
                     text_excerpt=f"Non-HTML resource: {resource_type}",
                     word_count=0,
@@ -914,6 +1066,8 @@ class Crawler:
                 status_code=status_code,
                 method=method,
                 render_ms=render_time,
+                ttfb_ms=timing["ttfb_ms"],
+                redirect_ms=timing["redirect_ms"],
                 content_hash=content_hash,
                 html_storage_path=html_storage_path,  # Path to stored HTML file
                 text_excerpt=text_excerpt,
@@ -1151,7 +1305,7 @@ class Crawler:
             absolute_url = urljoin(self.crawl.url, href)
             parsed_url = urlparse(absolute_url)
             
-            if parsed_url.netloc == self.domain:
+            if self._is_internal_host(parsed_url.netloc):
                 internal_links += 1
             else:
                 external_links += 1
@@ -1225,7 +1379,7 @@ class Crawler:
             parsed_url = urlparse(absolute_url)
 
             # Determine if internal or external
-            is_internal = parsed_url.netloc == self.domain
+            is_internal = self._is_internal_host(parsed_url.netloc)
 
             # Check if we should follow this link
             should_follow = False

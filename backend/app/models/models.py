@@ -130,6 +130,10 @@ class PageBase(BaseModel):
     status_code: Optional[int] = None
     method: str = "html"
     render_ms: Optional[int] = None
+    # Timing split stored on pages.ttfb_ms / redirect_ms (2026-10-20):
+    # render_ms is the whole fetch; ttfb_ms is what the report grades.
+    ttfb_ms: Optional[int] = None
+    redirect_ms: Optional[int] = None
     content_hash: Optional[str] = None
     html_storage_path: Optional[str] = None
     text_excerpt: Optional[str] = None

@@ -9,6 +9,7 @@ import re
 
 from app.services.content_extractor import SmartContentExtractor
 from app.db.supabase import supabase_client
+from app.core.performance import STATUS_PASS, STATUS_POOR, classify_ttfb, page_response_ms
 from uuid import uuid4
 
 logger = logging.getLogger(__name__)
@@ -284,22 +285,27 @@ class SEOAuditor:
         logger.info("Auditing performance issues...")
         
         try:
-            response = supabase_client.table("pages").select("url, response_time, content_length, title").eq("crawl_id", self.crawl_id).execute()
+            response = supabase_client.table("pages").select(
+                "url, response_time, ttfb_ms, ttfb_samples, content_length, title"
+            ).eq("crawl_id", self.crawl_id).execute()
             pages = response.data if response.data else []
             
             slow_pages = []
             large_pages = []
             
             for page in pages:
-                response_time = page.get('response_time', 0)
+                # Median server TTFB on Google's bands (app/core/performance.py);
+                # the old 3 s / 5 s cut-offs graded a single whole-fetch reading.
+                response_time = page_response_ms(page)
                 content_length = page.get('content_length', 0)
                 
-                if response_time > 3000:  # 3 seconds
+                status = classify_ttfb(response_time)
+                if status != STATUS_PASS:
                     slow_pages.append({
                         'url': page['url'],
                         'title': page.get('title', 'No title'),
                         'response_time': response_time,
-                        'severity': 'high' if response_time > 5000 else 'medium'
+                        'severity': 'medium' if status == STATUS_POOR else 'low'
                     })
                 
                 if content_length > 1024 * 1024:  # 1MB
@@ -310,7 +316,7 @@ class SEOAuditor:
                         'severity': 'high' if content_length > 2 * 1024 * 1024 else 'medium'
                     })
             
-            avg_response_time = sum(p.get('response_time', 0) for p in pages) / len(pages) if pages else 0
+            avg_response_time = sum(page_response_ms(p) for p in pages) / len(pages) if pages else 0
             
             return {
                 'slow_pages_count': len(slow_pages),

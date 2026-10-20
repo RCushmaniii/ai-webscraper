@@ -145,7 +145,7 @@ const PageAuditTab: React.FC<PageAuditTabProps> = ({ report }) => {
                   <th className="text-center py-2 px-3 font-medium text-gray-600">Meta</th>
                   <th className="text-center py-2 px-3 font-medium text-gray-600">H1</th>
                   <th className="text-center py-2 px-3 font-medium text-gray-600">Content</th>
-                  <th className="text-center py-2 px-3 font-medium text-gray-600">Speed</th>
+                  <th className="text-center py-2 px-3 font-medium text-gray-600" title="Server time to first byte, median of samples from our US-East server. Visitor-side performance is the Google PageSpeed card on the Executive tab.">Server</th>
                   <th className="text-right py-2 px-3 font-medium text-gray-600 cursor-pointer select-none" onClick={() => handleSort('issue_count')}>
                     <span className="inline-flex items-center gap-1">Issues <SortIcon field="issue_count" /></span>
                   </th>
@@ -173,7 +173,18 @@ const PageAuditTab: React.FC<PageAuditTabProps> = ({ report }) => {
                       <td className="py-2 px-3 text-center">{statusIcon(pa.checks.meta_description.status)}</td>
                       <td className="py-2 px-3 text-center">{statusIcon(pa.checks.h1.status)}</td>
                       <td className="py-2 px-3 text-center">{statusIcon(pa.checks.content_depth.status)}</td>
-                      <td className="py-2 px-3 text-center">{statusIcon(pa.checks.response_time.status)}</td>
+                      <td className="py-2 px-3 text-center whitespace-nowrap" title={
+                        pa.checks.response_time.ms != null
+                          ? `${pa.checks.response_time.ms} ms server response` +
+                            (pa.checks.response_time.samples > 1 ? ` (median of ${pa.checks.response_time.samples} samples)` : '') +
+                            (pa.checks.response_time.redirect_ms ? `, +${pa.checks.response_time.redirect_ms} ms redirect` : '')
+                          : 'Not measured'
+                      }>
+                        {statusIcon(pa.checks.response_time.status)}
+                        {pa.checks.response_time.ms != null && (
+                          <span className="ml-1 text-xs text-gray-400">{pa.checks.response_time.ms}ms</span>
+                        )}
+                      </td>
                       <td className="py-2 px-3 text-right text-gray-600">{pa.issue_count}</td>
                     </tr>
                   );
