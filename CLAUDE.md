@@ -441,7 +441,7 @@ ai-webscraper/
 - **Internal port:** `10000` (bound to `127.0.0.1`, set via `PORT=10000` in compose environment)
 - **Docker image:** `python:3.12-slim` + curl (~400MB). Was the 4GB Playwright base until 2026-10-18; nothing imported Playwright.
 - **Database:** Supabase (external, not self-hosted) — Project: `cushlabs-site-analysis`
-- **Caddy config:** `/etc/caddy/Caddyfile` on the VPS
+- **Caddy config:** `/etc/caddy/Caddyfile` on the VPS. It owns the frontend **Content-Security-Policy**; `connect-src` must list `https://vitals.cushlabs.ai` (the Web Vitals tracker POSTs there; it was silently blocked until 2026-10-19) and `scripts/smoke-prod.sh` fails if it is missing. Edit with a backup, `caddy validate`, then `systemctl reload caddy`.
 
 ### Architecture
 
@@ -466,6 +466,7 @@ ssh deploy@178.156.192.117 'cd ~/apps/cushlabs-prod-server && docker compose pul
 - **Code changes:** merge to main, wait for the GHCR image build, then run the command above.
 - **Config-only changes (env vars in `~/apps/cushlabs-prod-server/.env.webscraper`):** no image pull needed, but you must **recreate** (not just `restart`) so the new `env_file` is read: `docker compose up -d webscraper`.
 - Do NOT use `--build` — the base image is ~2GB and CI already built it; building on the 4GB box is slow and unnecessary.
+- **Dependencies are locked:** `backend/constraints.txt` pins every transitive package (`pip install -r requirements.txt -c constraints.txt` in the Dockerfile and CI). Bump a direct dependency in `requirements.txt`, then `bash scripts/lock-backend-deps.sh` (needs docker; `REMOTE=deploy@178.156.192.117` uses the VPS's) in the same PR. Why: 2026-10-19, an unpinned build shipped 45 packages newer than any dev machine and a production-only 422 could not be reproduced locally.
 
 ### Deploy Frontend
 
@@ -487,6 +488,7 @@ curl https://scraper.cushlabs.ai/api/v1/health/
 ### Test Gates (before and after publishing)
 
 - **Before merge:** `.github/workflows/ci.yml` — backend pytest (unit + `tests/test_api_smoke.py`, which boots the real app with TestClient), frontend `tsc`, Vitest, Vite build. Required green before any merge.
+- **Error contract:** request-validation failures (422) go through `app/core/errors.py`: the server logs `Validation rejected POST /path: field: reason` (never the value) and the body is `{"detail": [{loc,msg,type}], "message": "field: reason"}`. The SPA renders every failed call through `frontend/src/lib/apiError.ts` (`getApiErrorMessage(err, fallback, labels)`); never `toast.error(err.message)` — that is how users saw "Request failed with status code 422".
 - **After deploy:** `scripts/smoke-prod.sh` — health + version, security headers, auth gate, frontend CSP + bundle, version drift vs `main`. Runs twice daily from `.github/workflows/production-smoke.yml` (drift = warning) and at the end of both deploy scripts (drift = failure).
 - **Deploy scripts (bash, run via the Bash tool):** `scripts/deploy-backend.sh [sha]` waits for the GHCR build, pulls + recreates on the VPS, waits for container health, runs smoke. `scripts/deploy-frontend.sh` builds with `VITE_APP_VERSION=<sha>`, scps, runs smoke.
 - **Brand:** tokens follow `operating-system/cushlabs/brand-kit.md` — accent `#FF6A3D`, neutral greys, Manrope display / Inter body self-hosted in `frontend/public/fonts`, chevron mark. `primary-*` is the NEUTRAL scale and `secondary-*` is the ACCENT scale in `frontend/tailwind.config.cjs` (historical names, values swapped underneath). Never reintroduce teal or a blue accent.
@@ -664,7 +666,7 @@ https://deepwiki.com/RCushmaniii/ai-resume-tailor
 
 ---
 
-**Last Updated**: October 18, 2026
+**Last Updated**: October 19, 2026
 **Maintained By**: Claude (Anthropic) + CushLabs Team
 
 ## Session Log

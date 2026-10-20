@@ -12,6 +12,7 @@ import sentry_sdk
 from app.api.api import api_router
 from app.core.config import settings
 from app.core.sentry_filtering import before_send, is_transient_network_error
+from app.core.errors import register_exception_handlers
 
 sentry_sdk.init(
     dsn=os.environ.get("SENTRY_DSN"),
@@ -232,6 +233,10 @@ async def log_requests(request: Request, call_next):
 
 # Include API router
 app.include_router(api_router, prefix=settings.API_V1_STR)
+
+# 422s: log the field + reason (never the value) and add a human summary.
+# Without this a production validation failure is invisible on both ends.
+register_exception_handlers(app)
 
 @app.get("/")
 async def root():

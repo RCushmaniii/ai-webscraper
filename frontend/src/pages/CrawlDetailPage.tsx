@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { getApiErrorMessage } from '../lib/apiError';
 import { RefreshCw, ChevronUp, ChevronDown, Download, ExternalLink, FileText, Info, CheckCircle, AlertTriangle } from 'lucide-react';
 import { apiService, Crawl, Page, Link as CrawlLink, Issue, Image, CrawlReport } from '../services/api';
 import ConfirmationModal from '../components/ConfirmationModal';
@@ -281,8 +282,7 @@ const CrawlDetailPage: React.FC = () => {
       toast.success('Report generated successfully!');
     } catch (err: any) {
       console.error('Error generating report:', err);
-      const message = err.response?.data?.detail || 'Failed to generate report. Please try again.';
-      toast.error(message);
+      toast.error(getApiErrorMessage(err, 'Failed to generate report. Please try again.'));
     } finally {
       setGeneratingReport(false);
     }

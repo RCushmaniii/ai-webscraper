@@ -71,6 +71,14 @@ TMPIDX="$(mktemp)"
 index_code="$(curl -s -D "$TMPIDX.h" -o "$TMPIDX" -w '%{http_code}' --max-time 20 "$BASE/")"
 if [ "$index_code" = "200" ]; then pass "frontend index 200"; else fail "frontend index -> $index_code"; fi
 if tr -d '\r' < "$TMPIDX.h" | grep -qi '^content-security-policy:'; then pass "CSP header on frontend"; else fail "no CSP header on frontend"; fi
+# index.html loads https://vitals.cushlabs.ai/tracker.js, which POSTs reports.
+# Until 2026-10-19 connect-src omitted that origin, so the browser blocked every
+# report and nobody noticed. The Caddyfile on the VPS owns this header.
+if tr -d '\r' < "$TMPIDX.h" | grep -i '^content-security-policy:' | grep -q 'connect-src[^;]*https://vitals\.cushlabs\.ai'; then
+  pass "CSP connect-src allows vitals.cushlabs.ai"
+else
+  fail "CSP connect-src blocks vitals.cushlabs.ai (Web Vitals reports are dropped)"
+fi
 
 bundle="$(grep -o 'src="/assets/[^"]*\.js"' "$TMPIDX" | head -1 | sed 's/src="\([^"]*\)"/\1/')"
 if [ -n "$bundle" ]; then
