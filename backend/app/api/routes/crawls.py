@@ -79,7 +79,12 @@ async def create_crawl(
             "respect_robots_txt": respect_robots,
             "follow_external_links": raw_data.get("follow_external_links", False),
             "js_rendering": raw_data.get("js_rendering", False),
-            # float: int() turned 0.5 req/s into 0 and the limiter divided by zero
+            # float, and the column is NUMERIC(5,2) since migration
+            # 20261020030000. Do not cast to int: 0864680 did, 0.5 req/s became
+            # 0 and the limiter divided by zero. Do not send a float to an
+            # INTEGER column either: PR #110 did, and every crawl creation in
+            # production failed with Postgres 22P02 'invalid input syntax for
+            # type integer: "1.0"' until the column was widened.
             "rate_limit": float(raw_data.get("rate_limit", 2)),
             "user_agent": user_agent,
             "concurrency": 5,

@@ -10,6 +10,7 @@
  *   422  { detail: [{ loc, msg, type }], message: "url: URL must start ..." }
  *   4xx  { detail: "plain sentence" } or { detail: { message: "...", ... } }
  *   429  { detail: "...", retry_after: 60 }
+ *   5xx  { detail: "Something went wrong on our side. ...", error_id: "3f9a1c2e" }
  *
  * Rules:
  *  - Never show an axios/network error message verbatim.
@@ -132,6 +133,19 @@ export function getApiErrorMessage(
       ? (data as Record<string, unknown>)
       : null;
 
+  // A 5xx body is never shown, whatever it says. On 2026-10-20 one read
+  // "An unexpected error occurred: {'message': 'invalid input syntax for
+  // type integer: \"1.0\"', 'code': '22P02', ...}" straight from Postgres.
+  // The server logs the cause under error_id; showing the id lets the
+  // person quote it instead of describing the toast.
+  if (status >= 500) {
+    const errorId =
+      body && typeof body.error_id === "string" ? body.error_id.trim() : "";
+    return errorId
+      ? `${SERVER_ERROR_MESSAGE} Reference: ${errorId}.`
+      : SERVER_ERROR_MESSAGE;
+  }
+
   if (body) {
     if (status === 422 && Array.isArray(body.detail)) {
       const formatted = formatValidationErrors(
@@ -146,6 +160,5 @@ export function getApiErrorMessage(
       return body.message.trim();
   }
 
-  if (status >= 500) return SERVER_ERROR_MESSAGE;
   return STATUS_MESSAGES[status] || fallback;
 }

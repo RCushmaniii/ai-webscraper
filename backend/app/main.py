@@ -12,7 +12,7 @@ import sentry_sdk
 from app.api.api import api_router
 from app.core.config import settings
 from app.core.sentry_filtering import before_send, is_transient_network_error
-from app.core.errors import register_exception_handlers
+from app.core.errors import register_exception_handlers, server_error_response
 
 sentry_sdk.init(
     dsn=os.environ.get("SENTRY_DSN"),
@@ -217,19 +217,15 @@ async def log_requests(request: Request, call_next):
         return response
         
     except Exception as e:
-        # Log the exception
         process_time = time.time() - start_time
         logger.error(
             f"Request: {request.method} {request.url.path} "
-            f"Error: {str(e)} "
-            f"Duration: {process_time:.3f}s"
+            f"Status: 500 Duration: {process_time:.3f}s"
         )
-        
-        # Return error response
-        return JSONResponse(
-            status_code=500,
-            content={"detail": "Internal server error"}
-        )
+        # Same body shape as every other 5xx (app/core/errors.py): a calm
+        # sentence plus an error_id the log line carries. The traceback is
+        # logged there, not here.
+        return server_error_response(request, repr(e), exc_info=e)
 
 # Include API router
 app.include_router(api_router, prefix=settings.API_V1_STR)

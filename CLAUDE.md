@@ -114,6 +114,7 @@ Common gotchas:
 
 - ✅ `completed_at` (correct) vs ❌ `finished_at` (wrong)
 - ✅ `follow_external_links` (correct) vs ❌ `follow_external` (wrong)
+- ✅ `crawls.rate_limit` is `NUMERIC(5,2)` (migration `20261020030000`); send it as a float. It was `INTEGER` until 2026-10-20, and the two "fixes" that chased the mismatch (int-cast in `0864680`, float in PR #110) each broke production in turn.
 - ✅ Always query the database schema to confirm
 
 ### 3. Performance Optimization
@@ -488,7 +489,7 @@ curl https://scraper.cushlabs.ai/api/v1/health/
 ### Test Gates (before and after publishing)
 
 - **Before merge:** `.github/workflows/ci.yml` — backend pytest (unit + `tests/test_api_smoke.py`, which boots the real app with TestClient), frontend `tsc`, Vitest, Vite build. Required green before any merge.
-- **Error contract:** request-validation failures (422) go through `app/core/errors.py`: the server logs `Validation rejected POST /path: field: reason` (never the value) and the body is `{"detail": [{loc,msg,type}], "message": "field: reason"}`. The SPA renders every failed call through `frontend/src/lib/apiError.ts` (`getApiErrorMessage(err, fallback, labels)`); never `toast.error(err.message)` — that is how users saw "Request failed with status code 422".
+- **Error contract:** request-validation failures (422) go through `app/core/errors.py`: the server logs `Validation rejected POST /path: field: reason` (never the value) and the body is `{"detail": [{loc,msg,type}], "message": "field: reason"}`. Every 5xx (route `HTTPException(500, ...)` or an uncaught exception) leaves as `{"detail": <one calm sentence>, "error_id": "3f9a1c2e"}` with the real cause logged as `Server error 3f9a1c2e on POST /path: ...`; route-level `detail=f"...{e}"` strings are for the log only and never reach the client. The SPA renders every failed call through `frontend/src/lib/apiError.ts` (`getApiErrorMessage(err, fallback, labels)`), shows the `error_id` as "Reference: …", and never `toast.error(err.message)` — that is how users saw "Request failed with status code 422" and a raw Postgres error. The axios client retries only GET/HEAD/OPTIONS; a failed POST is reported once.
 - **After deploy:** `scripts/smoke-prod.sh` — health + version, security headers, auth gate, frontend CSP + bundle, version drift vs `main`. Runs twice daily from `.github/workflows/production-smoke.yml` (drift = warning) and at the end of both deploy scripts (drift = failure).
 - **Deploy scripts (bash, run via the Bash tool):** `scripts/deploy-backend.sh [sha]` waits for the GHCR build, pulls + recreates on the VPS, waits for container health, runs smoke. `scripts/deploy-frontend.sh` builds with `VITE_APP_VERSION=<sha>`, scps, runs smoke.
 - **Brand:** tokens follow `operating-system/cushlabs/brand-kit.md` — accent `#FF6A3D`, neutral greys, Manrope display / Inter body self-hosted in `frontend/public/fonts`, chevron mark. `primary-*` is the NEUTRAL scale and `secondary-*` is the ACCENT scale in `frontend/tailwind.config.cjs` (historical names, values swapped underneath). Never reintroduce teal or a blue accent.

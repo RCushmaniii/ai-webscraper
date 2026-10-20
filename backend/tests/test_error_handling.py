@@ -8,6 +8,7 @@ status code 422". See app/core/errors.py.
 """
 
 import logging
+import re
 from datetime import datetime
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
@@ -15,7 +16,7 @@ from uuid import uuid4
 import pytest
 from fastapi.testclient import TestClient
 
-from app.core.errors import describe, field_name, public_errors, summarize
+from app.core.errors import SERVER_ERROR_MESSAGE, describe, field_name, public_errors, summarize
 
 VALID_PAYLOAD = {
     "url": "https://www.example.com",
@@ -30,9 +31,15 @@ VALID_PAYLOAD = {
 
 
 @pytest.fixture
-def client():
-    """Authenticated TestClient; the DB is never reached because every test
-    here is rejected at validation, before the route body runs."""
+def db_client():
+    """Stand-in for the Supabase client; tests that need the DB to fail set
+    side effects on it."""
+    return MagicMock()
+
+
+@pytest.fixture
+def client(db_client):
+    """Authenticated TestClient with the DB replaced by ``db_client``."""
     from app.core.auth import get_current_user
     from app.main import app
     from app.models.models import User
@@ -42,7 +49,7 @@ def client():
                 created_at=datetime.now(), updated_at=datetime.now())
     app.dependency_overrides[get_current_user] = lambda: user
     try:
-        with patch.object(crawls_route, "get_auth_client", return_value=MagicMock()):
+        with patch.object(crawls_route, "get_auth_client", return_value=db_client):
             with TestClient(app, raise_server_exceptions=False) as c:
                 yield c
     finally:
@@ -135,3 +142,46 @@ class TestCreateCrawlValidation:
         # only fires on validation failures.
         r = client.post("/api/v1/crawls/", json=VALID_PAYLOAD)
         assert r.status_code != 422
+
+
+# What Postgres said on 2026-10-20 when the API sent 1.0 to an INTEGER column.
+PG_ERROR = "{'message': 'invalid input syntax for type integer: \"1.0\"', 'code': '22P02', 'hint': None, 'details': None}"
+
+
+class TestServerErrors:
+    """A 5xx never carries internals to the client; the log carries them
+    under an id the client can quote."""
+
+    def test_db_failure_is_a_calm_500_with_a_reference(self, client, db_client, caplog):
+        db_client.table.return_value.insert.return_value.execute.side_effect = RuntimeError(PG_ERROR)
+        with caplog.at_level(logging.ERROR, logger="app.core.errors"):
+            r = client.post("/api/v1/crawls/", json=VALID_PAYLOAD)
+
+        assert r.status_code == 500
+        body = r.json()
+        assert body["detail"] == SERVER_ERROR_MESSAGE
+        assert re.fullmatch(r"[0-9a-f]{8}", body["error_id"])
+        # Nothing from the driver reaches the client...
+        assert "22P02" not in r.text
+        assert "invalid input syntax" not in r.text
+        # ...and the log ties the id to the cause.
+        line = next(m for m in (rec.getMessage() for rec in caplog.records) if body["error_id"] in m)
+        assert "POST /api/v1/crawls/" in line
+        assert "22P02" in line
+
+    def test_four_xx_messages_pass_through_untouched(self, client):
+        # The user-agent rule raises a deliberate 422 with a sentence for people.
+        r = client.post("/api/v1/crawls/", json={**VALID_PAYLOAD, "user_agent": "Mozilla/5.0 Chrome/120"})
+        assert r.status_code == 422
+        assert "error_id" not in r.json()
+        assert r.json()["detail"] != SERVER_ERROR_MESSAGE
+
+    def test_every_5xx_shares_the_shape(self, client, db_client):
+        # The insert succeeds but the row cannot be fetched back: the route
+        # raises its own HTTPException(500, "Crawl created but failed to retrieve.").
+        fetch = db_client.table.return_value.select.return_value.eq.return_value.single.return_value.execute
+        fetch.return_value = MagicMock(error=MagicMock(message="boom"), data=None)
+        r = client.post("/api/v1/crawls/", json=VALID_PAYLOAD)
+        assert r.status_code == 500
+        assert set(r.json()) == {"detail", "error_id"}
+        assert "boom" not in r.text
