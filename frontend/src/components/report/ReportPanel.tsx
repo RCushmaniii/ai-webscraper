@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Loader2, FileBarChart, RefreshCw, Download, FileText, Table } from 'lucide-react';
 import { toast } from 'sonner';
+import { getApiErrorMessage } from '../../lib/apiError';
 import { apiService, CrawlReport } from '../../services/api';
 import ExecutiveTab from './ExecutiveTab';
 import PageAuditTab from './PageAuditTab';
@@ -73,7 +74,7 @@ const ReportPanel: React.FC<ReportPanelProps> = ({
       triggerDownload(blob, `cushlabs_report_${crawlId}.pdf`);
       toast.success('PDF downloaded');
     } catch (err: any) {
-      toast.error('PDF export failed: ' + (err?.message || 'Unknown error'));
+      toast.error(getApiErrorMessage(err, 'PDF export failed. Please try again.'));
     } finally {
       setExporting(false);
     }
@@ -88,7 +89,7 @@ const ReportPanel: React.FC<ReportPanelProps> = ({
       triggerDownload(blob, `cushlabs_${type}_${crawlId}.csv`);
       toast.success('CSV downloaded');
     } catch (err: any) {
-      toast.error('CSV export failed: ' + (err?.message || 'Unknown error'));
+      toast.error(getApiErrorMessage(err, 'CSV export failed. Please try again.'));
     } finally {
       setExporting(false);
     }

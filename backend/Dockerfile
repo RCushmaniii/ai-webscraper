@@ -19,9 +19,14 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first for better layer caching
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy requirements first for better layer caching.
+# constraints.txt pins every transitive package to the versions the test
+# suite ran against. Without it each image build re-resolved the open
+# ranges in requirements.txt (2026-10-19: 45 packages newer than any
+# developer machine, starlette 0.52 -> 1.9). Regenerate with
+# scripts/lock-backend-deps.sh.
+COPY requirements.txt constraints.txt ./
+RUN pip install --no-cache-dir -r requirements.txt -c constraints.txt
 
 # Copy the rest of the application
 COPY . .

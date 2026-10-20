@@ -3,7 +3,18 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { ArrowLeft, Loader2, Plus, AlertTriangle, Info } from "lucide-react";
 import { apiService, CrawlCreate } from "../services/api";
+import { getApiErrorMessage } from "../lib/apiError";
 import { usePageTitle } from "../hooks/usePageTitle";
+
+// Form labels for server-side validation messages ("Start URL: ...").
+const CRAWL_FIELD_LABELS = {
+  url: "Start URL",
+  name: "Crawl Name",
+  max_depth: "Max Depth",
+  max_pages: "Max Pages",
+  rate_limit: "Rate Limit",
+  user_agent: "User Agent",
+};
 
 interface UsageInfo {
   current_count: number;
@@ -63,7 +74,7 @@ const CrawlNewPage: React.FC = () => {
 
   const validateForm = (): string | null => {
     try {
-      const parsed = new URL(formData.url);
+      const parsed = new URL(formData.url.trim());
       if (!["http:", "https:"].includes(parsed.protocol)) {
         return "URL must start with http:// or https://";
       }
@@ -100,7 +111,14 @@ const CrawlNewPage: React.FC = () => {
     setFormSubmitting(true);
 
     try {
-      await apiService.createCrawl(formData);
+      // Trim what people type; a pasted URL with a leading space fails the
+      // server's scheme check while passing the browser's URL parser.
+      await apiService.createCrawl({
+        ...formData,
+        url: formData.url.trim(),
+        name: formData.name.trim(),
+        user_agent: formData.user_agent?.trim() || undefined,
+      });
       toast.success("Crawl created successfully");
       navigate("/crawls");
     } catch (err: any) {
@@ -115,11 +133,14 @@ const CrawlNewPage: React.FC = () => {
         // Refresh usage to update the UI
         fetchUsage();
       } else {
-        const errorMessage =
-          typeof detail === "string"
-            ? detail
-            : detail?.message || err?.message || "Failed to create crawl";
-        toast.error(errorMessage, { id: "crawl-form-error" });
+        toast.error(
+          getApiErrorMessage(
+            err,
+            "Could not create the crawl. Please try again.",
+            CRAWL_FIELD_LABELS,
+          ),
+          { id: "crawl-form-error" },
+        );
       }
     } finally {
       setFormSubmitting(false);

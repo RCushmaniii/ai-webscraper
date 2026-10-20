@@ -185,3 +185,22 @@ def make_crawler(make_crawl, mock_db):
         return crawler
 
     return _make
+
+
+# ---------------------------------------------------------------------------
+# Rate limiter isolation
+# ---------------------------------------------------------------------------
+
+@pytest.fixture(autouse=True)
+def _reset_in_memory_rate_limiter():
+    """Every TestClient POST shares one identity (ip:testclient), so the real
+    in-memory limiter counts across the whole run; once the suite had enough
+    POSTs, late tests started getting 429s (2026-10-19). Fresh window per test."""
+    try:
+        from app.middleware import rate_limiter
+    except Exception:  # app not importable in some unit-only contexts
+        yield
+        return
+    rate_limiter._rate_limiter.storage.clear()
+    yield
+    rate_limiter._rate_limiter.storage.clear()
