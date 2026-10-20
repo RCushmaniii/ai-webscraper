@@ -70,3 +70,18 @@ def test_pricing_is_its_own_purpose():
     assert infer_page_purpose("https://www.cushlabs.ai/pricing/") == "pricing"
     assert infer_page_purpose("https://x.example/plans") == "pricing"
     assert infer_page_purpose("https://x.example/contact") == "lead_generation"
+
+
+def test_cta_extractor_ignores_site_chrome():
+    from bs4 import BeautifulSoup
+    from app.services.semantic_builder import extract_cta_buttons
+
+    html = """
+    <button aria-label="Toggle theme">Toggle theme</button>
+    <button class="menu-btn" aria-expanded="false">Menu</button>
+    <button>Accept cookies</button>
+    <button>Book a Free 30-Min Call</button>
+    <a class="btn-primary" href="/trial">Start Your Free Trial</a>
+    <button>Next</button>
+    """
+    assert extract_cta_buttons(BeautifulSoup(html, "html.parser")) == ["Book a Free 30-Min Call", "Start Your Free Trial"]
