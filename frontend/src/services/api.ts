@@ -170,6 +170,36 @@ export interface Image {
   created_at: string;
 }
 
+/** One Lighthouse run from Google PageSpeed Insights. */
+export interface PageSpeedResult {
+  url: string;
+  strategy: "mobile" | "desktop" | string;
+  performance_score: number | null;
+  lighthouse_version?: string | null;
+  fcp_ms?: number | null;
+  lcp_ms?: number | null;
+  tbt_ms?: number | null;
+  speed_index_ms?: number | null;
+  server_response_ms?: number | null;
+  cls?: number | null;
+  /** Chrome UX Report field data; null when the site has too little traffic. */
+  field?: {
+    overall_category?: string;
+    lcp_ms?: number | null;
+    inp_ms?: number | null;
+    cls?: number | null;
+    ttfb_ms?: number | null;
+  } | null;
+}
+
+export interface PageSpeedData {
+  source: string;
+  fetched_at: string;
+  keyed?: boolean;
+  results: PageSpeedResult[];
+  errors: string[];
+}
+
 export interface CrawlReport {
   crawl_id: string;
   crawl_name?: string;
@@ -196,6 +226,8 @@ export interface CrawlReport {
       target?: string;
       url?: string;
     }>;
+    /** Google PageSpeed Insights (Lighthouse) for the start page and top pages. */
+    pagespeed?: PageSpeedData | null;
     page_audits?: Array<{
       url: string;
       title: string;
@@ -217,7 +249,17 @@ export interface CrawlReport {
         };
         h1: { status: string; value?: string };
         content_depth: { status: string; word_count?: number; detail?: string };
-        response_time: { status: string; ms?: number };
+        // Server time to first byte (median of samples) on Google's TTFB
+        // bands: pass / slow / poor. Not visitor-side performance; see
+        // `pagespeed` for Lighthouse.
+        response_time: {
+          status: string;
+          ms?: number;
+          metric?: "ttfb" | "fetch";
+          samples?: number;
+          redirect_ms?: number;
+          target?: string;
+        };
         status_code: { status: string; code?: number };
       };
       issue_count: number;
@@ -235,6 +277,9 @@ export interface CrawlReport {
       h1_pass_rate: number;
       content_pass_rate: number;
       performance_pass_rate: number;
+      performance_metric?: "ttfb" | "fetch";
+      performance_target?: string;
+      pagespeed_mobile_score?: number | null;
       total_findings: number;
       findings_by_severity: { high: number; medium: number; low: number };
     };

@@ -214,6 +214,14 @@ All authenticated routes use the `ProtectedRoute` wrapper:
 - Broken-link HEAD probes: one per unique URL, `MAX_LINK_CHECKS_PER_CRAWL = 200`.
 - User agent is `BOT_USER_AGENT` (`CushLabsBot/1.0 (+https://scraper.cushlabs.ai/bot.html)`); browser-impersonating strings are rejected with 422. The bot page is `frontend/public/bot.html` and the prod smoke test checks it.
 
+### 1b. Performance data: what is measured and what is claimed
+
+Since 2026-10-20 (before that, the report called a 97/100 Lighthouse site "critical" from one HTTP fetch):
+
+- **Visitor-side performance = Google PageSpeed Insights (Lighthouse).** `backend/app/services/pagespeed.py` runs it for the start page (mobile + desktop) and up to 3 primary pages during the crawl; stored on `crawls.pagespeed`, shown in `PageSpeedCard.tsx`, quoted to the AI as the authority. Free; key `PAGESPEED_API_KEY` (restricted to pagespeedonline.googleapis.com, lives only in the VPS env file) raises the quota to 25k/day; without a key it still works at a low rate.
+- **Server response time = median TTFB**, measured against the final URL with redirects timed separately (`pages.ttfb_ms`, `redirect_ms`, `ttfb_samples`, `final_url`), re-sampled twice at the end of the crawl with the link checker idle (`Crawler._resample_response_times`). Graded on Google's TTFB bands in `backend/app/core/performance.py` (pass < 800 ms, slow < 1800 ms, poor above); severity never above medium; findings say "measured from our US-East server". `pages.response_time` (whole fetch) is kept only as the fallback for old rows.
+- The apex and its `www.` form, plus wherever the start URL redirects, are one site (`Crawler.internal_hosts`); links resolve against `final_url`. A start URL that redirects produces one low-severity finding, not a per-page penalty.
+
 ### 2. User Tier System
 
 **Users have tier-based access**:
@@ -667,7 +675,7 @@ https://deepwiki.com/RCushmaniii/ai-resume-tailor
 
 ---
 
-**Last Updated**: October 19, 2026
+**Last Updated**: October 20, 2026
 **Maintained By**: Claude (Anthropic) + CushLabs Team
 
 ## Session Log

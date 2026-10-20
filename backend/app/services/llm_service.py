@@ -679,7 +679,10 @@ PASS RATES:
 - Meta descriptions: {stats.get('meta_pass_rate', 0)}% pass (target: 120-160 chars)
 - H1 tags: {stats.get('h1_pass_rate', 0)}% present
 - Content depth: {stats.get('content_pass_rate', 0)}% pass (300+ words)
-- Response time: {stats.get('performance_pass_rate', 0)}% pass (<1000ms)
+- Server response time (TTFB, median of samples, measured from our US-East server; a server-side hint, not visitor-side performance): {stats.get('performance_pass_rate', 0)}% under 800ms
+
+GOOGLE PAGESPEED INSIGHTS (Lighthouse) - THE AUTHORITY ON PERFORMANCE. Any performance verdict in your narrative must follow these scores; do not call a site slow when Lighthouse scores it 90+ even if server response time is flagged:
+{site_data.get('pagespeed_summary', 'Not available for this crawl.')}
 
 TOTALS: {site_data.get('total_pages', 0)} pages | {site_data.get('total_issues', 0)} issues | {site_data.get('broken_links', 0)} broken links | {site_data.get('images_missing_alt', 0)}/{site_data.get('total_images', 0)} images missing alt
 HTTP: {status_summary.get('2xx', 0)} OK | {status_summary.get('4xx', 0)} errors | Avg response: {site_data.get('avg_response_time_ms', 0)}ms

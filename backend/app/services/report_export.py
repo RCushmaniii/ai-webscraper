@@ -298,10 +298,29 @@ def generate_pdf_report(report_data: Dict[str, Any], crawl_data: Dict[str, Any])
         elements.append(Paragraph("Recommended Action Plan", styles["h2"]))
         elements.append(Paragraph(action_plan, styles["body"]))
 
+    # --- GOOGLE PAGESPEED (Lighthouse) ---
+    pagespeed = report_data.get("pagespeed") or {}
+    if pagespeed.get("results"):
+        elements.append(Paragraph("Performance (Google PageSpeed Insights)", styles["h2"]))
+        for r in pagespeed["results"]:
+            bits = [f"<b>{r.get('performance_score', '?')}/100</b> {r.get('strategy', '')} &mdash; {r.get('url', '')}"]
+            if r.get("lcp_ms") is not None:
+                bits.append(f"LCP {r['lcp_ms'] / 1000:.1f} s")
+            if r.get("cls") is not None:
+                bits.append(f"CLS {r['cls']}")
+            if r.get("tbt_ms") is not None:
+                bits.append(f"TBT {r['tbt_ms']} ms")
+            elements.append(Paragraph(", ".join(bits), styles["body"]))
+        elements.append(Paragraph(
+            "Lighthouse scores are the visitor-side measure of performance. The 'Server' column below is "
+            "server time to first byte measured from our US-East server (median of several samples).",
+            styles["body"],
+        ))
+
     # --- PAGE AUDIT TABLE ---
     if page_audits:
         elements.append(Paragraph("Page-by-Page Audit", styles["h2"]))
-        header = ["Page", "Score", "Title", "Meta", "H1", "Content", "Speed", "Issues"]
+        header = ["Page", "Score", "Title", "Meta", "H1", "Content", "Server", "Issues"]
         rows = [header]
         for pa in page_audits[:50]:  # Cap at 50 rows for PDF readability
             url_path = pa.get("url", "").split("//", 1)[-1].split("/", 1)[-1] or "/"
@@ -402,9 +421,11 @@ def generate_csv_export(report_data: Dict[str, Any], export_type: str) -> str:
         page_audits = report_data.get("page_audits", [])
         writer = csv.writer(output)
         writer.writerow(["URL", "Score", "Title Status", "Meta Status", "H1 Status",
-                         "Content Status", "Speed Status", "Issue Count"])
+                         "Content Status", "Server Response Status", "Server Response (ms, median TTFB)",
+                         "Issue Count"])
         for pa in page_audits:
             checks = pa.get("checks", {})
+            rt = checks.get("response_time", {})
             writer.writerow([
                 pa.get("url", ""),
                 pa.get("score", 0),
@@ -412,7 +433,8 @@ def generate_csv_export(report_data: Dict[str, Any], export_type: str) -> str:
                 checks.get("meta_description", {}).get("status", ""),
                 checks.get("h1", {}).get("status", ""),
                 checks.get("content_depth", {}).get("status", ""),
-                checks.get("response_time", {}).get("status", ""),
+                rt.get("status", ""),
+                rt.get("ms", ""),
                 pa.get("issue_count", 0),
             ])
 

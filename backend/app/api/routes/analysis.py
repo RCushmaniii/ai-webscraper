@@ -16,6 +16,23 @@ from app.services.llm_service import LLMService, TaskDisabledError, BudgetExceed
 from app.services.content_analyzer import ContentAnalyzer, quick_analyze_url
 from app.services.semantic_builder import build_semantic_skeleton, build_voice_fingerprint
 from app.core.llm_config import get_llm_settings, LLMTask, get_task_config, is_task_enabled
+from app.core.performance import (
+    MEASUREMENT_NOTE,
+    STATUS_PASS,
+    STATUS_POOR,
+    STATUS_SLOW,
+    TTFB_TARGET_TEXT,
+    classify_ttfb,
+    page_response_ms,
+    response_metric_name,
+    sample_count,
+)
+from app.services.pagespeed import headline as pagespeed_headline
+from app.services.report_findings import (
+    pagespeed_findings,
+    pagespeed_summary_text,
+    redirect_findings,
+)
 from app.core.auth import get_current_user, get_auth_client
 from app.models.models import User
 
@@ -418,7 +435,8 @@ async def generate_crawl_report(
         pages_response = supabase_client.table("pages").select(
             "id, url, title, meta_description, status_code, content_length, word_count, "
             "response_time, content_type, seo_score, h1_tags, h2_tags, internal_links, "
-            "external_links, images, nav_score, is_primary, depth"
+            "external_links, images, nav_score, is_primary, depth, "
+            "final_url, ttfb_ms, redirect_ms, ttfb_samples"
         ).eq("crawl_id", crawl_id).execute()
         pages = pages_response.data or []
 
@@ -1010,8 +1028,8 @@ async def generate_crawl_report(
                 problems.append("Thin content")
             if not page.get("title") or page.get("title") == "No title found":
                 problems.append("Missing title")
-            if page.get("response_time") and page.get("response_time") > 3000:
-                problems.append("Slow load time")
+            if classify_ttfb(page_response_ms(page)) == STATUS_POOR:
+                problems.append("Slow server response")
 
             if problems:
                 problem_pages.append({
@@ -1042,7 +1060,7 @@ async def generate_crawl_report(
             meta_len = seo.get("meta_description_length") or len(meta)
             h1 = seo.get("h1") or ""
             word_count = page.get("word_count") or 0
-            resp_time = page.get("response_time") or 0
+            resp_time = page_response_ms(page)
             status = page.get("status_code") or 0
 
             # Grade each dimension
@@ -1070,9 +1088,17 @@ async def generate_crawl_report(
                 "word_count": word_count,
                 "detail": f'{word_count} words' + (" (thin)" if 0 < word_count < 300 else ""),
             }
+            # Server time to first byte, median of the crawler's samples, on
+            # Google's TTFB bands. Never "critical": one server-side reading
+            # is not a verdict on the site (2026-10-20). Visitor-side
+            # performance is report_data["pagespeed"] (Lighthouse).
             checks["response_time"] = {
-                "status": "pass" if resp_time < 1000 else ("slow" if resp_time < 3000 else "critical"),
+                "status": classify_ttfb(resp_time),
                 "ms": round(resp_time),
+                "metric": response_metric_name(page),
+                "samples": sample_count(page),
+                "redirect_ms": page.get("redirect_ms") or 0,
+                "target": TTFB_TARGET_TEXT,
             }
             checks["status_code"] = {
                 "status": "pass" if 200 <= status < 400 else "fail",
@@ -1088,8 +1114,8 @@ async def generate_crawl_report(
             if checks["h1"]["status"] == "missing": score -= 15
             if checks["content_depth"]["status"] == "thin": score -= 10
             elif checks["content_depth"]["status"] == "empty": score -= 20
-            if checks["response_time"]["status"] == "slow": score -= 5
-            elif checks["response_time"]["status"] == "critical": score -= 15
+            if checks["response_time"]["status"] == STATUS_SLOW: score -= 5
+            elif checks["response_time"]["status"] == STATUS_POOR: score -= 10
             if checks["status_code"]["status"] == "fail": score -= 25
 
             page_audits.append({
@@ -1169,17 +1195,36 @@ async def generate_crawl_report(
                 "url": pa["url"],
             })
 
-        # Performance findings
-        slow_pages = [pa for pa in page_audits if pa["checks"]["response_time"]["status"] != "pass"]
+        # Server response findings. Wording says what was measured and from
+        # where; severity tops out at medium because a server-side reading
+        # from one location is a hint, not a verdict. Lighthouse (below) is
+        # the performance authority.
+        slow_pages = [pa for pa in page_audits if pa["checks"]["response_time"]["status"] != STATUS_PASS]
         for pa in slow_pages:
+            rt = pa["checks"]["response_time"]
+            n = rt.get("samples", 1)
+            basis = f"median of {n} samples" if n > 1 else "single sample"
             data_findings.append({
                 "category": "Performance",
-                "severity": "high" if pa["checks"]["response_time"]["status"] == "critical" else "medium",
-                "finding": f'Slow response on {pa["url"]}: {pa["checks"]["response_time"]["ms"]}ms',
-                "current_value": pa["checks"]["response_time"]["ms"],
-                "target": "Under 1000ms",
+                "severity": "medium" if rt["status"] == STATUS_POOR else "low",
+                "finding": (
+                    f'Server response time on {pa["url"]}: {rt["ms"]} ms '
+                    f'({basis}, {MEASUREMENT_NOTE})'
+                ),
+                "current_value": rt["ms"],
+                "target": TTFB_TARGET_TEXT,
                 "url": pa["url"],
             })
+
+        # Redirects: the start URL landing on another host (apex -> www) is
+        # worth one line; internal links that redirect are a real SEO cost.
+        for f in redirect_findings(crawl.get("url", ""), pages):
+            data_findings.append(f)
+
+        # Google PageSpeed (Lighthouse): a finding only when it is actually
+        # poor, so a 97/100 site is not told to "optimize performance".
+        for f in pagespeed_findings(crawl.get("pagespeed")):
+            data_findings.append(f)
 
         # Broken link findings
         for bl in broken_links[:15]:
@@ -1245,7 +1290,10 @@ async def generate_crawl_report(
             "meta_pass_rate": round(len([pa for pa in page_audits if pa["checks"]["meta_description"]["status"] == "pass"]) / total_pages * 100) if total_pages else 0,
             "h1_pass_rate": round(len([pa for pa in page_audits if pa["checks"]["h1"]["status"] == "pass"]) / total_pages * 100) if total_pages else 0,
             "content_pass_rate": round(len([pa for pa in page_audits if pa["checks"]["content_depth"]["status"] == "pass"]) / total_pages * 100) if total_pages else 0,
-            "performance_pass_rate": round(len([pa for pa in page_audits if pa["checks"]["response_time"]["status"] == "pass"]) / total_pages * 100) if total_pages else 0,
+            "performance_pass_rate": round(len([pa for pa in page_audits if pa["checks"]["response_time"]["status"] == STATUS_PASS]) / total_pages * 100) if total_pages else 0,
+            "performance_metric": "ttfb" if any(p.get("ttfb_ms") for p in pages) else "fetch",
+            "performance_target": TTFB_TARGET_TEXT,
+            "pagespeed_mobile_score": (pagespeed_headline(crawl.get("pagespeed")) or {}).get("performance_score"),
             "total_findings": len(data_findings),
             "findings_by_severity": {
                 "high": len([f for f in data_findings if f["severity"] == "high"]),
@@ -1393,6 +1441,7 @@ async def generate_crawl_report(
             "total_issues": len(issues),
             "summary_stats": summary_stats,
             "data_findings": findings_text,
+            "pagespeed_summary": pagespeed_summary_text(crawl.get("pagespeed")),
             "page_audits_summary": "\n".join([
                 f"  {pa['url']}: score {pa['score']}/100, {pa['issue_count']} issues"
                 + (f" — {', '.join(pa['issues'][:2])}" if pa['issues'] else "")
@@ -1482,6 +1531,9 @@ async def generate_crawl_report(
             "data_findings": data_findings,
             "page_audits": page_audits,
             "summary_stats": summary_stats,
+
+            # --- Google PageSpeed Insights (Lighthouse), collected by the worker ---
+            "pagespeed": crawl.get("pagespeed"),
 
             # --- Metrics (consumed by frontend Crawl Metrics widget) ---
             "metrics": {

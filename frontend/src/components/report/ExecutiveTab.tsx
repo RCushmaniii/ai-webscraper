@@ -10,6 +10,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { CrawlReport } from "../../services/api";
+import PageSpeedCard from "./PageSpeedCard";
 
 interface ExecutiveTabProps {
   report: CrawlReport;
@@ -305,6 +306,9 @@ const ExecutiveTab: React.FC<ExecutiveTabProps> = ({ report }) => {
           </div>
         </div>
 
+        {/* Google PageSpeed (Lighthouse): the visitor-side performance measure */}
+        <PageSpeedCard pagespeed={r.pagespeed} />
+
         {/* SEO Pass Rates */}
         {r.summary_stats && (
           <div className="bg-white rounded-lg border border-gray-200 p-6">
@@ -332,9 +336,9 @@ const ExecutiveTab: React.FC<ExecutiveTabProps> = ({ report }) => {
                   target: "300+ words",
                 },
                 {
-                  label: "Response Time",
+                  label: "Server Response",
                   rate: r.summary_stats.performance_pass_rate,
-                  target: "<1000ms",
+                  target: "<800ms TTFB",
                 },
               ].map((item) => (
                 <div key={item.label} className="text-center">

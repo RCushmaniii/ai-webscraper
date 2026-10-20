@@ -1,6 +1,6 @@
 import logging
 import asyncio
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from uuid import UUID, uuid4
 from datetime import datetime
 from supabase import create_client
@@ -8,6 +8,7 @@ from supabase import create_client
 from app.core.config import settings
 from app.models.models import Crawl, CrawlCreate
 from app.services.crawler import Crawler
+from app.services.pagespeed import MAX_EXTRA_PAGES, merge_pagespeed, pagespeed_for_urls
 from app.db.supabase import supabase_client
 
 # Configure logging
@@ -21,6 +22,36 @@ logging.getLogger("httpcore").setLevel(logging.WARNING)
 service_client = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY)
 
 logger.info("Service client initialized")
+
+
+async def _collect_pagespeed(crawl_id: str, start_task: "asyncio.Task", pages_saved: int) -> Optional[Dict[str, Any]]:
+    """Await the start-page Lighthouse task and add the top primary pages.
+    Never raises; a crawl is never failed over PageSpeed."""
+    try:
+        extra: List[str] = []
+        if pages_saved > 0:
+            rows = (
+                service_client.table("pages")
+                .select("url, final_url, nav_score, depth")
+                .eq("crawl_id", crawl_id)
+                .eq("is_primary", True)
+                .eq("status_code", 200)
+                .gt("depth", 0)
+                .order("nav_score", desc=True)
+                .limit(MAX_EXTRA_PAGES)
+                .execute()
+                .data
+                or []
+            )
+            extra = [r.get("final_url") or r["url"] for r in rows]
+        start_result = await asyncio.wait_for(start_task, timeout=180)
+        extra_result = await pagespeed_for_urls(None, extra) if extra else None
+        return merge_pagespeed(start_result, extra_result)
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"PageSpeed collection failed for crawl {crawl_id}: {e}")
+        if not start_task.done():
+            start_task.cancel()
+        return None
 
 
 async def crawl_site(crawl_id: str) -> Dict[str, Any]:
@@ -75,6 +106,11 @@ async def crawl_site(crawl_id: str) -> Dict[str, Any]:
 
         # 3. Instantiate Crawler with the model and service client (bypasses RLS)
         crawler = Crawler(crawl=crawl_model, db_client=service_client)
+
+        # Google PageSpeed (Lighthouse) for the start page runs alongside the
+        # crawl: it is Google fetching the site, not us, so it costs the
+        # target nothing extra and is usually done before the crawl is.
+        pagespeed_start = asyncio.create_task(pagespeed_for_urls(crawl_model.url))
 
         # 4. Run the crawl
         await crawler.start()
@@ -167,6 +203,11 @@ async def crawl_site(crawl_id: str) -> Dict[str, Any]:
             else:
                 # Clean run — clear any stale error from a prior re-run attempt.
                 final_update["error"] = None
+
+        # 4.5 PageSpeed for the start page (already running) plus up to three
+        # primary pages. Stored before the crawl is marked done so a report
+        # generated the moment it completes already has Lighthouse data.
+        final_update["pagespeed"] = await _collect_pagespeed(crawl_id, pagespeed_start, pages_saved)
 
         service_client.table("crawls").update(final_update).eq("id", crawl_id).execute()
 

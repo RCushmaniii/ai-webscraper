@@ -144,6 +144,9 @@ class Settings(BaseSettings):
 
     # Firecrawl API (JS rendering fallback for SPA pages)
     FIRECRAWL_API_KEY: str = os.getenv("FIRECRAWL_API_KEY", "")
+    # Google PageSpeed Insights (Lighthouse). Free; optional - without a key
+    # the API still answers at a lower quota. See services/pagespeed.py.
+    PAGESPEED_API_KEY: str = os.getenv("PAGESPEED_API_KEY", "")
 
     # Storage settings
     STORAGE_DIR: str = os.getenv("STORAGE_DIR", os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "storage"))

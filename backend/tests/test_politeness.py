@@ -58,6 +58,16 @@ def quiet_crawler(make_crawler, **overrides):
     """A Crawler whose persistence and side-channel calls are mocked, with a mock httpx client."""
     crawler = make_crawler(**overrides)
     crawler.client = MagicMock()
+    # The crawler fetches pages with build_request + send(stream=True) so it
+    # can time headers separately from the body (2026-10-20). Route that
+    # through client.get so tests keep scripting responses on `get` and
+    # asserting on its calls.
+    crawler.client.build_request = lambda method, url, **kw: httpx.Request(method, url)
+
+    async def _send(request, stream=False, **kw):
+        return await crawler.client.get(str(request.url))
+
+    crawler.client.send = AsyncMock(side_effect=_send)
     crawler.client.aclose = AsyncMock()
     crawler._verify_crawl_exists = AsyncMock(return_value=True)
     crawler._save_page_to_db = AsyncMock()
