@@ -4,6 +4,31 @@ Entries are newest-first. Each entry documents one Claude Code working session.
 
 ---
 
+## Session: 2026-10-20 (afternoon: messaging review made honest; PR #114)
+
+### Accomplished
+
+- **Robert's CushLabs assistant reviewed the Content & Brand tab and found it generic**: six unlike pages with the identical 75/80/70 sub-scores, advice to add a value proposition and CTA already on the page, Title Case heading rewrites on a sentence-case site, a suggested meta that dropped the MXN price, no quoted copy anywhere. Verified in code: gpt-4o-mini, 600 output tokens, fed a skeleton (H1, up to 10 H2s, first sentence of 8 paragraphs, button labels, URL-guessed purpose), no rubric, no evidence field, and a prompt whose own rules ("do not penalise absence of urgency", "cite actual copy") the model ignored. The scores were not a code fallback; each page's prose was distinct.
+- **Decision (operating vision applied):** small fix, not a rebuild. The tab had no revenue hypothesis and was a credibility leak in a client-facing report; removing wrong numbers protects what pays, a rubric rebuild would not provably differentiate. Robert: "small fix".
+- **PR #114:** scores stripped before storage and from the UI; `strategy_evidence.py` evidence gate (model must quote verbatim; Python verifies against the skeleton; unverified pages lose gaps/issues/suggestions/recommendation and show "no verifiable note"); tab relabelled "Messaging Review, AI reading, not a score" with the quoted lines shown above each note; prompt forbids recommending what is already present, changing heading case, adding urgency, dropping currency/market; `pricing` is its own page purpose; executive narrative gets recommendations with their quote and no scores; health score content pillar no longer blends a strategy score.
+- Tests: backend 231 (6 new), frontend 55, tsc + build clean. Deployed both tiers; report regenerated on the verification crawl from the server to confirm the gate.
+
+### Decisions Made
+
+- A content-strategy number returns only if computed from counted signals with a published rubric (recorded in CLAUDE.md).
+- Descriptive prose (detected tone, assessment) is kept but hidden in the UI when a page has no verified quote.
+
+### Immediate Next Steps
+
+- [ ] Upstash limiter still failing open (unchanged): https://console.upstash.com/redis usage check.
+
+### Technical Debt
+
+- `batches.py` references a non-existent `batch.rate_limit` (dead route).
+- Prod smoke test performs no write.
+
+---
+
 ## Session: 2026-10-20 (performance findings were wrong: PageSpeed Insights + honest TTFB; PR #113)
 
 ### Accomplished
