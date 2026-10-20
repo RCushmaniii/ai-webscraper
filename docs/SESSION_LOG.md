@@ -4,6 +4,35 @@ Entries are newest-first. Each entry documents one Claude Code working session.
 
 ---
 
+## Session: 2026-10-20 (crawl creation broken since PR #110: INTEGER column vs float; 5xx contract)
+
+### Accomplished
+
+- **Root cause of the broken crawl creation found and fixed in production.** With the 422 handler deployed, Robert's retry produced a 500 whose toast read the raw Postgres dict: `invalid input syntax for type integer: "1.0"` (22P02). PR #110 restored `float(rate_limit)` in `create_crawl` (the `int()` cast from 0864680 had turned 0.5 req/s into 0 and the limiter divided by zero), but `crawls.rate_limit` was created as `INTEGER` in `20251216000359_init_schema.sql`. So every crawl creation since the politeness release failed at the insert. Not caught by tests because the DB is mocked; not caught by the smoke test because it never creates a crawl.
+- **Migration `20261020030000_rate_limit_numeric.sql`** widens `crawls.rate_limit` and `batches.rate_limit` to `NUMERIC(5,2)`. Applied with `supabase db push` (column type read before/after via the PostgREST OpenAPI from inside the container: integer -> numeric), then verified with a throwaway insert of 1.0 and 0.5 under Robert's user id, deleted in the same script. Crawl creation worked in production again before the PR was even opened.
+- **5xx contract** (`app/core/errors.py`, PR #112): every `HTTPException` >= 500 and every uncaught exception now returns `{"detail": "Something went wrong on our side. ...", "error_id": "<8 hex>"}`; the cause is logged as `Server error <id> on POST /path: ...`. Status code and headers preserved; 4xx sentences untouched. The request-logging middleware's catch-all returns the same shape. ~45 route-level `detail=f"...{e}"` strings are now log-only.
+- **SPA**: `apiError.ts` ignores any 5xx body except `error_id` ("Reference: ..."); the axios client retries only GET/HEAD/OPTIONS (it had re-sent the failing crawl POST three times; a POST that reached the server may already have created the crawl and used a free-tier slot).
+- Tests: backend 206 (3 new), frontend 53 (2 new), tsc + build clean.
+
+### Decisions Made
+
+- Change the column, not the code: the form (step 0.1), the Pydantic model (float, ge=0.1) and the crawler's limiter all want fractions; the INTEGER column was the one outlier, and the two code-side "fixes" each broke production in turn.
+- A 5xx never carries words from a driver, Postgres or an upstream API. The reference id replaces them for the user; the log keeps the cause.
+- Retries are restricted by method, not removed: GET retries still smooth over transient 502s during a container restart.
+
+### Immediate Next Steps
+
+- [ ] Robert's own confirmation of a crawl created from the form (the only step that cannot be run from here: it needs his browser session). Server-side proof already exists.
+- [ ] Upstash still reports "temporarily rate-limited" on every mutating request, so the API limiter fails open. Check usage at https://console.upstash.com/redis and give this app its own database if the free quota is shared.
+
+### Technical Debt
+
+- Still open: the original 422s at 01:09 UTC never reproduced (the same payload passes validation now); the handler from #111 will name the field if it recurs.
+- The prod smoke test never exercises a write. A create-and-delete crawl probe with a service token would have caught this class of failure within hours instead of at Robert's next click.
+- `batches.py` references `batch.rate_limit` on a model that has no such field (batch creation is dead code).
+
+---
+
 ## Session: 2026-10-19 (evening: unexplained 422 on crawl creation; error contract, dependency lock, CSP fix)
 
 ### Accomplished
