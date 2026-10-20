@@ -18,15 +18,26 @@ SERVICE="webscraper"
 
 cd "$(dirname "$0")/.."
 git fetch -q origin main
-EXPECTED="${1:-$(git rev-parse origin/main)}"
+# Accept a short SHA too: the GitHub API only matches full ones, and a 7-char
+# argument made this script abort with "no run found" on 2026-10-19.
+EXPECTED="$(git rev-parse --verify "${1:-origin/main}^{commit}")"
 
 echo "Expecting backend version: $EXPECTED"
 
 # Make sure CI has actually published the image for this SHA before pulling.
-run_id="$(gh run list --workflow build-image.yml --branch main --limit 1 --json databaseId,headSha,status,conclusion \
-  --jq "map(select(.headSha==\"$EXPECTED\")) | .[0].databaseId // empty")"
+# Actions can take a minute or two to schedule the run after a merge, so poll
+# instead of aborting on the first miss, and look past the newest run in case
+# another push landed on main in between.
+run_id=""
+for attempt in $(seq 1 12); do
+  run_id="$(gh run list --workflow build-image.yml --branch main --limit 10 --json databaseId,headSha \
+    --jq "map(select(.headSha==\"$EXPECTED\")) | .[0].databaseId // empty")"
+  [ -n "$run_id" ] && break
+  echo "No 'Build & push image' run for $EXPECTED yet (attempt $attempt/12); waiting 15s ..."
+  sleep 15
+done
 if [ -z "$run_id" ]; then
-  echo "No 'Build & push image' run found for $EXPECTED yet — did the push only touch docs? Aborting." >&2
+  echo "No 'Build & push image' run found for $EXPECTED after 3 minutes — did the push only touch docs? Aborting." >&2
   exit 1
 fi
 echo "Waiting for image build run $run_id ..."

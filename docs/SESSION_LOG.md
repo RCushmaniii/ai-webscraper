@@ -4,6 +4,42 @@ Entries are newest-first. Each entry documents one Claude Code working session.
 
 ---
 
+## Session: 2026-10-19 (evening: unexplained 422 on crawl creation; error contract, dependency lock, CSP fix)
+
+### Accomplished
+
+- **PR #111 merged and deployed (2e5025b), smoke green on both tiers.** Robert's first crawl of www.cushlabs.ai after the politeness release was refused with a 422 and the toast read axios's "Request failed with status code 422". He called it out as unacceptable for a user-facing product; the fix makes that class of failure impossible to hide again.
+- **Root-cause investigation (still open at close):** the production log proved the route body never ran, so the 422 is FastAPI request validation, not the new user-agent check. The exact form payload returns 200 through TestClient, through a real uvicorn with production's package set rebuilt locally, and inside the live container on the VPS. The cause therefore lives in the live request itself; after this deploy the next rejection names its field in both the toast and `docker logs webscraper` ("Validation rejected POST /api/v1/crawls/: field: reason").
+- **Error contract** (`backend/app/core/errors.py`): RequestValidationError handler logs field + reason (never the value) and returns `{"detail": [{loc,msg,type}], "message": "field: reason"}`. The default body used to echo `input` back to the client.
+- **Frontend** (`src/lib/apiError.ts`): `getApiErrorMessage(err, fallback, labels)` renders 422 lists with form labels, string/structured details, 429/5xx/network cases; never an axios message or status code. Wired into CrawlNewPage, CrawlDetailPage, ReportPanel. The crawl form trims URL/name/user agent before sending.
+- **Dependency lock** (`backend/constraints.txt`, `-c constraints.txt` in Dockerfile and CI, `scripts/lock-backend-deps.sh`): the image built this afternoon had resolved 45 packages newer than any dev machine (starlette 0.52 -> 1.9, anyio, h11, httpx, openai 1.109 vs local 2.26 ...). Pinned to the set the suite and production ran on.
+- **CSP fix, live on the VPS:** the Caddyfile's `connect-src` omitted `https://vitals.cushlabs.ai`, so every Web Vitals report had been blocked by the browser since the tracker was added. Added with backup (`/etc/caddy/Caddyfile.bak-20261019-csp`), `caddy validate`, reload. `scripts/smoke-prod.sh` now fails if it regresses.
+- **Test hygiene:** `tests/conftest.py` resets the in-memory rate limiter per test; the suite's cumulative POSTs (one identity, `ip:testclient`) had started to 429 later tests once more route tests were added.
+- **Deploy script:** `scripts/deploy-backend.sh` now accepts a short SHA and polls up to 3 minutes for the image-build run instead of aborting on the first miss (both bit this evening).
+- Tests: backend 203 green (12 new), frontend tsc + 51 vitest (11 new) + build.
+
+### Decisions Made
+
+- Keep FastAPI's `detail` list shape (minus `input`/`ctx`/`url`) and add a top-level `message`; field labels are applied client-side where the form knows them.
+- Pin via a constraints file rather than fully pinning requirements.txt: direct deps and their floors stay readable, Dependabot keeps bumping them, and the lock is regenerated inside python:3.12-slim so Linux-only markers match the image.
+- Reverted prettier's whole-file reformat of CrawlDetailPage.tsx and ReportPanel.tsx (2,000+ cosmetic lines) and applied only the three real edits.
+
+### Immediate Next Steps
+
+- [ ] Robert retries the crawl (Start URL `https://www.cushlabs.ai`, defaults). Read `docker logs webscraper | grep "Validation rejected"` for the field, then fix the actual cause.
+- [ ] Upstash reports "Your database has been temporarily rate-limited" on every mutating request, so the API limiter is failing open (by design). Check the Upstash console usage for the shared database; if another project is consuming the free quota, give this app its own database.
+
+### Technical Debt
+
+- `_is_private_ip` SSRF checks still only cover sitemap URLs (carried over).
+- `openai` in production is 1.109.1 while local dev has 2.26.0; the constraints file now freezes production at 1.109.1. Any move to the 2.x SDK is a deliberate bump in requirements.txt + regenerated lock.
+
+### Open Questions / Blockers
+
+- The live request's 422 reason: unknown until the next submission lands with the new handler deployed.
+
+---
+
 ## Session: 2026-10-19 (crawler politeness: robots.txt, backoff, honest bot identity; Google sign-in restored)
 
 ### Accomplished
