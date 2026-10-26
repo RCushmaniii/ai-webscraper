@@ -19,6 +19,14 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/*
 
+# Unprivileged runtime user (uid 1000 matches the `deploy` user on the Hetzner
+# box). The only runtime write path is STORAGE_DIR (/app/storage), which in
+# production is the `webscraper-storage` volume. That volume must be owned by
+# uid 1000: it was chowned on the box on 2026-10-26, and a fresh host needs
+#   docker run --rm -v cushlabs-prod-server_webscraper-storage:/d alpine chown -R 1000:1000 /d
+# before the first start, or init_db's create_storage_directories() fails.
+RUN useradd --create-home --uid 1000 --user-group --shell /usr/sbin/nologin app
+
 # Copy requirements first for better layer caching.
 # constraints.txt pins every transitive package to the versions the test
 # suite ran against. Without it each image build re-resolved the open
@@ -40,6 +48,12 @@ ENV APP_VERSION=${GIT_SHA}
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+
+# When STORAGE_DIR is not a mounted volume (plain `docker run`), the app must
+# still be able to create it under /app.
+RUN mkdir -p /app/storage && chown app:app /app/storage
+
+USER app
 
 EXPOSE 10000
 
