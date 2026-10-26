@@ -4,6 +4,30 @@ Entries are newest-first. Each entry documents one Claude Code working session.
 
 ---
 
+## Session: 2026-10-26 (backend container runs as non-root; PR #116)
+
+**Outcome:** PR #116 merged and deployed. The backend container runs as uid 1000 instead of root; the
+storage volume is owned by that user.
+
+### Accomplished
+
+- **Non-root container.** `backend/Dockerfile` creates an `app` user (uid 1000) and switches to it.
+  The only runtime write path is `STORAGE_DIR` (/app/storage), the `webscraper-storage` volume in
+  production. That volume was chowned to uid 1000 on the box immediately before the recreate, and
+  the Dockerfile documents the one-line chown a fresh host needs. For a plain `docker run` without a
+  volume the image pre-creates `/app/storage` owned by the app user.
+- **Deployed** via `cushlabs-prod-server/scripts/deploy-service.sh webscraper` (auto-rollback on
+  failed healthcheck). Live: `uid=1000`, healthy, https://scraper.cushlabs.ai/api/v1/health/ reports
+  version `012f96e` and environment `production`, storage writable, no permission errors in the log.
+  The compose service also carries `no-new-privileges` and `cap_drop: ALL` since prod-server PR #30.
+
+### Immediate Next Steps
+
+- [ ] None from this session. `scripts/smoke-prod.sh` will report drift until the next backend merge
+      only if the SHA check is strict; the health endpoint already shows the merged SHA.
+
+---
+
 ## Session: 2026-10-20 (afternoon: messaging review made honest; PR #114)
 
 ### Accomplished
